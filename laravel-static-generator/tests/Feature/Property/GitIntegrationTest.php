@@ -14,7 +14,7 @@ class GitIntegrationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->testRepoPath = storage_path('framework/testing/git_test');
+        $this->testRepoPath = '/tmp/laravel-static-generator-tests/git_test_' . uniqid('', true);
         if (!is_dir($this->testRepoPath)) {
             mkdir($this->testRepoPath, 0755, true);
         }

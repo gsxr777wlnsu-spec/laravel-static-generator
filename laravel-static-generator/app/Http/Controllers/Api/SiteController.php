@@ -214,7 +214,7 @@ class SiteController extends Controller
         return response()->json($deployment);
     }
 
-    public function importAndDeploy(int $id): JsonResponse
+    public function importAndDeploy(Request $request, int $id): JsonResponse
     {
         $site = $this->sites->findById($id);
 
@@ -223,37 +223,39 @@ class SiteController extends Controller
         }
 
         try {
-            // 1. Read import-deploy config file
-            $importFile = storage_path('import-deploy/md/test/contact-us.md');
+            $importRelativePath = trim((string) $request->input('import_path', 'import-deploy/md/test/contact-us.md'));
+            if ($importRelativePath === '' || str_contains($importRelativePath, '..')) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Invalid import_path',
+                    'message' => 'import_path must be a storage-relative path without ".."',
+                ], 422);
+            }
+
+            $importFile = storage_path($importRelativePath);
             if (!file_exists($importFile)) {
                 return response()->json(['error' => 'Import file not found: ' . $importFile], 404);
             }
 
-            $content = file_get_contents($importFile);
-            $config = \Symfony\Component\Yaml\Yaml::parse($content);
-
-            // 2. Update site with SFTP config from file
-            if (isset($config['sftp_host'])) {
-                $site->sftp_host = $config['sftp_host'];
-                $site->sftp_port = $config['sftp_port'] ?? 22;
-                $site->sftp_username = $config['sftp_username'];
-                $site->sftp_password = $config['sftp_password'];
-                $site->sftp_auth_method = $config['sftp_auth_method'] ?? 'Password';
-                $site->sftp_remote_path = $config['sftp_remote_path'];
-                $site->save();
-            }
-
-            // 3. Import pages from file (using the new config for site creation if needed)
+            // 1. Import pages and SFTP config from file.
             $importService = app(\App\Services\ImportService::class);
             $result = $importService->importFromMdFile($importFile, $site->id);
-            $page = $result['pages'][0];
+            $site = ($result['site'] ?? $site)->fresh() ?? $site->fresh() ?? $site;
+            $pagesCount = (int) ($result['pages_count'] ?? 0);
 
-            // 4. Generate HTML
-            $html = $this->generator->generatePage($page);
+            // 2. Generate full static site to prepare staging files for deployment.
+            $generation = $this->generator->generateSite($site);
+            if (($generation['success'] ?? false) !== true) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Generation failed',
+                    'generation_errors' => $generation['errors'] ?? [],
+                    'message' => 'HTML generation failed, deployment skipped.',
+                ], 422);
+            }
 
-            // 5. Test SFTP connection first
+            // 3. Test SFTP connection.
             $sftpConnected = $this->sftp->testConnection($site);
-            
             if (!$sftpConnected) {
                 return response()->json([
                     'success' => false,
@@ -262,9 +264,21 @@ class SiteController extends Controller
                 ], 400);
             }
 
-            // 6. Deploy to remote server
+            // 4. Deploy generated files.
             $deployment = $this->deploy->deploy($site);
-            
+            if ($deployment->status !== 'completed') {
+                return response()->json([
+                    'success' => false,
+                    'error' => $deployment->error_message ?: 'Deployment failed',
+                    'message' => 'Import & Deploy finished with deployment failure.',
+                    'site_id' => $site->id,
+                    'sftp_host' => $site->sftp_host,
+                    'remote_path' => $site->sftp_remote_path,
+                    'pages_count' => $pagesCount,
+                    'deployment' => $deployment,
+                ], 422);
+            }
+
             $this->audit->log('site.import_and_deployed', Site::class, $site->id);
 
             return response()->json([
@@ -273,11 +287,11 @@ class SiteController extends Controller
                 'site_id' => $site->id,
                 'sftp_host' => $site->sftp_host,
                 'remote_path' => $site->sftp_remote_path,
-                'pages_count' => 1,
+                'pages_count' => $pagesCount,
                 'deployment' => $deployment
             ]);
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
                 'error' => $e->getMessage(),

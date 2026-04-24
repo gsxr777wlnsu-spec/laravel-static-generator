@@ -21,7 +21,7 @@ class TemplateSet extends Model
 
     public function getAbsolutePath(): string
     {
-        return storage_path("app/templates/{$this->slug}");
+        return resource_path("views/templates/{$this->slug}");
     }
 
     public function validateStructure(): array
@@ -64,7 +64,7 @@ class TemplateSet extends Model
 
     public static function createFromDirectory(string $sourcePath, string $name, string $slug): self
     {
-        $targetPath = storage_path("app/templates/{$slug}");
+        $targetPath = resource_path("views/templates/{$slug}");
         
         if (File::exists($targetPath)) {
             throw new \Exception("Template set '{$slug}' already exists");
@@ -83,7 +83,7 @@ class TemplateSet extends Model
     public function clone(string $newName, string $newSlug): self
     {
         $sourcePath = $this->getAbsolutePath();
-        $targetPath = storage_path("app/templates/{$newSlug}");
+        $targetPath = resource_path("views/templates/{$newSlug}");
         
         if (File::exists($targetPath)) {
             throw new \Exception("Template set '{$newSlug}' already exists");

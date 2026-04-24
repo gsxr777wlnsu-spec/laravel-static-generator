@@ -62,7 +62,7 @@
                             Edit
                         </a>
                         <button type="button"
-                                class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                                class="cursor-pointer text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 focus:outline-none focus-visible:outline-none"
                                 onclick="deletePage({{ $page->id }}, '{{ addslashes($page->title) }}')">
                             Delete
                         </button>

@@ -48,7 +48,9 @@ class MediaController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'site_id' => 'required|exists:sites,id',
-            'file' => 'required|image|mimes:jpeg,jpg,png,gif,svg,webp|max:10240',
+            // Do not use `image|mimes` here: some TinyMCE WebP blobs fail extension guessing.
+            // MediaManagerService performs strict MIME validation.
+            'file' => 'required|file|max:10240',
             'alt' => 'required|string|max:255',
             'title' => 'nullable|string|max:255',
         ]);

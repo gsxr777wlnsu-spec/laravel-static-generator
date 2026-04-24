@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Contracts\DeployServiceInterface;
+use App\Contracts\HtmlGeneratorInterface;
 use App\Http\Controllers\Controller;
-use App\Services\DeployService;
-use App\Services\HtmlGeneratorService;
 use App\Services\ImportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,14 +13,14 @@ class ImportController extends Controller
 {
     public function __construct(
         private ImportService $importService,
-        private DeployService $deployService,
-        private HtmlGeneratorService $htmlGenerator
+        private DeployServiceInterface $deployService,
+        private HtmlGeneratorInterface $htmlGenerator
     ) {}
 
     public function import(Request $request): JsonResponse
     {
         $request->validate([
-            'file' => 'required|file|mimes:md,yaml,txt',
+            'file' => 'required|file|mimes:md,yaml,yml,txt',
         ]);
 
         try {
@@ -41,7 +41,7 @@ class ImportController extends Controller
                 ],
                 'pages_count' => $pagesCount,
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
                 'error' => $e->getMessage(),
@@ -52,7 +52,7 @@ class ImportController extends Controller
     public function importAndDeploy(Request $request): JsonResponse
     {
         $request->validate([
-            'file' => 'required|file|mimes:md,yaml,txt',
+            'file' => 'required|file|mimes:md,yaml,yml,txt',
         ]);
 
         try {
@@ -64,12 +64,19 @@ class ImportController extends Controller
             $pagesCount = $result['pages_count'];
 
             $this->htmlGenerator->generateSite($site);
-
-            $freshDeployService = new \App\Services\DeployService(
-                $this->htmlGenerator,
-                app(\App\Contracts\DeploymentRepositoryInterface::class)
-            );
-            $deployment = $freshDeployService->deploy($site);
+            $deployment = $this->deployService->deploy($site);
+            if ($deployment->status !== 'completed') {
+                return response()->json([
+                    'success' => false,
+                    'error' => $deployment->error_message ?: 'Deployment failed',
+                    'deployment' => [
+                        'id' => $deployment->id,
+                        'status' => $deployment->status,
+                        'sftp_host' => $deployment->sftp_host,
+                        'remote_path' => $deployment->remote_path,
+                    ],
+                ], 422);
+            }
 
             return response()->json([
                 'success' => true,
@@ -88,7 +95,7 @@ class ImportController extends Controller
                     'remote_path' => $deployment->remote_path,
                 ],
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
                 'error' => $e->getMessage(),

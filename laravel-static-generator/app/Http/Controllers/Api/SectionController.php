@@ -130,6 +130,27 @@ class SectionController extends Controller
         }
 
         $data = $validator->validated();
+        $requestedIds = array_map('intval', $data['order']);
+        if (count($requestedIds) !== count(array_unique($requestedIds))) {
+            return response()->json([
+                'error' => 'Order payload contains duplicate section IDs',
+            ], 422);
+        }
+
+        $currentIds = Section::where('page_id', $data['page_id'])
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        sort($requestedIds);
+        sort($currentIds);
+
+        if ($requestedIds !== $currentIds) {
+            return response()->json([
+                'error' => 'Order payload must include exactly all sections of the target page',
+            ], 422);
+        }
+
         $this->sections->reorder($data['page_id'], $data['order']);
 
         return response()->json(['message' => 'Sections reordered successfully']);

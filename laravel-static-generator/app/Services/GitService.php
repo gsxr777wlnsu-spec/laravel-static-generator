@@ -25,7 +25,7 @@ class GitService
     {
         if (!is_dir($this->repositoryPath . '/.git')) {
             $this->runCommand(['git', 'init']);
-            Log::info("Git initialized in {$this->repositoryPath}");
+            $this->safeLogInfo("Git initialized in {$this->repositoryPath}");
         }
     }
 
@@ -50,7 +50,7 @@ class GitService
         $this->runCommand(['git', 'config', 'user.email', 'deploy@localhost']);
 
         $this->runCommand(['git', 'commit', '-m', $message]);
-        Log::info("Git commit: {$message}");
+        $this->safeLogInfo("Git commit: {$message}");
     }
 
     public function history(int $limit = 10): array
@@ -88,7 +88,16 @@ class GitService
     public function restore(string $hash): void
     {
         $this->runCommand(['git', 'checkout', $hash, '--', '.']);
-        Log::info("Git restored to {$hash}");
+        $this->safeLogInfo("Git restored to {$hash}");
+    }
+
+    protected function safeLogInfo(string $message): void
+    {
+        try {
+            Log::info($message);
+        } catch (\Throwable $e) {
+            // Logging failure must not break git operations.
+        }
     }
 
     protected function runCommand(array $command): string

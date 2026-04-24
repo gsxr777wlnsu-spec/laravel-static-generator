@@ -12,7 +12,7 @@
         </div>
         <div class="mt-4 flex items-center gap-3 sm:mt-0">
             <button id="preview-page-btn" type="button"
-                    class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
+                    class="inline-flex cursor-pointer items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus:outline-none focus-visible:outline-none">
                 Preview
             </button>
             <a href="{{ route('admin.pages.index', $site->id) }}"
@@ -122,7 +122,7 @@
                 Cancel
             </a>
             <button type="submit"
-                    class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
+                    class="inline-flex cursor-pointer items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus:outline-none focus-visible:outline-none">
                 Save Changes
             </button>
         </div>
@@ -142,20 +142,20 @@
                         </select>
                         <button id="add-module-btn" type="button"
                                 style="background-color: #4f46e5 !important;"
-                                class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
+                                class="inline-flex cursor-pointer items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus:outline-none focus-visible:outline-none">
                             Add Module
                         </button>
                     </div>
                     <button id="clear-all-btn" type="button"
                             style="background-color: #dc2626 !important;"
-                            class="inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700">
+                            class="inline-flex cursor-pointer items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 focus:outline-none focus-visible:outline-none">
                         Clear All
                     </button>
                     <div class="h-6 w-px bg-gray-300 dark:bg-gray-700 hidden lg:block"></div>
                     <button id="apply-template-btn" type="button"
                             style="background-color: #d97706 !important;"
-                            class="inline-flex items-center rounded-md bg-amber-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-500">
-                        Apply From Template
+                            class="inline-flex cursor-pointer items-center rounded-md bg-amber-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-500 focus:outline-none focus-visible:outline-none">
+                        Apply Selected Template To Modules
                     </button>
                 </div>
             </div>
@@ -191,12 +191,12 @@
                         <div class="flex border-b border-gray-200 dark:border-gray-700 mb-4">
                             <button type="button" @click="tab = 'visual'; initTinyMCE($el.closest('.section-item'))" 
                                     :class="tab === 'visual' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
-                                    class="py-2 px-4 border-b-2 font-medium text-sm">
+                                    class="cursor-pointer py-2 px-4 border-b-2 font-medium text-sm focus:outline-none focus-visible:outline-none">
                                 Visual Editor
                             </button>
                             <button type="button" @click="tab = 'json'; syncFromTinyMCE($el.closest('.section-item'))" 
                                     :class="tab === 'json' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
-                                    class="py-2 px-4 border-b-2 font-medium text-sm">
+                                    class="cursor-pointer py-2 px-4 border-b-2 font-medium text-sm focus:outline-none focus-visible:outline-none">
                                 JSON
                             </button>
                         </div>
@@ -215,12 +215,12 @@
                     <div class="mt-4 flex gap-3">
                         <button type="button"
                                 style="background-color: #4f46e5 !important;"
-                                class="save-section-btn inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
+                                class="save-section-btn inline-flex cursor-pointer items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus:outline-none focus-visible:outline-none">
                             Save Module
                         </button>
                         <button type="button"
                                 style="background-color: #dc2626 !important;"
-                                class="delete-section-btn inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500">
+                                class="delete-section-btn inline-flex cursor-pointer items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 focus:outline-none focus-visible:outline-none">
                             Delete Module
                         </button>
                     </div>
@@ -235,9 +235,72 @@
 
 <script>
 const moduleDefaults = @json($moduleDefaults ?? []);
+const editorAssetPrefix = '/admin/sites/{{ $site->id }}/media/serve/assets/';
 
 function getCsrfToken() {
     return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+}
+
+function escapeRegExp(value) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function toEditorAssetUrls(html) {
+    if (typeof html !== 'string' || html === '') {
+        return html;
+    }
+
+    const attrRewritten = html.replace(
+        /((?:src|href)\s*=\s*["'])\/assets\/([^"']+)(["'])/gi,
+        `$1${editorAssetPrefix}$2$3`
+    );
+
+    return attrRewritten.replace(
+        /url\((['"]?)\/assets\/([^'")]+)\1\)/gi,
+        `url($1${editorAssetPrefix}$2$1)`
+    );
+}
+
+function toStorageAssetUrls(html) {
+    if (typeof html !== 'string' || html === '') {
+        return html;
+    }
+
+    const escapedEditorPrefix = escapeRegExp(editorAssetPrefix);
+    const attrPattern = new RegExp(`((?:src|href)\\s*=\\s*["'])${escapedEditorPrefix}([^"']+)(["'])`, 'gi');
+    const cssPattern = new RegExp(`url\\((['"]?)${escapedEditorPrefix}([^'")]+)\\1\\)`, 'gi');
+
+    const normalizedAttr = html.replace(attrPattern, '$1/assets/$2$3');
+    return normalizedAttr.replace(cssPattern, 'url($1/assets/$2$1)');
+}
+
+function extensionByMime(mimeType) {
+    switch ((mimeType || '').toLowerCase().trim()) {
+        case 'image/jpeg':
+            return 'jpg';
+        case 'image/png':
+            return 'png';
+        case 'image/gif':
+            return 'gif';
+        case 'image/webp':
+        case 'image/x-webp':
+            return 'webp';
+        case 'image/svg+xml':
+            return 'svg';
+        default:
+            return null;
+    }
+}
+
+function normalizeUploadFilename(filename, mimeType) {
+    const normalizedExt = extensionByMime(mimeType);
+    if (!normalizedExt) {
+        return filename || 'image';
+    }
+
+    const sourceName = String(filename || 'image').trim() || 'image';
+    const baseName = sourceName.replace(/\.[^./\\]+$/, '') || 'image';
+    return `${baseName}.${normalizedExt}`;
 }
 
 async function readApiResponse(response) {
@@ -613,8 +676,8 @@ function initTinyMCE(container) {
         content = JSON.parse(jsonTextarea.value);
     } catch (e) {}
 
-    const rawHtml = content.raw_html || '';
-    textarea.value = rawHtml;
+    const rawHtml = typeof content.raw_html === 'string' ? content.raw_html : '';
+    textarea.value = toEditorAssetUrls(rawHtml);
 
     tinymce.init({
         target: textarea,
@@ -643,10 +706,12 @@ function initTinyMCE(container) {
         schema: 'html5',
         images_upload_url: '/api/media',
         images_upload_handler: (blobInfo, progress) => new Promise((resolve, reject) => {
+            const blob = blobInfo.blob();
+            const fileName = normalizeUploadFilename(blobInfo.filename(), blob.type);
             const formData = new FormData();
-            formData.append('file', blobInfo.blob(), blobInfo.filename());
+            formData.append('file', blob, fileName);
             formData.append('site_id', '{{ $site->id }}');
-            formData.append('alt', blobInfo.filename());
+            formData.append('alt', fileName);
 
             fetch('/api/media', {
                 method: 'POST',
@@ -697,7 +762,7 @@ function initTinyMCE(container) {
                                     <div class="media-browser-container">
                                         <div class="media-browser-toolbar">
                                             <div id="upload-status" class="upload-loading">Uploading...</div>
-                                            <button type="button" class="upload-btn" onclick="document.getElementById('picker-upload').click()">+ Upload New</button>
+                                            <button type="button" class="upload-btn cursor-pointer focus:outline-none focus-visible:outline-none" onclick="document.getElementById('picker-upload').click()">+ Upload New</button>
                                             <input type="file" id="picker-upload" style="display:none" accept="image/*">
                                         </div>
                                         <div id="media-gallery" class="media-grid">Loading library...</div>
@@ -823,6 +888,7 @@ function syncFromTinyMCE(container) {
         
         // Clean up junk attributes injected by browser extensions (like bis_size)
         html = html.replace(/\s*bis_[a-z]+="[^"]*"/gi, '');
+        html = toStorageAssetUrls(html);
         
         content.raw_html = html;
         jsonTextarea.value = JSON.stringify(content, null, 4);

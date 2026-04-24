@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Storage;
 
 class MediaManagerService implements MediaManagerInterface
 {
-    private const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    private const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/x-webp', 'image/svg+xml'];
     private const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
     private const WARNING_FILE_SIZE = 2 * 1024 * 1024; // 2MB
 
@@ -28,25 +28,28 @@ class MediaManagerService implements MediaManagerInterface
             throw new \InvalidArgumentException($validation['message']);
         }
 
+        $mimeType = $this->normalizeMimeType((string) $file->getMimeType());
         $filename = $this->generateUniqueFilename($file);
         $path = "{$site->id}/assets/images/upload/{$filename}";
         
         Storage::disk('sites')->put($path, file_get_contents($file->getRealPath()));
 
-        $imageSize = getimagesize($file->getRealPath());
+        $imageSize = @getimagesize($file->getRealPath());
+        $width = is_array($imageSize) ? ($imageSize[0] ?? null) : null;
+        $height = is_array($imageSize) ? ($imageSize[1] ?? null) : null;
         
         $media = $this->repository->create([
             'site_id' => $site->id,
             'path' => $path,
             'alt' => $alt,
             'title' => $title,
-            'width' => $imageSize[0] ?? null,
-            'height' => $imageSize[1] ?? null,
+            'width' => $width,
+            'height' => $height,
             'size' => $file->getSize(),
-            'mime_type' => $file->getMimeType(),
+            'mime_type' => $mimeType,
         ]);
         
-        if (in_array($file->getMimeType(), ['image/jpeg', 'image/png'])) {
+        if (in_array($mimeType, ['image/jpeg', 'image/png'], true)) {
             GenerateWebPJob::dispatch($media);
         }
         
@@ -68,7 +71,9 @@ class MediaManagerService implements MediaManagerInterface
 
     public function validateFile(UploadedFile $file): array
     {
-        if (!in_array($file->getMimeType(), self::ALLOWED_MIME_TYPES)) {
+        $mimeType = $this->normalizeMimeType((string) $file->getMimeType());
+
+        if (!in_array($mimeType, self::ALLOWED_MIME_TYPES, true)) {
             return [
                 'valid' => false,
                 'message' => 'Invalid file type. Allowed types: ' . implode(', ', self::ALLOWED_MIME_TYPES)
@@ -96,7 +101,74 @@ class MediaManagerService implements MediaManagerInterface
 
     private function generateUniqueFilename(UploadedFile $file): string
     {
-        return uniqid() . '_' . time() . '.' . $file->getClientOriginalExtension();
+        $extension = $this->resolveExtension($file);
+        return uniqid() . '_' . time() . '.' . $extension;
+    }
+
+    private function resolveExtension(UploadedFile $file): string
+    {
+        $mimeType = $this->normalizeMimeType((string) $file->getMimeType());
+        $expectedExtension = $this->extensionFromMimeType($mimeType);
+        $originalExtension = strtolower(trim((string) $file->getClientOriginalExtension()));
+
+        if ($originalExtension !== '' && $this->isExtensionCompatibleWithMimeType($originalExtension, $mimeType)) {
+            return $originalExtension;
+        }
+
+        if ($expectedExtension !== null) {
+            return $expectedExtension;
+        }
+
+        if ($originalExtension !== '') {
+            return $originalExtension;
+        }
+
+        return 'bin';
+    }
+
+    private function isExtensionCompatibleWithMimeType(string $extension, string $mimeType): bool
+    {
+        $extension = strtolower(trim($extension));
+        if ($extension === '') {
+            return false;
+        }
+
+        return in_array($extension, $this->extensionsForMimeType($mimeType), true);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function extensionsForMimeType(string $mimeType): array
+    {
+        return match ($mimeType) {
+            'image/jpeg' => ['jpg', 'jpeg'],
+            'image/png' => ['png'],
+            'image/gif' => ['gif'],
+            'image/webp' => ['webp'],
+            'image/svg+xml' => ['svg'],
+            default => [],
+        };
+    }
+
+    private function extensionFromMimeType(string $mimeType): ?string
+    {
+        $extensions = $this->extensionsForMimeType($mimeType);
+        if (empty($extensions)) {
+            return null;
+        }
+
+        return $extensions[0];
+    }
+
+    private function normalizeMimeType(string $mimeType): string
+    {
+        $mimeType = strtolower(trim($mimeType));
+        if ($mimeType === 'image/x-webp') {
+            return 'image/webp';
+        }
+
+        return $mimeType;
     }
 
     public function discoverExistingMedia(Site $site): int
@@ -117,7 +189,7 @@ class MediaManagerService implements MediaManagerInterface
             }
 
             // Check if it's an image
-            $mimeType = Storage::disk('sites')->mimeType($filePath);
+            $mimeType = Storage::disk('sites')->mimeType($filePath) ?: '';
             if (!str_starts_with($mimeType, 'image/')) {
                 continue;
             }
@@ -130,13 +202,15 @@ class MediaManagerService implements MediaManagerInterface
             if (!$exists) {
                 $fullPath = Storage::disk('sites')->path($filePath);
                 $imageSize = @getimagesize($fullPath);
+                $width = is_array($imageSize) ? ($imageSize[0] ?? null) : null;
+                $height = is_array($imageSize) ? ($imageSize[1] ?? null) : null;
                 
                 $this->repository->create([
                     'site_id' => $site->id,
                     'path' => $filePath,
                     'alt' => basename($filePath),
-                    'width' => $imageSize[0] ?? null,
-                    'height' => $imageSize[1] ?? null,
+                    'width' => $width,
+                    'height' => $height,
                     'size' => Storage::disk('sites')->size($filePath),
                     'mime_type' => $mimeType,
                 ]);

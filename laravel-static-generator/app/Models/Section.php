@@ -18,7 +18,7 @@ class Section extends Model
         'content',
         'raw_html',
         'class',
-        'id',
+        'identifier',
         'settings',
         'order',
     ];

@@ -1,10 +1,53 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full">
+<html lang="en" class="h-full{{ request()->cookie('color-theme') === 'dark' ? ' dark' : '' }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Admin Panel') - Laravel Static Generator</title>
+    <script>
+    (function() {
+        var cookieName = 'color-theme';
+
+        function getCookie(name) {
+            var escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            var match = document.cookie.match(new RegExp('(?:^|; )' + escaped + '=([^;]*)'));
+            return match ? decodeURIComponent(match[1]) : null;
+        }
+
+        function setCookie(name, value) {
+            var securePart = window.location.protocol === 'https:' ? '; secure' : '';
+            document.cookie = name + '=' + encodeURIComponent(value) + '; path=/; max-age=31536000; samesite=lax' + securePart;
+        }
+
+        var cookieTheme = getCookie(cookieName);
+        var storageTheme = null;
+
+        try {
+            storageTheme = window.localStorage.getItem(cookieName);
+        } catch (error) {}
+
+        var theme = null;
+        if (cookieTheme === 'dark' || cookieTheme === 'light') {
+            theme = cookieTheme;
+        } else if (storageTheme === 'dark' || storageTheme === 'light') {
+            theme = storageTheme;
+        } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            theme = 'dark';
+        } else {
+            theme = 'light';
+        }
+
+        document.documentElement.classList.toggle('dark', theme === 'dark');
+        if (cookieTheme !== theme) {
+            setCookie(cookieName, theme);
+        }
+
+        try {
+            window.localStorage.setItem(cookieName, theme);
+        } catch (error) {}
+    })();
+    </script>
     <link rel="stylesheet" href="/build/assets/app-BO56juKC.css">
 </head>
 <body class="h-full bg-gray-50 dark:bg-gray-900">
@@ -29,7 +72,7 @@
                         </div>
                     </div>
                     <div class="flex items-center">
-                        <button id="theme-toggle" class="rounded-lg p-2.5 text-sm text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700">
+                        <button id="theme-toggle" class="cursor-pointer rounded-lg p-2.5 text-sm text-gray-500 hover:bg-gray-100 focus:outline-none focus-visible:outline-none dark:text-gray-400 dark:hover:bg-gray-700">
                             <svg id="theme-toggle-dark-icon" class="hidden h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
                                 <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path>
                             </svg>
@@ -64,11 +107,21 @@
 
     <script>
     (function() {
+        var cookieName = 'color-theme';
         var toggle = document.getElementById('theme-toggle');
         var darkIcon = document.getElementById('theme-toggle-dark-icon');
         var lightIcon = document.getElementById('theme-toggle-light-icon');
         
         if (!toggle || !darkIcon || !lightIcon) return;
+
+        function persistTheme(theme) {
+            var securePart = window.location.protocol === 'https:' ? '; secure' : '';
+            document.cookie = cookieName + '=' + encodeURIComponent(theme) + '; path=/; max-age=31536000; samesite=lax' + securePart;
+
+            try {
+                window.localStorage.setItem(cookieName, theme);
+            } catch (error) {}
+        }
         
         function updateIcons() {
             if (document.documentElement.classList.contains('dark')) {
@@ -81,10 +134,11 @@
         }
         
         updateIcons();
+        persistTheme(document.documentElement.classList.contains('dark') ? 'dark' : 'light');
         
         toggle.addEventListener('click', function() {
             var isDark = document.documentElement.classList.toggle('dark');
-            localStorage.setItem('color-theme', isDark ? 'dark' : 'light');
+            persistTheme(isDark ? 'dark' : 'light');
             updateIcons();
         });
     })();

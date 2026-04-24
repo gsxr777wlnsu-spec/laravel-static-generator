@@ -14,13 +14,9 @@ class DeployService implements DeployServiceInterface
 {
     public function __construct(
         private HtmlGeneratorInterface $generator,
-        private DeploymentRepositoryInterface $deployments
+        private DeploymentRepositoryInterface $deployments,
+        private SftpClientInterface $sftp
     ) {}
-
-    private function createSftpClient(): SftpClientInterface
-    {
-        return new SftpClient();
-    }
 
     public function deploy(Site $site): Deployment
     {
@@ -40,17 +36,20 @@ class DeployService implements DeployServiceInterface
             $files = Storage::disk('generated')->allFiles($stagingPath);
             $filesCount = count($files);
 
-            $sftp = $this->createSftpClient();
             $remotePath = $site->sftp_remote_path;
             if (empty($remotePath)) {
                 $remotePath = '/var/www/' . $site->domain;
             }
-            
-            if (!$sftp->uploadDirectory($site, $stagingPath, $remotePath)) {
+
+            if (!$this->sftp->connect($site)) {
+                throw new \RuntimeException('Failed to connect to SFTP server');
+            }
+
+            if (!$this->sftp->uploadDirectory($site, $stagingPath, $remotePath)) {
                 throw new \RuntimeException('Failed to upload files to SFTP server');
             }
 
-            $sftp->disconnect();
+            $this->sftp->disconnect();
 
             $duration = max(0, now()->diffInSeconds($deployment->started_at));
 
@@ -65,6 +64,12 @@ class DeployService implements DeployServiceInterface
             ]);
 
         } catch (\Exception $e) {
+            try {
+                $this->sftp->disconnect();
+            } catch (\Throwable) {
+                // Ignore disconnect issues in failure flow.
+            }
+
             $this->deployments->update($deployment, [
                 'status' => 'failed',
                 'completed_at' => now(),

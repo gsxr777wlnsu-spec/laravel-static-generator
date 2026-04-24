@@ -42,7 +42,7 @@
 
                 <div class="sm:col-span-4">
                     <button type="submit"
-                            class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
+                            class="inline-flex cursor-pointer items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus:outline-none focus-visible:outline-none">
                         Upload
                     </button>
                 </div>
@@ -79,10 +79,10 @@
                         {{ $item->size ?? '-' }} bytes
                     </td>
                     <td class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium space-x-2">
-                        <button type="button" class="save-media-btn text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">
+                        <button type="button" class="save-media-btn cursor-pointer text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 focus:outline-none focus-visible:outline-none">
                             Save
                         </button>
-                        <button type="button" class="delete-media-btn text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
+                        <button type="button" class="delete-media-btn cursor-pointer text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 focus:outline-none focus-visible:outline-none">
                             Delete
                         </button>
                     </td>

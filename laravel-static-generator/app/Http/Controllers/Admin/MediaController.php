@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Contracts\SiteRepositoryInterface;
 use App\Http\Controllers\Controller;
 use App\Models\Media;
+use Illuminate\Support\Facades\Storage;
 
 class MediaController extends Controller
 {
@@ -35,19 +36,64 @@ class MediaController extends Controller
             abort(404);
         }
 
-        $fullPath = "{$siteId}/{$path}";
-
-        if (!\Illuminate\Support\Facades\Storage::disk('sites')->exists($fullPath)) {
+        [$disk, $fullPath] = $this->resolveAssetPath($siteId, $path);
+        if ($disk === null || $fullPath === null) {
             abort(404);
         }
 
-        $content = \Illuminate\Support\Facades\Storage::disk('sites')->get($fullPath);
-        $mimeType = \Illuminate\Support\Facades\Storage::disk('sites')->mimeType($fullPath);
+        $content = Storage::disk($disk)->get($fullPath);
+        $mimeType = null;
+
+        if ($disk === 'sites') {
+            $mimeType = Media::query()
+                ->where('site_id', $siteId)
+                ->where('path', $fullPath)
+                ->value('mime_type');
+        }
+
+        if (!is_string($mimeType) || trim($mimeType) === '') {
+            $mimeType = Storage::disk($disk)->mimeType($fullPath);
+        }
+
+        $mimeType = strtolower(trim((string) $mimeType));
+        if ($mimeType === 'image/x-webp') {
+            $mimeType = 'image/webp';
+        }
+        if ($mimeType === '') {
+            $mimeType = 'application/octet-stream';
+        }
 
         return response($content, 200, [
             'Content-Type' => $mimeType,
             'X-Robots-Tag' => 'noindex, nofollow',
             'Cache-Control' => 'max-age=86400, private',
         ]);
+    }
+
+    /**
+     * @return array{0: string|null, 1: string|null}
+     */
+    private function resolveAssetPath(int $siteId, string $path): array
+    {
+        $normalizedPath = trim(str_replace('\\', '/', $path), '/');
+        if ($normalizedPath === '' || str_contains($normalizedPath, '..')) {
+            return [null, null];
+        }
+
+        $candidates = [
+            ['sites', "{$siteId}/{$normalizedPath}"],
+            ['generated', "site{$siteId}/{$normalizedPath}"],
+            ['generated', "{$siteId}/{$normalizedPath}"],
+            ['generated', "site1/{$normalizedPath}"],
+            ['generated', "1/{$normalizedPath}"],
+        ];
+
+        foreach ($candidates as [$disk, $candidatePath]) {
+            if (Storage::disk($disk)->exists($candidatePath)) {
+                return [$disk, $candidatePath];
+            }
+        }
+
+        return [null, null];
     }
 }

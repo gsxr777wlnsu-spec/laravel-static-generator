@@ -7,13 +7,21 @@ use App\Notifications\DeploymentCompleted;
 use App\Notifications\DeploymentFailed;
 use App\Notifications\GenerationCompleted;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Schema;
 
 class NotificationService
 {
     public function notifyAdmins(object $notification): void
     {
-        $admins = User::where('is_admin', true)->get();
-        Notification::send($admins, $notification);
+        $query = User::query();
+        if (Schema::hasColumn('users', 'is_admin')) {
+            $query->where('is_admin', true);
+        }
+
+        $admins = $query->get();
+        if ($admins->isNotEmpty()) {
+            Notification::send($admins, $notification);
+        }
     }
 
     public function notifyUser(User $user, object $notification): void

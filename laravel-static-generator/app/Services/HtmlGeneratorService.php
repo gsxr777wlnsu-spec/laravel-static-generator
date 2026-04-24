@@ -173,99 +173,110 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         return $html;
     }
 
-private function copyAssetsToPreview(int $siteId, string $previewToken): void
+    private function copyAssetsToPreview(int $siteId, string $previewToken): void
     {
-        $previewBaseDir = storage_path("generated/preview/{$previewToken}");
-        
-        $sourceAssetPath = storage_path("generated/site{$siteId}/assets");
-        
-        if (!is_dir($sourceAssetPath)) {
-            $sourceAssetPath = storage_path("generated/site1/assets");
+        $generatedDisk = Storage::disk('generated');
+        $sourceAssetPath = "site{$siteId}/assets";
+
+        if (!$generatedDisk->exists($sourceAssetPath)) {
+            $sourceAssetPath = 'site1/assets';
         }
-        
-        if (!is_dir($sourceAssetPath)) {
+
+        if (!$generatedDisk->exists($sourceAssetPath)) {
             return;
         }
-        
-        if (!is_dir($previewBaseDir)) {
-            mkdir($previewBaseDir, 0755, true);
-        }
-        
-        $files = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($sourceAssetPath, \RecursiveDirectoryIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::SELF_FIRST
-        );
 
-        foreach ($files as $file) {
-            $relativePath = 'assets/' . $files->getSubPathname();
-            $targetFile = $previewBaseDir . DIRECTORY_SEPARATOR . $relativePath;
-            
-            if ($file->isDir()) {
-                if (!is_dir($targetFile)) {
-                    mkdir($targetFile, 0755, true);
-                }
-            } else {
-                $dir = dirname($targetFile);
-                if (!is_dir($dir)) {
-                    mkdir($dir, 0755, true);
-                }
-                copy($file->getPathname(), $targetFile);
-            }
-        }
+        $previewAssetsPath = "preview/{$previewToken}/assets";
+        $this->copyStorageDirectory('generated', $sourceAssetPath, 'generated', $previewAssetsPath);
     }
 
     private function copyAssetsToSite(int $siteId): void
     {
-        $targetBaseDir = storage_path("generated/site{$siteId}/assets");
-        $sourceAssetPath = storage_path("generated/site1/assets");
+        $targetPath = "site{$siteId}/assets";
 
-        if (!is_dir($sourceAssetPath)) {
+        $sourceFromSitesDisk = "{$siteId}/assets";
+        if (Storage::disk('sites')->exists($sourceFromSitesDisk)) {
+            $this->copyStorageDirectory('sites', $sourceFromSitesDisk, 'generated', $targetPath);
             return;
         }
 
-        if (!is_dir($targetBaseDir)) {
-            mkdir($targetBaseDir, 0755, true);
+        $fallbackPath = 'site1/assets';
+        if ($fallbackPath === $targetPath || !Storage::disk('generated')->exists($fallbackPath)) {
+            return;
         }
 
-        $files = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($sourceAssetPath, \RecursiveDirectoryIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::SELF_FIRST
-        );
-
-        foreach ($files as $file) {
-            $targetFile = $targetBaseDir . DIRECTORY_SEPARATOR . $files->getSubPathname();
-
-            if ($file->isDir()) {
-                if (!is_dir($targetFile)) {
-                    mkdir($targetFile, 0755, true);
-                }
-            } else {
-                $dir = dirname($targetFile);
-                if (!is_dir($dir)) {
-                    mkdir($dir, 0755, true);
-                }
-                copy($file->getPathname(), $targetFile);
-            }
-        }
+        $this->copyStorageDirectory('generated', $fallbackPath, 'generated', $targetPath);
     }
 
     public function cleanupExpiredPreviews(): int
     {
-        $previewDir = 'preview';
-        $allDirs = Storage::disk('generated')->directories($previewDir);
-        
+        $generatedDisk = Storage::disk('generated');
+        $allDirs = $generatedDisk->directories('preview');
+
         $cleaned = 0;
         foreach ($allDirs as $dir) {
-            $dirName = basename($dir);
-            $createdAt = Storage::disk('generated')->getMetadata($dir)['lastModified'] ?? null;
-            
-            if ($createdAt && now()->diffInMinutes(now()->createFromTimestamp($createdAt)) > 30) {
-                Storage::disk('generated')->deleteDirectory($dir);
+            $files = $generatedDisk->allFiles($dir);
+
+            if (empty($files)) {
+                $generatedDisk->deleteDirectory($dir);
+                $cleaned++;
+                continue;
+            }
+
+            $latestModified = null;
+            foreach ($files as $file) {
+                try {
+                    $modifiedAt = $generatedDisk->lastModified($file);
+                } catch (\Throwable) {
+                    continue;
+                }
+
+                if ($latestModified === null || $modifiedAt > $latestModified) {
+                    $latestModified = $modifiedAt;
+                }
+            }
+
+            if ($latestModified === null) {
+                continue;
+            }
+
+            if (now()->diffInMinutes(\Illuminate\Support\Carbon::createFromTimestamp($latestModified)) > 30) {
+                $generatedDisk->deleteDirectory($dir);
                 $cleaned++;
             }
         }
         
         return $cleaned;
+    }
+
+    private function copyStorageDirectory(string $sourceDisk, string $sourcePath, string $targetDisk, string $targetPath): void
+    {
+        $source = Storage::disk($sourceDisk);
+        $target = Storage::disk($targetDisk);
+
+        if (!$source->exists($sourcePath)) {
+            return;
+        }
+
+        if (!$target->exists($targetPath)) {
+            $target->makeDirectory($targetPath);
+        }
+
+        $directories = $source->allDirectories($sourcePath);
+        foreach ($directories as $directory) {
+            $relativePath = ltrim((string) Str::of($directory)->after($sourcePath), '/');
+            $targetDirectory = $relativePath === '' ? $targetPath : "{$targetPath}/{$relativePath}";
+            if (!$target->exists($targetDirectory)) {
+                $target->makeDirectory($targetDirectory);
+            }
+        }
+
+        $files = $source->allFiles($sourcePath);
+        foreach ($files as $file) {
+            $relativePath = ltrim((string) Str::of($file)->after($sourcePath), '/');
+            $targetFilePath = $relativePath === '' ? $targetPath : "{$targetPath}/{$relativePath}";
+            $target->put($targetFilePath, $source->get($file));
+        }
     }
 
     private function resolvePageTemplatePath(Page $page): string

@@ -27,7 +27,7 @@ class TemplateSetService
     {
         $slug = $data['slug'] ?? Str::slug($data['name']);
         
-        $targetPath = storage_path("app/templates/{$slug}");
+        $targetPath = resource_path("views/templates/{$slug}");
         
         if (File::exists($targetPath)) {
             throw new \Exception("Template set '{$slug}' already exists");
@@ -86,7 +86,7 @@ class TemplateSetService
         $newSlug = Str::slug($newName);
         
         $sourcePath = $templateSet->getAbsolutePath();
-        $targetPath = storage_path("app/templates/{$newSlug}");
+        $targetPath = resource_path("views/templates/{$newSlug}");
         
         if (File::exists($targetPath)) {
             throw new \Exception("Template set '{$newSlug}' already exists");
@@ -145,7 +145,7 @@ class TemplateSetService
 
         $components = [];
         foreach (File::files($componentsPath) as $file) {
-            if ($file->getExtension() === 'blade.php') {
+            if (\Illuminate\Support\Str::endsWith($file->getFilename(), '.blade.php')) {
                 $name = basename($file->getFilename(), '.blade.php');
                 $components[$name] = $file->getFilename();
             }

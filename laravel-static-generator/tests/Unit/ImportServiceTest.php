@@ -4,8 +4,10 @@ namespace Tests\Unit;
 
 use App\Models\Site;
 use App\Services\ImportService;
+use Illuminate\Support\Facades\File;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class ImportServiceTest extends TestCase
@@ -18,8 +20,11 @@ class ImportServiceTest extends TestCase
     {
         parent::setUp();
         $this->service = app(ImportService::class);
-        
-        Storage::fake('generated');
+
+        $root = '/tmp/laravel-static-generator-tests/generated-' . Str::uuid();
+        File::ensureDirectoryExists($root);
+        config()->set('filesystems.disks.generated.root', $root);
+        Storage::forgetDisk('generated');
     }
 
     public function test_import_creates_site_from_yaml(): void

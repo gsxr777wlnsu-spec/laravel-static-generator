@@ -29,8 +29,12 @@ class ImportService
         }
 
         $data = Yaml::parse($content);
-        if (!$data) {
-            throw new \RuntimeException("Could not parse YAML content");
+        if ($data === null) {
+            throw new \RuntimeException('Could not parse YAML content');
+        }
+
+        if (!is_array($data)) {
+            throw new \RuntimeException('Invalid YAML structure: root value must be a map/object');
         }
 
         return $this->importSite($data, $siteId);
@@ -83,13 +87,38 @@ class ImportService
 
         $importedPages = [];
 
-        if (isset($data['sftp_host']) || isset($data['sftp_username']) || isset($data['sftp_password'])) {
+        $hasSftpUpdates = false;
+        foreach ([
+            'sftp_host',
+            'sftp_port',
+            'sftp_username',
+            'sftp_password',
+            'sftp_private_key',
+            'sftp_auth_method',
+            'sftp_remote_path',
+        ] as $sftpKey) {
+            if (array_key_exists($sftpKey, $data)) {
+                $hasSftpUpdates = true;
+                break;
+            }
+        }
+
+        if ($hasSftpUpdates) {
+            $authMethod = $site->sftp_auth_method;
+            if (isset($data['sftp_auth_method'])) {
+                $candidate = strtolower((string) $data['sftp_auth_method']);
+                if (in_array($candidate, ['password', 'key'], true)) {
+                    $authMethod = $candidate;
+                }
+            }
+
             $site->update([
                 'sftp_host' => $data['sftp_host'] ?? $site->sftp_host,
                 'sftp_port' => $data['sftp_port'] ?? $site->sftp_port,
                 'sftp_username' => $data['sftp_username'] ?? $site->sftp_username,
-                'sftp_password' => $data['sftp_password'] ?? $site->sftp_password,
-                'sftp_auth_method' => $data['sftp_auth_method'] ?? $site->sftp_auth_method,
+                'sftp_password' => $this->resolveEncryptedSecret($data, 'sftp_password', $site->sftp_password),
+                'sftp_private_key' => $this->resolveEncryptedSecret($data, 'sftp_private_key', $site->sftp_private_key),
+                'sftp_auth_method' => $authMethod,
                 'sftp_remote_path' => $data['sftp_remote_path'] ?? $site->sftp_remote_path,
             ]);
         }
@@ -150,7 +179,16 @@ class ImportService
             return;
         }
 
-        $this->copyDirectory($baseTemplatesPath, $targetPath);
+        $parentDir = dirname($targetPath);
+        if (!is_dir($parentDir) || !is_writable($parentDir)) {
+            return;
+        }
+
+        try {
+            $this->copyDirectory($baseTemplatesPath, $targetPath);
+        } catch (\Throwable) {
+            // Template copy is best-effort and should not fail the whole import.
+        }
     }
 
     private function importPage(Site $site, array $data, bool $bootstrapSections = false): Page
@@ -252,16 +290,17 @@ class ImportService
                 'module' => $moduleKey,
                 'module_key' => $moduleKey,
                 'heading' => $heading,
+                'raw_html' => $rawHtml,
                 'class' => $classAttr ?: $moduleKey,
                 'identifier' => $idAttr ?: null,
-                'content' => json_encode([
+                'content' => [
                     'module' => $moduleKey,
                     'module_key' => $moduleKey,
                     'heading' => $heading,
                     'class' => $classAttr ?: $moduleKey,
                     'id' => $idAttr ?: null,
                     'raw_html' => $rawHtml,
-                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                ],
             ]);
         }
     }
@@ -289,7 +328,7 @@ class ImportService
         return $map[$templateKey] ?? null;
     }
 
-    private function resolveModuleKey(string $classAttr, string $idAttr, ?string $templateKey = null): string
+    private function resolveModuleKey(string $classAttr, string $idAttr, ?string $templateKey = null): ?string
     {
         $tokens = preg_split('/\s+/', $classAttr) ?: [];
 
@@ -385,12 +424,13 @@ class ImportService
                 'heading' => $sectionData['heading'] ?? null,
                 'subheading' => $sectionData['subheading'] ?? null,
                 'description' => $sectionData['description'] ?? null,
+                'raw_html' => $sectionData['raw_html'] ?? null,
                 'class' => $sectionData['class'] ?? null,
                 'identifier' => $sectionData['id'] ?? null,
                 'settings' => isset($sectionData['settings']) && is_array($sectionData['settings'])
                     ? $sectionData['settings']
                     : null,
-                'content' => json_encode($contentFields, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                'content' => $contentFields,
             ]);
         }
     }
@@ -441,6 +481,30 @@ class ImportService
                     throw new \RuntimeException("Could not copy file: {$sourcePath} to {$destPath}");
                 }
             }
+        }
+    }
+
+    private function resolveEncryptedSecret(array $data, string $key, ?string $existingValue): ?string
+    {
+        if (!array_key_exists($key, $data)) {
+            return $existingValue;
+        }
+
+        $value = $data[$key];
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return $this->encryptIfNeeded((string) $value);
+    }
+
+    private function encryptIfNeeded(string $value): string
+    {
+        try {
+            decrypt($value);
+            return $value;
+        } catch (\Throwable) {
+            return encrypt($value);
         }
     }
 

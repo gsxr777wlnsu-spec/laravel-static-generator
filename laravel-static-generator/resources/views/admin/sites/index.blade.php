@@ -57,9 +57,9 @@
                         <a href="{{ route('admin.pages.index', $site->id) }}" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">Pages</a>
                         <a href="{{ route('admin.media.index', $site->id) }}" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">Media</a>
                         <a href="{{ route('admin.sites.edit', $site->id) }}" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">Edit</a>
-                        <button onclick="generateSite({{ $site->id }})" class="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300">Generate</button>
-                        <button onclick="deleteSite({{ $site->id }}, '{{ addslashes($site->name) }}')" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">Delete</button>
-                        <button onclick="deploySite({{ $site->id }})" class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">Deploy</button>
+                        <button type="button" onclick="generateSite({{ $site->id }})" class="cursor-pointer text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 focus:outline-none focus-visible:outline-none">Generate</button>
+                        <button type="button" onclick="deleteSite({{ $site->id }}, '{{ addslashes($site->name) }}')" class="cursor-pointer text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 focus:outline-none focus-visible:outline-none">Delete</button>
+                        <button type="button" onclick="deploySite({{ $site->id }})" class="cursor-pointer text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 focus:outline-none focus-visible:outline-none">Deploy</button>
                     </td>
                 </tr>
                 @empty
@@ -304,39 +304,6 @@ function promptImportAndDeploy() {
         importAndDeploy(siteId);
     } else if (siteId) {
         alert('Site not found with ID: ' + siteId);
-    }
-}
-
-async function importAndDeploy(siteId) {
-    if (!confirm('Import & Deploy: This will import contact-us.md and deploy to remote server. Continue?')) return;
-    
-    try {
-        const response = await fetch(`/api/sites/${siteId}/import-and-deploy`, {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': getCsrfToken(),
-                'X-Requested-With': 'XMLHttpRequest',
-            },
-            credentials: 'same-origin',
-        });
-
-        const data = await readApiResponse(response);
-
-        if (!response.ok) {
-            alert('Import & Deploy failed: ' + (data.error || data.message || `HTTP ${response.status}`));
-            return;
-        }
-
-        if (data.success) {
-            alert(`Import & Deploy completed successfully!\n\n${data.message || ''}`);
-        } else {
-            alert('Import & Deploy failed: ' + (data.error || 'Unknown error'));
-        }
-        
-        window.location.reload();
-    } catch (error) {
-        alert('Error: ' + error.message);
     }
 }
 </script>
