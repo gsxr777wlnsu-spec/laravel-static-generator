@@ -1,0 +1,12 @@
+vendor/
+node_modules/
+.env
+.env.local
+storage/logs/
+storage/generated/
+storage/import/
+storage/import-deploy/
+storage/staging/
+public/build/
+*.log
+.DS_Store
