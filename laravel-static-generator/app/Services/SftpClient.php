@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Storage;
 use League\Flysystem\Filesystem;
 use League\Flysystem\PhpseclibV3\SftpAdapter;
 use League\Flysystem\PhpseclibV3\SftpConnectionProvider;
+use phpseclib3\Crypt\PublicKeyLoader;
+use phpseclib3\Net\SSH2;
 
 class SftpClient implements SftpClientInterface
 {
@@ -133,9 +135,79 @@ class SftpClient implements SftpClientInterface
         }
     }
 
+    public function runPostDeployCommands(Site $site, string $remotePath): void
+    {
+        $normalizedRemotePath = rtrim(trim($remotePath), '/');
+        if ($normalizedRemotePath === '') {
+            throw new \RuntimeException('Remote path is required for post-deploy commands');
+        }
+
+        $targetPath = $normalizedRemotePath . '/';
+        $ssh = $this->createSshConnection($site);
+
+        foreach ([
+            'chown -R www-data:www-data ' . escapeshellarg($targetPath),
+            'chmod 755 ' . escapeshellarg($targetPath),
+            'systemctl reload nginx',
+        ] as $command) {
+            $this->runSshCommandOrFail($ssh, $command);
+        }
+    }
+
     public function disconnect(): void
     {
         $this->filesystem = null;
+    }
+
+    private function createSshConnection(Site $site): SSH2
+    {
+        $credentials = $site->getSftpCredentials();
+        $host = trim((string) ($credentials['host'] ?? ''));
+        $username = trim((string) ($credentials['username'] ?? ''));
+        $port = (int) ($credentials['port'] ?? 22);
+
+        if ($host === '' || $username === '') {
+            throw new \RuntimeException('SFTP host and username are required for post-deploy commands');
+        }
+
+        $ssh = new SSH2($host, $port, 30);
+        $authMethod = strtolower((string) ($credentials['auth_method'] ?? ''));
+
+        if ($authMethod === 'key' && !empty($credentials['private_key'])) {
+            $privateKey = PublicKeyLoader::load($this->decryptIfNeeded((string) $credentials['private_key']));
+            if (!$ssh->login($username, $privateKey)) {
+                throw new \RuntimeException('SSH login failed using private key');
+            }
+            return $ssh;
+        }
+
+        $password = (string) ($credentials['password'] ?? '');
+        if ($password === '') {
+            throw new \RuntimeException('SSH password is required for post-deploy commands');
+        }
+
+        if (!$ssh->login($username, $this->decryptIfNeeded($password))) {
+            throw new \RuntimeException('SSH login failed using password');
+        }
+
+        return $ssh;
+    }
+
+    private function runSshCommandOrFail(SSH2 $ssh, string $command): void
+    {
+        $wrappedCommand = 'sh -lc ' . escapeshellarg($command . ' 2>&1; printf "\n__EXIT_CODE:%s" "$?"');
+        $output = $ssh->exec($wrappedCommand);
+
+        if (!is_string($output) || !preg_match('/__EXIT_CODE:(\d+)\s*$/', $output, $matches)) {
+            throw new \RuntimeException('Could not determine status for remote command: ' . $command);
+        }
+
+        $exitCode = (int) $matches[1];
+        if ($exitCode !== 0) {
+            $cleanOutput = trim((string) preg_replace('/__EXIT_CODE:\d+\s*$/', '', $output));
+            $errorSuffix = $cleanOutput !== '' ? ' Output: ' . $cleanOutput : '';
+            throw new \RuntimeException("Remote command failed ({$exitCode}): {$command}.{$errorSuffix}");
+        }
     }
 
     private function decryptIfNeeded(string $value): string

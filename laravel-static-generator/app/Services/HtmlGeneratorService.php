@@ -188,6 +188,7 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
 
         $previewAssetsPath = "preview/{$previewToken}/assets";
         $this->copyStorageDirectory('generated', $sourceAssetPath, 'generated', $previewAssetsPath);
+        $this->ensureMainScriptAlias('generated', $previewAssetsPath);
     }
 
     private function copyAssetsToSite(int $siteId): void
@@ -197,6 +198,7 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         $sourceFromSitesDisk = "{$siteId}/assets";
         if (Storage::disk('sites')->exists($sourceFromSitesDisk)) {
             $this->copyStorageDirectory('sites', $sourceFromSitesDisk, 'generated', $targetPath);
+            $this->ensureMainScriptAlias('generated', $targetPath);
             return;
         }
 
@@ -206,6 +208,25 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         }
 
         $this->copyStorageDirectory('generated', $fallbackPath, 'generated', $targetPath);
+        $this->ensureMainScriptAlias('generated', $targetPath);
+    }
+
+    private function ensureMainScriptAlias(string $diskName, string $assetsPath): void
+    {
+        $disk = Storage::disk($diskName);
+        $normalizedAssetsPath = trim($assetsPath, '/');
+
+        $mainScriptPath = "{$normalizedAssetsPath}/js/main.js";
+        if ($disk->exists($mainScriptPath)) {
+            return;
+        }
+
+        $appScriptPath = "{$normalizedAssetsPath}/js/app.js";
+        if (!$disk->exists($appScriptPath)) {
+            return;
+        }
+
+        $disk->put($mainScriptPath, $disk->get($appScriptPath));
     }
 
     public function cleanupExpiredPreviews(): int

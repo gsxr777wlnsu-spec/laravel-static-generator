@@ -265,7 +265,7 @@ class SiteController extends Controller
             }
 
             // 4. Deploy generated files.
-            $deployment = $this->deploy->deploy($site);
+            $deployment = $this->deploy->deploy($site, true);
             if ($deployment->status !== 'completed') {
                 return response()->json([
                     'success' => false,

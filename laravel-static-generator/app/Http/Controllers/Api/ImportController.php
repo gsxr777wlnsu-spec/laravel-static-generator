@@ -64,7 +64,7 @@ class ImportController extends Controller
             $pagesCount = $result['pages_count'];
 
             $this->htmlGenerator->generateSite($site);
-            $deployment = $this->deployService->deploy($site);
+            $deployment = $this->deployService->deploy($site, true);
             if ($deployment->status !== 'completed') {
                 return response()->json([
                     'success' => false,

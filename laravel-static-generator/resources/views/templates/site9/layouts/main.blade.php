@@ -212,7 +212,7 @@
         </div>
     </footer>
     
-    <script defer src="/assets/js/app.js"></script>
+    <script defer src="/assets/js/main.js"></script>
     <script defer src="/assets/js/lightbox.js"></script>
     <script defer src="/assets/js/faq.js"></script>
     @endif

@@ -168,6 +168,20 @@ class ImportService
                 copy($file->getPathname(), $targetFile);
             }
         }
+
+        $this->ensureMainScriptInAssets($targetPath);
+    }
+
+    private function ensureMainScriptInAssets(string $assetsPath): void
+    {
+        $appScriptPath = $assetsPath . DIRECTORY_SEPARATOR . 'js' . DIRECTORY_SEPARATOR . 'app.js';
+        $mainScriptPath = $assetsPath . DIRECTORY_SEPARATOR . 'js' . DIRECTORY_SEPARATOR . 'main.js';
+
+        if (!is_file($appScriptPath) || is_file($mainScriptPath)) {
+            return;
+        }
+
+        copy($appScriptPath, $mainScriptPath);
     }
 
     private function copyTemplatesToSite(int $siteId): void

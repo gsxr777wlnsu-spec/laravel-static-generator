@@ -16,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class PageController extends Controller
 {
@@ -74,6 +75,8 @@ class PageController extends Controller
         if ($this->seo->checkDuplicateSlugs($site, $data['slug'])) {
             return response()->json(['error' => 'Slug already exists for this site'], 422);
         }
+
+        $data = $this->applyAutoCanonicalOnStore($data, $site);
 
         $warnings = [];
         if (isset($data['meta_title'])) {
@@ -152,17 +155,19 @@ class PageController extends Controller
         }
 
         $data = $validator->validated();
+        $site = $this->sites->findById($page->site_id);
 
         if (isset($data['template_key'])) {
             $data['template_key'] = $this->templatePresets->normalizeKey($data['template_key']);
         }
         
         if (isset($data['slug'])) {
-            $site = $this->sites->findById($page->site_id);
             if ($this->seo->checkDuplicateSlugs($site, $data['slug'], $page->id)) {
                 return response()->json(['error' => 'Slug already exists for this site'], 422);
             }
         }
+
+        $data = $this->applyAutoCanonicalOnUpdate($data, $page, $site);
 
         $oldValues = $page->toArray();
         $page = $this->pages->update($page, $data);
@@ -290,5 +295,105 @@ class PageController extends Controller
                 'order' => $index,
             ]);
         }
+    }
+
+    private function applyAutoCanonicalOnStore(array $data, ?\App\Models\Site $site): array
+    {
+        if (!$site) {
+            return $data;
+        }
+
+        $canonical = trim((string) ($data['canonical'] ?? ''));
+        if ($canonical === '') {
+            $data['canonical'] = $this->buildCanonicalUrl((string) $site->domain, (string) ($data['slug'] ?? ''));
+        } else {
+            $data['canonical'] = $canonical;
+        }
+
+        return $data;
+    }
+
+    private function applyAutoCanonicalOnUpdate(array $data, Page $page, ?\App\Models\Site $site): array
+    {
+        if (!$site) {
+            return $data;
+        }
+
+        $currentSlug = (string) $page->slug;
+        $nextSlug = array_key_exists('slug', $data) ? (string) $data['slug'] : $currentSlug;
+
+        $currentAutoCanonical = $this->buildCanonicalUrl((string) $site->domain, $currentSlug);
+        $currentLegacyAutoCanonical = $this->buildLegacyCanonicalUrl((string) $site->domain, $currentSlug);
+        $nextAutoCanonical = $this->buildCanonicalUrl((string) $site->domain, $nextSlug);
+        $currentCanonical = trim((string) ($page->canonical ?? ''));
+
+        if (array_key_exists('canonical', $data)) {
+            $requestedCanonical = trim((string) ($data['canonical'] ?? ''));
+            if (
+                $requestedCanonical === '' ||
+                $requestedCanonical === $currentAutoCanonical ||
+                $requestedCanonical === $currentLegacyAutoCanonical
+            ) {
+                $data['canonical'] = $nextAutoCanonical;
+            } else {
+                $data['canonical'] = $requestedCanonical;
+            }
+
+            return $data;
+        }
+
+        if (
+            $currentCanonical === '' ||
+            $currentCanonical === $currentAutoCanonical ||
+            $currentCanonical === $currentLegacyAutoCanonical
+        ) {
+            $data['canonical'] = $nextAutoCanonical;
+        }
+
+        return $data;
+    }
+
+    private function buildCanonicalUrl(string $siteDomain, string $slug): string
+    {
+        $domain = $this->normalizeDomainForCanonical($siteDomain);
+        $normalizedSlug = trim($slug);
+        $normalizedSlug = trim($normalizedSlug, '/');
+
+        if ($normalizedSlug === '' || Str::lower($normalizedSlug) === 'index' || Str::lower($normalizedSlug) === 'index.html') {
+            return $domain . '/';
+        }
+
+        if (!Str::endsWith(Str::lower($normalizedSlug), '.html')) {
+            $normalizedSlug .= '.html';
+        }
+
+        return $domain . '/' . $normalizedSlug;
+    }
+
+    private function buildLegacyCanonicalUrl(string $siteDomain, string $slug): string
+    {
+        $domain = $this->normalizeDomainForCanonical($siteDomain);
+        $normalizedSlug = trim($slug);
+        $normalizedSlug = trim($normalizedSlug, '/');
+
+        if ($normalizedSlug === '' || Str::lower($normalizedSlug) === 'index' || Str::lower($normalizedSlug) === 'index.html') {
+            return $domain . '/';
+        }
+
+        return $domain . '/' . preg_replace('/\.html$/i', '', $normalizedSlug);
+    }
+
+    private function normalizeDomainForCanonical(string $siteDomain): string
+    {
+        $domain = trim($siteDomain);
+        if ($domain === '') {
+            return 'https://';
+        }
+
+        if (!preg_match('#^https?://#i', $domain)) {
+            $domain = 'https://' . $domain;
+        }
+
+        return rtrim($domain, '/');
     }
 }

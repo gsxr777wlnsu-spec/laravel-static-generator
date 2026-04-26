@@ -3,9 +3,14 @@
 namespace App\Repositories;
 
 use App\Contracts\SiteRepositoryInterface;
+use App\Models\AuditLog;
+use App\Models\Deployment;
+use App\Models\Media;
+use App\Models\Section;
 use App\Models\Site;
 use App\Models\Page;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -27,7 +32,31 @@ class SiteRepository implements SiteRepositoryInterface
 
     public function delete(Site $site): bool
     {
-        return $site->delete();
+        $siteId = (int) $site->id;
+        $outputPath = (string) ($site->output_path ?? '');
+
+        $pageIds = Page::where('site_id', $siteId)->pluck('id')->all();
+        $mediaIds = Media::where('site_id', $siteId)->pluck('id')->all();
+        $deploymentIds = Deployment::where('site_id', $siteId)->pluck('id')->all();
+        $sectionIds = empty($pageIds)
+            ? []
+            : Section::whereIn('page_id', $pageIds)->pluck('id')->all();
+
+        $deleted = DB::transaction(function () use ($site, $siteId, $pageIds, $sectionIds, $mediaIds, $deploymentIds): bool {
+            $this->deleteAuditLogsForAuditable(Site::class, [$siteId]);
+            $this->deleteAuditLogsForAuditable(Page::class, $pageIds);
+            $this->deleteAuditLogsForAuditable(Section::class, $sectionIds);
+            $this->deleteAuditLogsForAuditable(Media::class, $mediaIds);
+            $this->deleteAuditLogsForAuditable(Deployment::class, $deploymentIds);
+
+            return $site->delete();
+        });
+
+        if ($deleted) {
+            $this->cleanupSiteFilesystemArtifacts($siteId, $outputPath);
+        }
+
+        return $deleted;
     }
 
     public function findById(int $id): ?Site
@@ -88,6 +117,90 @@ class SiteRepository implements SiteRepositoryInterface
                 Storage::disk('sites')->makeDirectory($dir);
             }
         }
+    }
+
+    private function deleteAuditLogsForAuditable(string $auditableType, array $ids): void
+    {
+        if (empty($ids)) {
+            return;
+        }
+
+        AuditLog::where('auditable_type', $auditableType)
+            ->whereIn('auditable_id', $ids)
+            ->delete();
+    }
+
+    private function cleanupSiteFilesystemArtifacts(int $siteId, string $outputPath): void
+    {
+        $this->deleteDirectoryOnDisk('sites', (string) $siteId);
+        $this->deleteDirectoryOnDisk('generated', 'site' . $siteId);
+        $this->deleteDirectoryOnDisk('generated', (string) $siteId);
+        $this->deleteDirectoryOnDisk('staging', 'site' . $siteId);
+        $this->deleteDirectoryOnDisk('staging', (string) $siteId);
+
+        $normalizedOutputPath = $this->normalizeOutputPathForGeneratedDisk($outputPath);
+        if ($normalizedOutputPath !== null) {
+            $this->deleteDirectoryOnDisk('generated', $normalizedOutputPath);
+        }
+
+        $templatePath = resource_path("views/templates/site{$siteId}");
+        try {
+            if (is_dir($templatePath) && !File::deleteDirectory($templatePath)) {
+                \Log::warning('Failed to delete site template directory', [
+                    'site_id' => $siteId,
+                    'path' => $templatePath,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('Failed to delete site template directory', [
+                'site_id' => $siteId,
+                'path' => $templatePath,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function deleteDirectoryOnDisk(string $disk, string $path): void
+    {
+        $normalized = trim($path, '/');
+        if ($normalized === '' || str_contains($normalized, '..')) {
+            return;
+        }
+
+        try {
+            if (Storage::disk($disk)->exists($normalized) && !Storage::disk($disk)->deleteDirectory($normalized)) {
+                \Log::warning('Failed to delete site artifact directory', [
+                    'disk' => $disk,
+                    'path' => $normalized,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('Failed to delete site artifact directory', [
+                'disk' => $disk,
+                'path' => $normalized,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function normalizeOutputPathForGeneratedDisk(string $outputPath): ?string
+    {
+        $normalized = trim(str_replace('\\', '/', $outputPath));
+        if ($normalized === '') {
+            return null;
+        }
+
+        $normalized = ltrim($normalized, '/');
+        if (str_starts_with($normalized, 'generated/')) {
+            $normalized = substr($normalized, strlen('generated/'));
+        }
+
+        $normalized = trim($normalized, '/');
+        if ($normalized === '' || str_contains($normalized, '..')) {
+            return null;
+        }
+
+        return $normalized;
     }
 
     public function cloneFromStaging(string $stagingPath, array $siteData): ?Site

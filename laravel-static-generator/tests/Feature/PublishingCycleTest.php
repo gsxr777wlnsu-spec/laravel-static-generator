@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Contracts\SftpClientInterface;
+use App\Contracts\DeployServiceInterface;
 use App\Models\Page;
 use App\Models\Section;
 use App\Models\Site;
@@ -35,6 +36,7 @@ class PublishingCycleTest extends TestCase
     public function test_generate_then_preview_cycle_works(): void
     {
         $this->useTemporaryGeneratedDisk();
+        $this->useTemporarySitesDisk();
 
         $site = Site::create([
             'name' => 'Cycle Site',
@@ -67,6 +69,8 @@ class PublishingCycleTest extends TestCase
             ],
         ]);
 
+        Storage::disk('sites')->put("{$site->id}/assets/js/app.js", 'console.log("from app.js");');
+
         $mockGitService = \Mockery::mock(GitService::class);
         $mockGitService->shouldReceive('setRepositoryPath')->andReturnSelf();
         $mockGitService->shouldReceive('commit')->andReturnNull();
@@ -82,6 +86,11 @@ class PublishingCycleTest extends TestCase
         Storage::disk('generated')->assertExists("site{$site->id}/index.html");
         Storage::disk('generated')->assertExists("site{$site->id}/sitemap.xml");
         Storage::disk('generated')->assertExists("site{$site->id}/robots.txt");
+        Storage::disk('generated')->assertExists("site{$site->id}/assets/js/main.js");
+        $this->assertSame(
+            'console.log("from app.js");',
+            Storage::disk('generated')->get("site{$site->id}/assets/js/main.js")
+        );
 
         $previewTokenResponse = $this->actingAs($this->admin)->postJson("/api/pages/{$page->id}/preview-token");
         $previewTokenResponse->assertOk();
@@ -90,6 +99,12 @@ class PublishingCycleTest extends TestCase
         $previewUrl = $previewTokenResponse->json('preview_url');
         $this->assertIsString($previewUrl);
         $this->assertStringStartsWith('/api/preview/', $previewUrl);
+
+        preg_match('#^/api/preview/([^/]+)/#', (string) $previewUrl, $matches);
+        $this->assertArrayHasKey(1, $matches);
+        $previewToken = $matches[1];
+        Storage::disk('generated')->assertExists("preview/{$previewToken}/assets/js/main.js");
+
         $previewResponse = $this->actingAs($this->admin)->get($previewUrl);
 
         $previewResponse->assertOk();
@@ -140,6 +155,53 @@ class PublishingCycleTest extends TestCase
         ]);
     }
 
+    public function test_deploy_with_post_commands_runs_remote_commands(): void
+    {
+        $this->useTemporaryGeneratedDisk();
+
+        $site = Site::create([
+            'name' => 'Deploy Import Site',
+            'domain' => 'import.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/import',
+            'status' => 'active',
+            'locale' => 'en',
+            'default_locale' => 'en',
+            'sftp_host' => '37.1.217.183',
+            'sftp_username' => 'root',
+            'sftp_auth_method' => 'password',
+            'sftp_remote_path' => '/var/www/import.example',
+        ]);
+
+        Storage::disk('generated')->put("site{$site->id}/index.html", '<html>ok</html>');
+
+        $mockSftp = \Mockery::mock(SftpClientInterface::class);
+        $mockSftp->shouldReceive('connect')->once()->withArgs(function (Site $argSite) use ($site) {
+            return $argSite->id === $site->id;
+        })->andReturn(true);
+        $mockSftp->shouldReceive('uploadDirectory')->once()->withArgs(function (Site $argSite, string $localPath, string $remotePath) use ($site) {
+            return $argSite->id === $site->id
+                && $localPath === "site{$site->id}"
+                && $remotePath === '/var/www/import.example';
+        })->andReturn(true);
+        $mockSftp->shouldReceive('runPostDeployCommands')->once()->withArgs(function (Site $argSite, string $remotePath) use ($site) {
+            return $argSite->id === $site->id
+                && $remotePath === '/var/www/import.example';
+        });
+        $mockSftp->shouldReceive('disconnect')->once();
+
+        $this->app->instance(SftpClientInterface::class, $mockSftp);
+
+        $deployment = $this->app->make(DeployServiceInterface::class)->deploy($site, true);
+
+        $this->assertSame('completed', $deployment->status);
+        $this->assertDatabaseHas('deployments', [
+            'id' => $deployment->id,
+            'status' => 'completed',
+            'remote_path' => '/var/www/import.example',
+        ]);
+    }
+
     private function useTemporaryGeneratedDisk(): void
     {
         $root = '/tmp/laravel-static-generator-tests/generated-' . Str::uuid();
@@ -152,5 +214,14 @@ class PublishingCycleTest extends TestCase
         File::ensureDirectoryExists($compiledViewsPath);
         config()->set('view.compiled', $compiledViewsPath);
         app()->forgetInstance('blade.compiler');
+    }
+
+    private function useTemporarySitesDisk(): void
+    {
+        $root = '/tmp/laravel-static-generator-tests/sites-' . Str::uuid();
+        File::ensureDirectoryExists($root);
+
+        config()->set('filesystems.disks.sites.root', $root);
+        Storage::forgetDisk('sites');
     }
 }

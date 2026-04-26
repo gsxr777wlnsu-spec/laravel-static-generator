@@ -18,7 +18,7 @@ class DeployService implements DeployServiceInterface
         private SftpClientInterface $sftp
     ) {}
 
-    public function deploy(Site $site): Deployment
+    public function deploy(Site $site, bool $runPostDeployCommands = false): Deployment
     {
         $deployment = $this->deployments->create([
             'site_id' => $site->id,
@@ -47,6 +47,10 @@ class DeployService implements DeployServiceInterface
 
             if (!$this->sftp->uploadDirectory($site, $stagingPath, $remotePath)) {
                 throw new \RuntimeException('Failed to upload files to SFTP server');
+            }
+
+            if ($runPostDeployCommands) {
+                $this->sftp->runPostDeployCommands($site, $remotePath);
             }
 
             $this->sftp->disconnect();

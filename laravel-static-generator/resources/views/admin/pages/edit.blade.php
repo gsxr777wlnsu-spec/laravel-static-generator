@@ -236,13 +236,87 @@
 <script>
 const moduleDefaults = @json($moduleDefaults ?? []);
 const editorAssetPrefix = '/admin/sites/{{ $site->id }}/media/serve/assets/';
+const canonicalSiteDomain = @json($site->domain);
+let canonicalManuallyEdited = false;
 
 function getCsrfToken() {
     return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 }
 
+function normalizeCanonicalDomain(domain) {
+    const value = String(domain || '').trim();
+    if (value === '') {
+        return 'https://';
+    }
+
+    const withProtocol = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+    return withProtocol.replace(/\/+$/, '');
+}
+
+function buildCanonicalFromSlug(slugValue) {
+    const domain = normalizeCanonicalDomain(canonicalSiteDomain);
+    const slug = String(slugValue || '').trim().replace(/^\/+|\/+$/g, '');
+
+    if (slug === '' || slug.toLowerCase() === 'index' || slug.toLowerCase() === 'index.html') {
+        return `${domain}/`;
+    }
+
+    return `${domain}/${slug.replace(/\.html$/i, '')}.html`;
+}
+
+function buildLegacyCanonicalFromSlug(slugValue) {
+    const domain = normalizeCanonicalDomain(canonicalSiteDomain);
+    const slug = String(slugValue || '').trim().replace(/^\/+|\/+$/g, '');
+
+    if (slug === '' || slug.toLowerCase() === 'index' || slug.toLowerCase() === 'index.html') {
+        return `${domain}/`;
+    }
+
+    return `${domain}/${slug.replace(/\.html$/i, '')}`;
+}
+
+function syncCanonicalFromSlug(force = false) {
+    const slugInput = document.querySelector('input[name="slug"]');
+    const canonicalInput = document.querySelector('input[name="canonical"]');
+
+    if (!slugInput || !canonicalInput) {
+        return;
+    }
+
+    const generatedCanonical = buildCanonicalFromSlug(slugInput.value);
+    if (force || !canonicalManuallyEdited || canonicalInput.value.trim() === '') {
+        canonicalInput.value = generatedCanonical;
+    }
+}
+
 function escapeRegExp(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+const slugInput = document.querySelector('input[name="slug"]');
+const canonicalInput = document.querySelector('input[name="canonical"]');
+
+if (slugInput && canonicalInput) {
+    const generatedCanonical = buildCanonicalFromSlug(slugInput.value);
+    const legacyGeneratedCanonical = buildLegacyCanonicalFromSlug(slugInput.value);
+    const currentCanonical = canonicalInput.value.trim();
+
+    canonicalManuallyEdited = currentCanonical !== ''
+        && currentCanonical !== generatedCanonical
+        && currentCanonical !== legacyGeneratedCanonical;
+
+    if (currentCanonical === '') {
+        canonicalInput.value = generatedCanonical;
+    }
+
+    slugInput.addEventListener('input', () => syncCanonicalFromSlug());
+    canonicalInput.addEventListener('input', () => {
+        const nextGenerated = buildCanonicalFromSlug(slugInput.value);
+        const nextLegacyGenerated = buildLegacyCanonicalFromSlug(slugInput.value);
+        canonicalManuallyEdited = canonicalInput.value.trim() !== ''
+            && canonicalInput.value.trim() !== nextGenerated
+            && canonicalInput.value.trim() !== nextLegacyGenerated;
+    });
 }
 
 function toEditorAssetUrls(html) {
@@ -600,6 +674,10 @@ document.getElementById('page-form').addEventListener('submit', async function (
 
     const formData = new FormData(this);
     const data = Object.fromEntries(formData);
+
+    if (!String(data.canonical || '').trim()) {
+        data.canonical = buildCanonicalFromSlug(data.slug || '');
+    }
 
     const ogData = parseJsonField(data.og_data || '', 'OpenGraph Data');
     if (ogData === false) return;

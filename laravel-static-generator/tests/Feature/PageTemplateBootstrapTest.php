@@ -76,6 +76,52 @@ class PageTemplateBootstrapTest extends TestCase
         $this->assertSame('hero', $firstSection->content['module'] ?? null);
     }
 
+    public function test_creating_page_auto_generates_canonical_from_site_domain_and_slug(): void
+    {
+        $site = $this->createSite();
+
+        $response = $this->actingAs($this->admin)->postJson('/api/pages', [
+            'site_id' => $site->id,
+            'slug' => 'contact-us',
+            'title' => 'Contact Us',
+            'status' => 'draft',
+            'locale' => 'en',
+            'template_key' => 'blank',
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('page.canonical', 'https://template-site.example/contact-us.html');
+    }
+
+    public function test_updating_slug_updates_auto_generated_canonical_in_response(): void
+    {
+        $site = $this->createSite();
+
+        $page = Page::create([
+            'site_id' => $site->id,
+            'slug' => 'old-slug',
+            'title' => 'Old Slug',
+            'status' => 'draft',
+            'locale' => 'en',
+            'template_key' => 'blank',
+            'canonical' => 'https://template-site.example/old-slug',
+        ]);
+
+        $response = $this->actingAs($this->admin)->putJson("/api/pages/{$page->id}", [
+            'slug' => 'new-slug',
+            'canonical' => 'https://template-site.example/old-slug',
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('canonical', 'https://template-site.example/new-slug.html');
+
+        $this->assertDatabaseHas('pages', [
+            'id' => $page->id,
+            'slug' => 'new-slug',
+            'canonical' => 'https://template-site.example/new-slug.html',
+        ]);
+    }
+
     public function test_bootstrap_endpoint_replaces_sections_and_updates_template_key(): void
     {
         $site = $this->createSite();
