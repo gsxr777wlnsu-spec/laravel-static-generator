@@ -112,6 +112,108 @@ class PublishingCycleTest extends TestCase
         $previewResponse->assertSee('Welcome');
     }
 
+    public function test_sitemap_module_is_dynamic_and_uses_latest_pages(): void
+    {
+        $this->useTemporaryGeneratedDisk();
+        $this->useTemporarySitesDisk();
+
+        $site = Site::create([
+            'name' => 'Sitemap Dynamic Site',
+            'domain' => 'sitemap-dynamic.example',
+            'template_set' => 'test',
+            'output_path' => 'generated/sitemap-dynamic',
+            'status' => 'active',
+            'locale' => 'en',
+            'default_locale' => 'en',
+        ]);
+
+        Page::create([
+            'site_id' => $site->id,
+            'slug' => 'index',
+            'title' => 'Home Page',
+            'template_key' => 'index',
+            'status' => 'published',
+            'locale' => 'en',
+        ]);
+
+        $appPage = Page::create([
+            'site_id' => $site->id,
+            'slug' => 'app',
+            'title' => 'Download App',
+            'template_key' => 'app',
+            'status' => 'published',
+            'locale' => 'en',
+        ]);
+
+        $sitemapPage = Page::create([
+            'site_id' => $site->id,
+            'slug' => 'sitemap',
+            'title' => 'Sitemap',
+            'template_key' => 'sitemap',
+            'status' => 'published',
+            'locale' => 'en',
+        ]);
+
+        Section::create([
+            'page_id' => $sitemapPage->id,
+            'type' => 'module',
+            'module' => 'sitemap',
+            'module_key' => 'sitemap',
+            'order' => 1,
+            'content' => [
+                'module' => 'sitemap',
+                'module_key' => 'sitemap',
+                'class' => 'sitemap',
+                'id' => 'sitemap',
+                'heading' => 'Sitemap',
+            ],
+        ]);
+
+        $mockGitService = \Mockery::mock(GitService::class);
+        $mockGitService->shouldReceive('setRepositoryPath')->andReturnSelf();
+        $mockGitService->shouldReceive('commit')->andReturnNull();
+        $this->app->instance(GitService::class, $mockGitService);
+
+        $firstGenerate = $this->actingAs($this->admin)->postJson("/api/sites/{$site->id}/generate");
+        $firstGenerate->assertOk();
+        $this->assertTrue((bool) $firstGenerate->json('success'));
+
+        Storage::disk('generated')->assertExists("site{$site->id}/sitemap.xml");
+        Storage::disk('generated')->assertExists("site{$site->id}/sitemap.html");
+
+        $firstGeneratedFiles = $firstGenerate->json('generated_files', []);
+        $xmlIndex = array_search("site{$site->id}/sitemap.xml", $firstGeneratedFiles, true);
+        $sitemapHtmlIndex = array_search("site{$site->id}/sitemap.html", $firstGeneratedFiles, true);
+        $this->assertNotFalse($xmlIndex);
+        $this->assertNotFalse($sitemapHtmlIndex);
+        $this->assertTrue($xmlIndex < $sitemapHtmlIndex, 'sitemap.html must be generated after sitemap.xml');
+
+        $firstSitemapHtml = Storage::disk('generated')->get("site{$site->id}/sitemap.html");
+        $this->assertStringContainsString('href="/"', $firstSitemapHtml);
+        $this->assertStringContainsString('href="app.html"', $firstSitemapHtml);
+        $this->assertStringContainsString('Download App', $firstSitemapHtml);
+
+        $appPage->delete();
+
+        Page::create([
+            'site_id' => $site->id,
+            'slug' => 'tips',
+            'title' => 'Tips And Tricks',
+            'template_key' => 'tips',
+            'status' => 'published',
+            'locale' => 'en',
+        ]);
+
+        $secondGenerate = $this->actingAs($this->admin)->postJson("/api/sites/{$site->id}/generate");
+        $secondGenerate->assertOk();
+        $this->assertTrue((bool) $secondGenerate->json('success'));
+
+        $secondSitemapHtml = Storage::disk('generated')->get("site{$site->id}/sitemap.html");
+        $this->assertStringNotContainsString('href="app.html"', $secondSitemapHtml);
+        $this->assertStringContainsString('href="tips.html"', $secondSitemapHtml);
+        $this->assertStringContainsString('Tips And Tricks', $secondSitemapHtml);
+    }
+
     public function test_deploy_uses_generated_directory_and_completes(): void
     {
         $this->useTemporaryGeneratedDisk();
@@ -133,6 +235,9 @@ class PublishingCycleTest extends TestCase
         Storage::disk('generated')->put("site{$site->id}/index.html", '<html>ok</html>');
 
         $mockSftp = \Mockery::mock(SftpClientInterface::class);
+        $mockSftp->shouldReceive('testConnection')->once()->withArgs(function (Site $argSite) use ($site) {
+            return $argSite->id === $site->id;
+        })->andReturn(true);
         $mockSftp->shouldReceive('connect')->once()->withArgs(function (Site $argSite) use ($site) {
             return $argSite->id === $site->id;
         })->andReturn(true);

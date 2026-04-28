@@ -101,6 +101,9 @@ class PageTemplatePresetService
      */
     private const MODULE_CATALOG = [
         'authors',
+        'authors-cookies',
+        'authors-cookie-policy',
+        'authors-privacy-policy',
         'background',
         'benefits',
         'benefits-demo',
@@ -194,6 +197,24 @@ class PageTemplatePresetService
 
     private const MODULE_DEFAULTS = [
         'authors' => ['class' => 'authors', 'id' => 'authors'],
+        'authors-cookies' => [
+            'class' => 'authors',
+            'id' => 'cookies',
+            'heading' => 'Acceptance of Terms',
+            'description' => 'Utilising this slot game platform signifies your acceptance of the terms and conditions outlined here, which include the reading and understanding of all components. Should these terms be unsatisfactory in any form, the services provided should be ceased immediately.',
+        ],
+        'authors-cookie-policy' => [
+            'class' => 'authors',
+            'id' => 'cookies',
+            'heading' => 'What Are Cookies',
+            'description' => 'The following sections detail the specific use of cookies for the site dedicated to all information and services regarding the Ganesha Fortune slot game.',
+        ],
+        'authors-privacy-policy' => [
+            'class' => 'authors',
+            'id' => 'cookies',
+            'heading' => 'Offers',
+            'description' => 'The site offers the necessary details that pertain to online slot gaming, given that such information can only be accessed if you agree with this privacy policy. This document highlights the extensive measures that we have put in place to ensure the protection of user data, promote responsible gambling behaviour, and comply with the local laws of India where our site is hosted. The online gambling industry is bound by the strict rules and regulations set in place, and we uphold these for the good of every user. You have to accept our terms in full in order to access the site. Use of our site without any restrictions will be regarded as your acceptance to the terms mentioned in this privacy statement.',
+        ],
         'benefits' => ['class' => 'benefits', 'id' => 'benefits'],
         'benefits-demo' => ['class' => 'benefits benefits--demo', 'id' => 'benefits'],
         'bonuses' => ['class' => 'bonuses', 'id' => 'bonuses'],
@@ -407,7 +428,7 @@ class PageTemplatePresetService
         foreach (self::MODULE_DEFAULTS as $key => $config) {
             $rawHtml = '';
             $path = resource_path("views/defaults/modules/{$key}.html");
-            if (file_exists($path)) {
+            if ($key !== 'sitemap' && file_exists($path)) {
                 $rawHtml = file_get_contents($path);
             }
 
@@ -558,6 +579,30 @@ class PageTemplatePresetService
             }
 
             $base = preg_replace('/(--|__).*$/', '', $token);
+
+            if (
+                $base === 'authors'
+                && $templateKey === 'terms-and-conditions'
+                && $idAttr === 'cookies'
+            ) {
+                return 'authors-cookies';
+            }
+
+            if (
+                $base === 'authors'
+                && $templateKey === 'cookie-policy'
+                && $idAttr === 'cookies'
+            ) {
+                return 'authors-cookie-policy';
+            }
+
+            if (
+                $base === 'authors'
+                && $templateKey === 'privacy-policy'
+                && $idAttr === 'cookies'
+            ) {
+                return 'authors-privacy-policy';
+            }
 
             if (
                 $base === 'casino'

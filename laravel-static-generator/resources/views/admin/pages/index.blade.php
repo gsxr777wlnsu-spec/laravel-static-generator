@@ -121,6 +121,10 @@ async function deletePage(pageId, pageTitle) {
             return;
         }
 
+        if (data.warning) {
+            alert(data.warning);
+        }
+
         window.location.reload();
     } catch (error) {
         alert('Error: ' + error.message);

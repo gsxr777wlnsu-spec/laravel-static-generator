@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Contracts\SftpClientInterface;
 use App\Models\AuditLog;
 use App\Models\Deployment;
 use App\Models\Media;
@@ -196,6 +197,44 @@ class SiteCrudTest extends TestCase
         $this->assertFalse(Storage::disk('generated')->exists("site{$site->id}"));
         $this->assertFalse(Storage::disk('generated')->exists('delete-site'));
         $this->assertFalse(Storage::disk('staging')->exists("site{$site->id}"));
+    }
+
+    public function test_destroy_removes_remote_directory_when_sftp_is_configured(): void
+    {
+        $this->useTemporaryStorageRoots();
+
+        $site = Site::create([
+            'name' => 'Remote Delete Site',
+            'domain' => 'remote-delete.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/remote-delete',
+            'status' => 'active',
+            'locale' => 'en',
+            'default_locale' => 'en',
+            'sftp_host' => '37.1.217.183',
+            'sftp_port' => 22,
+            'sftp_username' => 'root',
+            'sftp_password' => encrypt('secret'),
+            'sftp_auth_method' => 'password',
+            'sftp_remote_path' => '/var/www/html/remote-delete.example',
+        ]);
+
+        $mockSftp = \Mockery::mock(SftpClientInterface::class);
+        $mockSftp->shouldReceive('connect')->once()->withArgs(function (Site $argSite) use ($site) {
+            return $argSite->id === $site->id;
+        })->andReturn(true);
+        $mockSftp->shouldReceive('deleteDirectory')->once()->withArgs(function (Site $argSite, string $remotePath) use ($site) {
+            return $argSite->id === $site->id
+                && $remotePath === 'var/www/html/remote-delete.example';
+        })->andReturn(true);
+        $mockSftp->shouldReceive('disconnect')->once();
+
+        $this->app->instance(SftpClientInterface::class, $mockSftp);
+
+        $response = $this->actingAs($this->admin)->deleteJson("/api/sites/{$site->id}");
+        $response->assertOk();
+
+        $this->assertDatabaseMissing('sites', ['id' => $site->id]);
     }
 
     private function useTemporaryStorageRoots(): void

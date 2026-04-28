@@ -7,9 +7,12 @@ use App\Contracts\HtmlGeneratorInterface;
 use App\Contracts\PageRepositoryInterface;
 use App\Contracts\SeoServiceInterface;
 use App\Contracts\SiteRepositoryInterface;
+use App\Contracts\SftpClientInterface;
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\Page;
 use App\Models\Section;
+use App\Models\Site;
 use App\Services\PageTemplatePresetService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -26,7 +29,8 @@ class PageController extends Controller
         private SeoServiceInterface $seo,
         private HtmlGeneratorInterface $generator,
         private AuditLogServiceInterface $audit,
-        private PageTemplatePresetService $templatePresets
+        private PageTemplatePresetService $templatePresets,
+        private SftpClientInterface $sftp
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -101,6 +105,11 @@ class PageController extends Controller
         });
 
         $page = $page->fresh(['sections']);
+
+        $sitemapSyncWarning = $this->syncSitemapArtifactsToRemote($site);
+        if ($sitemapSyncWarning !== null) {
+            $warnings[] = $sitemapSyncWarning;
+        }
 
         $this->audit->log('page.created', Page::class, $page->id, null, $page->toArray());
 
@@ -179,15 +188,68 @@ class PageController extends Controller
 
     public function destroy(int $id): JsonResponse
     {
-        $page = Page::find($id);
+        $page = Page::with('site')->find($id);
 
         if (!$page) {
             return response()->json(['error' => 'Page not found'], 404);
         }
 
+        $site = $page->site;
+        if (!$site) {
+            return response()->json(['error' => 'Site not found for page'], 404);
+        }
+
+        $filename = $this->resolveGeneratedFilename($page);
+
+        if ($this->hasSftpConfiguration($site)) {
+            $remoteRoot = $this->resolveRemoteRootPath($site);
+            $remoteFilePath = trim($remoteRoot, '/') . '/' . $filename;
+
+            try {
+                if (!$this->sftp->connect($site)) {
+                    return response()->json([
+                        'error' => 'Remote delete failed',
+                        'message' => 'Could not connect to SFTP server for remote page deletion.',
+                    ], 422);
+                }
+
+                if (!$this->sftp->deleteFile($site, $remoteFilePath)) {
+                    return response()->json([
+                        'error' => 'Remote delete failed',
+                        'message' => "Could not delete remote page file: {$remoteFilePath}",
+                    ], 422);
+                }
+            } finally {
+                $this->sftp->disconnect();
+            }
+        }
+
+        $sectionIds = Section::where('page_id', $page->id)->pluck('id')->all();
         $this->audit->log('page.deleted', Page::class, $page->id, $page->toArray(), null);
-        
-        $this->pages->delete($page);
+
+        DB::transaction(function () use ($page, $sectionIds): void {
+            AuditLog::where('auditable_type', Page::class)
+                ->where('auditable_id', $page->id)
+                ->delete();
+
+            if (!empty($sectionIds)) {
+                AuditLog::where('auditable_type', Section::class)
+                    ->whereIn('auditable_id', $sectionIds)
+                    ->delete();
+            }
+
+            $this->pages->delete($page);
+        });
+
+        $this->deletePageArtifactsFromDisk($site, $filename);
+
+        $warning = $this->syncSitemapArtifactsToRemote($site);
+        if ($warning !== null) {
+            return response()->json([
+                'message' => 'Page deleted successfully',
+                'warning' => $warning,
+            ]);
+        }
 
         return response()->json(['message' => 'Page deleted successfully']);
     }
@@ -395,5 +457,150 @@ class PageController extends Controller
         }
 
         return rtrim($domain, '/');
+    }
+
+    private function hasSftpConfiguration(Site $site): bool
+    {
+        $credentials = $site->getSftpCredentials();
+
+        return trim((string) ($credentials['host'] ?? '')) !== ''
+            && trim((string) ($credentials['username'] ?? '')) !== '';
+    }
+
+    private function resolveRemoteRootPath(Site $site): string
+    {
+        $remotePath = trim((string) ($site->sftp_remote_path ?? ''), '/');
+        if ($remotePath !== '') {
+            return $remotePath;
+        }
+
+        return trim('/var/www/' . trim((string) $site->domain, '/'), '/');
+    }
+
+    private function resolveGeneratedFilename(Page $page): string
+    {
+        $slug = trim((string) $page->slug);
+        if ($slug === '' || Str::lower($slug) === 'index' || Str::lower($slug) === 'index.html') {
+            return 'index.html';
+        }
+
+        if (!Str::endsWith(Str::lower($slug), '.html')) {
+            $slug .= '.html';
+        }
+
+        return ltrim($slug, '/');
+    }
+
+    private function deletePageArtifactsFromDisk(Site $site, string $filename): void
+    {
+        $this->deleteFileOnDisk('generated', "site{$site->id}/{$filename}");
+        $this->deleteFileOnDisk('generated', "{$site->id}/{$filename}");
+        $this->deleteFileOnDisk('staging', "site{$site->id}/{$filename}");
+        $this->deleteFileOnDisk('staging', "{$site->id}/{$filename}");
+
+        $outputPath = $this->normalizeOutputPathForGeneratedDisk((string) ($site->output_path ?? ''));
+        if ($outputPath !== null) {
+            $this->deleteFileOnDisk('generated', "{$outputPath}/{$filename}");
+        }
+    }
+
+    private function deleteFileOnDisk(string $disk, string $path): void
+    {
+        $normalized = trim($path, '/');
+        if ($normalized === '' || str_contains($normalized, '..')) {
+            return;
+        }
+
+        try {
+            if (Storage::disk($disk)->exists($normalized)) {
+                Storage::disk($disk)->delete($normalized);
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('Failed to delete page artifact file', [
+                'disk' => $disk,
+                'path' => $normalized,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function normalizeOutputPathForGeneratedDisk(string $outputPath): ?string
+    {
+        $normalized = trim(str_replace('\\', '/', $outputPath));
+        if ($normalized === '') {
+            return null;
+        }
+
+        $normalized = ltrim($normalized, '/');
+        if (str_starts_with($normalized, 'generated/')) {
+            $normalized = substr($normalized, strlen('generated/'));
+        }
+
+        $normalized = trim($normalized, '/');
+        if ($normalized === '' || str_contains($normalized, '..')) {
+            return null;
+        }
+
+        return $normalized;
+    }
+
+    private function syncSitemapArtifactsToRemote(Site $site): ?string
+    {
+        if (!$this->hasSftpConfiguration($site)) {
+            return null;
+        }
+
+        $sitemapPage = Page::where('site_id', $site->id)
+            ->where('status', 'published')
+            ->whereIn('slug', ['sitemap', 'sitemap.html'])
+            ->orderBy('id')
+            ->first();
+
+        if (!$sitemapPage) {
+            return null;
+        }
+
+        try {
+            $sitemapXmlPath = "site{$site->id}/sitemap.xml";
+            Storage::disk('generated')->put($sitemapXmlPath, $this->generator->generateSitemap($site));
+
+            $sitemapHtmlFilename = $this->resolveGeneratedFilename($sitemapPage);
+            $sitemapHtmlPath = "site{$site->id}/{$sitemapHtmlFilename}";
+            Storage::disk('generated')->put($sitemapHtmlPath, $this->generator->generatePage($sitemapPage));
+
+            $remoteRoot = trim($this->resolveRemoteRootPath($site), '/');
+            if ($remoteRoot === '') {
+                return 'Automatic sitemap deploy skipped: remote path is empty.';
+            }
+
+            if (!$this->sftp->connect($site)) {
+                return 'Automatic sitemap deploy failed: could not connect to SFTP.';
+            }
+
+            $remoteSitemapXmlPath = $remoteRoot . '/sitemap.xml';
+            if (!$this->sftp->uploadFile($site, $sitemapXmlPath, $remoteSitemapXmlPath)) {
+                return "Automatic sitemap deploy failed: could not upload {$remoteSitemapXmlPath}.";
+            }
+
+            $remoteSitemapHtmlPath = $remoteRoot . '/' . $sitemapHtmlFilename;
+            if (!$this->sftp->uploadFile($site, $sitemapHtmlPath, $remoteSitemapHtmlPath)) {
+                return "Automatic sitemap deploy failed: could not upload {$remoteSitemapHtmlPath}.";
+            }
+
+            return null;
+        } catch (\Throwable $e) {
+            \Log::warning('Automatic sitemap deploy failed', [
+                'site_id' => $site->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return 'Automatic sitemap deploy failed: ' . $e->getMessage();
+        } finally {
+            try {
+                $this->sftp->disconnect();
+            } catch (\Throwable) {
+                // Ignore disconnect issues.
+            }
+        }
     }
 }

@@ -33,6 +33,10 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
             'languageVersions' => $languageVersions,
         ];
 
+        if ($this->isSitemapPage($page)) {
+            $data['sitemapLinks'] = $this->buildSitemapLinks($page->site);
+        }
+
         $templatePath = $this->resolvePageTemplatePath($page);
 
         $html = View::make($templatePath, $data)->render();
@@ -42,14 +46,16 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
 
     public function generateSite(Site $site, ?callable $onProgress = null): array
     {
-        $pages = $this->pageRepository->getActiveBySite($site);
+        $pages = $this->pageRepository->getActiveBySite($site)->values();
+        $regularPages = $pages->reject(fn (Page $page) => $this->isSitemapPage($page))->values();
+        $sitemapPages = $pages->filter(fn (Page $page) => $this->isSitemapPage($page))->values();
         $generatedFiles = [];
         $errors = [];
 
-        $totalSteps = $pages->count() + 2; // +1sitemap, +1robots
+        $totalSteps = $pages->count() + 2; // +1 sitemap.xml, +1 robots.txt
         $currentStep = 0;
 
-        foreach ($pages as $page) {
+        foreach ($regularPages as $page) {
             try {
                 $html = $this->generatePage($page);
                 
@@ -80,10 +86,45 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         $sitemapPath = "site{$site->id}/sitemap.xml";
         Storage::disk('generated')->put($sitemapPath, $this->generateSitemap($site));
         $generatedFiles[] = $sitemapPath;
+        $currentStep++;
+        if ($onProgress) {
+            $onProgress($currentStep, $totalSteps);
+        }
+
+        foreach ($sitemapPages as $page) {
+            try {
+                $html = $this->generatePage($page);
+
+                $filename = $page->slug === 'index' || $page->slug === ''
+                    ? 'index.html'
+                    : $page->slug . '.html';
+
+                $path = "site{$site->id}/{$filename}";
+
+                Storage::disk('generated')->put($path, $html);
+
+                $generatedFiles[] = $path;
+            } catch (\Exception $e) {
+                $errors[] = [
+                    'page_id' => $page->id,
+                    'slug' => $page->slug,
+                    'error' => $e->getMessage()
+                ];
+            }
+
+            $currentStep++;
+            if ($onProgress) {
+                $onProgress($currentStep, $totalSteps);
+            }
+        }
 
         $robotsPath = "site{$site->id}/robots.txt";
         Storage::disk('generated')->put($robotsPath, $this->generateRobotsTxt($site));
         $generatedFiles[] = $robotsPath;
+        $currentStep++;
+        if ($onProgress) {
+            $onProgress($currentStep, $totalSteps);
+        }
 
         // Copy assets to the site's generated directory
         $this->copyAssetsToSite($site->id);
@@ -138,6 +179,252 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         $content .= "Sitemap: https://{$site->domain}/sitemap.xml" . PHP_EOL;
         
         return $content;
+    }
+
+    private function isSitemapPage(Page $page): bool
+    {
+        $slug = trim((string) $page->slug, '/');
+        return in_array($slug, ['sitemap', 'sitemap.html'], true);
+    }
+
+    /**
+     * @return array<int, array{href:string,label:string}>
+     */
+    private function buildSitemapLinks(Site $site): array
+    {
+        $links = [];
+        $lookup = [];
+
+        $activePages = $this->pageRepository->getActiveBySite($site);
+        foreach ($activePages as $page) {
+            $href = $this->hrefFromSlug((string) $page->slug);
+            if ($href === null) {
+                continue;
+            }
+
+            $label = trim((string) $page->title);
+            if ($label === '') {
+                $label = $this->labelFromHref($href);
+            }
+
+            $this->pushSitemapLink($links, $lookup, $href, $label);
+        }
+
+        foreach ($this->sitemapHrefsFromXml($site) as $href) {
+            $this->pushSitemapLink($links, $lookup, $href, $this->labelFromHref($href));
+        }
+
+        if (count($links) === 0) {
+            foreach ($this->sitemapHrefsFromGeneratedFiles($site) as $href) {
+                $this->pushSitemapLink($links, $lookup, $href, $this->labelFromHref($href));
+            }
+        }
+
+        if (count($links) === 0) {
+            return [
+                ['href' => '/', 'label' => 'Home'],
+            ];
+        }
+
+        $homeIndex = null;
+        foreach ($links as $index => $link) {
+            if (($link['href'] ?? '') === '/') {
+                $homeIndex = $index;
+                break;
+            }
+        }
+
+        if ($homeIndex !== null && $homeIndex > 0) {
+            $homeLink = $links[$homeIndex];
+            array_splice($links, $homeIndex, 1);
+            array_unshift($links, $homeLink);
+        }
+
+        return $links;
+    }
+
+    private function pushSitemapLink(array &$links, array &$lookup, string $href, string $label): void
+    {
+        $normalizedHref = trim($href);
+        if ($normalizedHref === '') {
+            return;
+        }
+
+        $key = Str::lower($normalizedHref);
+        if (array_key_exists($key, $lookup)) {
+            return;
+        }
+
+        $normalizedLabel = trim($label);
+        if ($normalizedLabel === '') {
+            $normalizedLabel = $this->labelFromHref($normalizedHref);
+        }
+
+        $lookup[$key] = count($links);
+        $links[] = [
+            'href' => $normalizedHref,
+            'label' => $normalizedLabel,
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function sitemapHrefsFromXml(Site $site): array
+    {
+        $sitemapPath = "site{$site->id}/sitemap.xml";
+        if (!Storage::disk('generated')->exists($sitemapPath)) {
+            return [];
+        }
+
+        $xmlContent = Storage::disk('generated')->get($sitemapPath);
+        if (!is_string($xmlContent) || trim($xmlContent) === '') {
+            return [];
+        }
+
+        $xml = @simplexml_load_string($xmlContent);
+        if ($xml === false) {
+            return [];
+        }
+
+        $urls = [];
+        if (!isset($xml->url)) {
+            return $urls;
+        }
+
+        foreach ($xml->url as $urlNode) {
+            $loc = trim((string) ($urlNode->loc ?? ''));
+            if ($loc === '') {
+                continue;
+            }
+
+            $href = $this->hrefFromUrl($loc, (string) $site->domain);
+            if ($href === null) {
+                continue;
+            }
+
+            $urls[] = $href;
+        }
+
+        return $urls;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function sitemapHrefsFromGeneratedFiles(Site $site): array
+    {
+        $sitePath = "site{$site->id}";
+        if (!Storage::disk('generated')->exists($sitePath)) {
+            return [];
+        }
+
+        $hrefs = [];
+        foreach (Storage::disk('generated')->allFiles($sitePath) as $filePath) {
+            $relativePath = ltrim((string) Str::of($filePath)->after("{$sitePath}/"), '/');
+            if ($relativePath === '') {
+                continue;
+            }
+
+            if (!Str::endsWith(Str::lower($relativePath), '.html')) {
+                continue;
+            }
+
+            if ($relativePath === 'index.html') {
+                $hrefs[] = '/';
+                continue;
+            }
+
+            $hrefs[] = $relativePath;
+        }
+
+        return $hrefs;
+    }
+
+    private function hrefFromSlug(string $slug): ?string
+    {
+        $normalizedSlug = trim($slug);
+        if ($normalizedSlug === '') {
+            return '/';
+        }
+
+        $normalizedSlug = trim($normalizedSlug, '/');
+        if ($normalizedSlug === '' || Str::lower($normalizedSlug) === 'index' || Str::lower($normalizedSlug) === 'index.html') {
+            return '/';
+        }
+
+        if (!Str::endsWith(Str::lower($normalizedSlug), '.html')) {
+            $normalizedSlug .= '.html';
+        }
+
+        return $normalizedSlug;
+    }
+
+    private function hrefFromUrl(string $url, string $siteDomain): ?string
+    {
+        $normalizedUrl = trim($url);
+        if ($normalizedUrl === '') {
+            return null;
+        }
+
+        $parts = parse_url($normalizedUrl);
+        if ($parts === false) {
+            return null;
+        }
+
+        if (isset($parts['scheme']) || isset($parts['host'])) {
+            $urlHost = Str::lower((string) ($parts['host'] ?? ''));
+            $domainUrl = Str::startsWith($siteDomain, ['http://', 'https://']) ? $siteDomain : ('https://' . $siteDomain);
+            $domainHost = Str::lower((string) parse_url($domainUrl, PHP_URL_HOST));
+
+            if ($urlHost !== '' && $domainHost !== '' && $urlHost !== $domainHost) {
+                return $normalizedUrl;
+            }
+        }
+
+        $path = trim((string) ($parts['path'] ?? ''));
+        if ($path === '' || $path === '/') {
+            return '/';
+        }
+
+        $path = trim($path, '/');
+        if ($path === '' || Str::lower($path) === 'index' || Str::lower($path) === 'index.html') {
+            return '/';
+        }
+
+        if (!Str::endsWith(Str::lower($path), '.html')) {
+            $path .= '.html';
+        }
+
+        return $path;
+    }
+
+    private function labelFromHref(string $href): string
+    {
+        $trimmed = trim($href);
+        if ($trimmed === '' || $trimmed === '/') {
+            return 'Home';
+        }
+
+        if (Str::startsWith($trimmed, ['http://', 'https://'])) {
+            $path = (string) parse_url($trimmed, PHP_URL_PATH);
+            $trimmed = trim($path, '/');
+        }
+
+        if ($trimmed === '' || $trimmed === '/') {
+            return 'Home';
+        }
+
+        $segment = Str::of($trimmed)
+            ->trim('/')
+            ->replaceMatches('/\.html$/i', '')
+            ->afterLast('/')
+            ->replace(['-', '_'], ' ')
+            ->squish()
+            ->title()
+            ->value();
+
+        return $segment !== '' ? $segment : 'Page';
     }
 
     public function generatePreview(Page $page): array

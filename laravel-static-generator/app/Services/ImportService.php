@@ -355,6 +355,30 @@ class ImportService
             $base = preg_replace('/(--|__).*$/', '', $token);
 
             if (
+                $base === 'authors'
+                && $templateKey === 'terms-and-conditions'
+                && $idAttr === 'cookies'
+            ) {
+                return 'authors-cookies';
+            }
+
+            if (
+                $base === 'authors'
+                && $templateKey === 'cookie-policy'
+                && $idAttr === 'cookies'
+            ) {
+                return 'authors-cookie-policy';
+            }
+
+            if (
+                $base === 'authors'
+                && $templateKey === 'privacy-policy'
+                && $idAttr === 'cookies'
+            ) {
+                return 'authors-privacy-policy';
+            }
+
+            if (
                 $base === 'casino'
                 && $templateKey === '1win'
                 && $idAttr === 'bonuses'
@@ -686,7 +710,11 @@ class ImportService
             
             // Save ALL fields from YAML in content JSON (not just standard fields)
             $contentFields = array_filter($sectionData, fn($v) => $v !== null);
-            if (!isset($contentFields['raw_html']) || !is_string($contentFields['raw_html']) || trim($contentFields['raw_html']) === '') {
+            $isDynamicSitemapModule = trim((string) $module) === 'sitemap';
+            if (
+                !$isDynamicSitemapModule
+                && (!isset($contentFields['raw_html']) || !is_string($contentFields['raw_html']) || trim($contentFields['raw_html']) === '')
+            ) {
                 $generatedRawHtml = $this->generateRawHtmlFromModuleView($site, $page, $sectionData);
                 if ($generatedRawHtml !== null) {
                     $contentFields['raw_html'] = $generatedRawHtml;

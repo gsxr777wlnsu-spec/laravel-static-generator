@@ -135,9 +135,37 @@ class SiteController extends Controller
             return response()->json(['error' => 'Site not found'], 404);
         }
 
+        if ($this->hasSftpConfiguration($site)) {
+            $remotePath = $this->resolveRemoteRootPath($site);
+
+            try {
+                if (!$this->sftp->connect($site)) {
+                    return response()->json([
+                        'error' => 'Remote delete failed',
+                        'message' => 'Could not connect to SFTP server for remote site deletion.',
+                    ], 422);
+                }
+
+                if (!$this->sftp->deleteDirectory($site, $remotePath)) {
+                    return response()->json([
+                        'error' => 'Remote delete failed',
+                        'message' => "Could not delete remote directory: {$remotePath}",
+                    ], 422);
+                }
+            } finally {
+                $this->sftp->disconnect();
+            }
+        }
+
         $this->audit->log('site.deleted', Site::class, $site->id, $site->toArray(), null);
-        
-        $this->sites->delete($site);
+
+        $deleted = $this->sites->delete($site);
+        if (!$deleted) {
+            return response()->json([
+                'error' => 'Delete failed',
+                'message' => 'Site could not be deleted from local database/storage.',
+            ], 500);
+        }
 
         return response()->json(['message' => 'Site deleted successfully']);
     }
@@ -356,5 +384,23 @@ class SiteController extends Controller
             'success' => $success,
             'message' => $success ? 'Connection successful' : 'Connection failed'
         ]);
+    }
+
+    private function hasSftpConfiguration(Site $site): bool
+    {
+        $credentials = $site->getSftpCredentials();
+
+        return trim((string) ($credentials['host'] ?? '')) !== ''
+            && trim((string) ($credentials['username'] ?? '')) !== '';
+    }
+
+    private function resolveRemoteRootPath(Site $site): string
+    {
+        $remotePath = trim((string) ($site->sftp_remote_path ?? ''), '/');
+        if ($remotePath !== '') {
+            return $remotePath;
+        }
+
+        return trim('/var/www/' . trim((string) $site->domain, '/'), '/');
     }
 }

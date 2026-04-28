@@ -135,6 +135,132 @@ class SftpClient implements SftpClientInterface
         }
     }
 
+    public function uploadFile(Site $site, string $localFilePath, string $remoteFilePath): bool
+    {
+        try {
+            if (!$this->filesystem) {
+                if (!$this->connect($site)) {
+                    return false;
+                }
+            }
+
+            $normalizedLocalFilePath = trim($localFilePath, '/');
+            if ($normalizedLocalFilePath === '' || str_contains($normalizedLocalFilePath, '..')) {
+                \Log::warning('Refused to upload unsafe local file path', [
+                    'site_id' => $site->id,
+                    'local_file_path' => $localFilePath,
+                ]);
+                return false;
+            }
+
+            if (!Storage::disk('generated')->exists($normalizedLocalFilePath)) {
+                \Log::warning('Local file not found for upload', [
+                    'site_id' => $site->id,
+                    'local_file_path' => $normalizedLocalFilePath,
+                ]);
+                return false;
+            }
+
+            $normalizedRemoteFilePath = trim($remoteFilePath, '/');
+            if ($normalizedRemoteFilePath === '' || str_contains($normalizedRemoteFilePath, '..')) {
+                \Log::warning('Refused to upload unsafe remote file path', [
+                    'site_id' => $site->id,
+                    'remote_file_path' => $remoteFilePath,
+                ]);
+                return false;
+            }
+
+            $remoteDir = dirname($normalizedRemoteFilePath);
+            if ($remoteDir !== '.' && $remoteDir !== '') {
+                try {
+                    $this->filesystem->createDirectory($remoteDir, ['visibility' => 'public']);
+                } catch (\Exception) {
+                    // Directory might already exist.
+                }
+            }
+
+            $content = Storage::disk('generated')->get($normalizedLocalFilePath);
+            $this->filesystem->write($normalizedRemoteFilePath, $content);
+            return true;
+        } catch (\Exception $e) {
+            \Log::error('SFTP upload file failed', [
+                'site_id' => $site->id,
+                'local_file_path' => $localFilePath,
+                'remote_file_path' => $remoteFilePath,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
+    public function deleteDirectory(Site $site, string $remotePath): bool
+    {
+        try {
+            if (!$this->filesystem) {
+                if (!$this->connect($site)) {
+                    return false;
+                }
+            }
+
+            $normalizedRemotePath = trim($remotePath, '/');
+            if (!$this->isSafeRemoteDirectoryPath($normalizedRemotePath)) {
+                \Log::warning('Refused to delete unsafe remote directory path', [
+                    'site_id' => $site->id,
+                    'remote_path' => $remotePath,
+                ]);
+                return false;
+            }
+
+            if (!$this->filesystem->directoryExists($normalizedRemotePath)) {
+                return true;
+            }
+
+            $this->filesystem->deleteDirectory($normalizedRemotePath);
+            return true;
+        } catch (\Exception $e) {
+            \Log::error('SFTP delete directory failed', [
+                'site_id' => $site->id,
+                'remote_path' => $remotePath,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    public function deleteFile(Site $site, string $remoteFilePath): bool
+    {
+        try {
+            if (!$this->filesystem) {
+                if (!$this->connect($site)) {
+                    return false;
+                }
+            }
+
+            $normalizedRemoteFilePath = trim($remoteFilePath, '/');
+            if ($normalizedRemoteFilePath === '') {
+                \Log::warning('Refused to delete empty remote file path', [
+                    'site_id' => $site->id,
+                    'remote_file_path' => $remoteFilePath,
+                ]);
+                return false;
+            }
+
+            if (!$this->filesystem->fileExists($normalizedRemoteFilePath)) {
+                return true;
+            }
+
+            $this->filesystem->delete($normalizedRemoteFilePath);
+            return true;
+        } catch (\Exception $e) {
+            \Log::error('SFTP delete file failed', [
+                'site_id' => $site->id,
+                'remote_file_path' => $remoteFilePath,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
     public function runPostDeployCommands(Site $site, string $remotePath): void
     {
         $normalizedRemotePath = rtrim(trim($remotePath), '/');
@@ -217,5 +343,41 @@ class SftpClient implements SftpClientInterface
         } catch (\Throwable) {
             return $value;
         }
+    }
+
+    private function isSafeRemoteDirectoryPath(string $remotePath): bool
+    {
+        $normalized = trim($remotePath, '/');
+        if ($normalized === '' || str_contains($normalized, '..')) {
+            return false;
+        }
+
+        $segments = array_values(array_filter(explode('/', $normalized), fn ($segment) => $segment !== ''));
+        if (count($segments) < 2) {
+            return false;
+        }
+
+        $protectedPaths = [
+            'var',
+            'var/www',
+            'var/www/html',
+            'etc',
+            'usr',
+            'home',
+            'root',
+            'tmp',
+            'opt',
+            'srv',
+            'dev',
+            'proc',
+            'sys',
+            'bin',
+            'sbin',
+            'lib',
+            'lib64',
+            'boot',
+        ];
+
+        return !in_array(strtolower($normalized), $protectedPaths, true);
     }
 }
