@@ -121,6 +121,11 @@
                class="inline-flex items-center rounded-md bg-white dark:bg-gray-700 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-300 dark:ring-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600">
                 Cancel
             </a>
+            <button id="save-deploy-btn" type="button"
+                    style="background-color: #d97706 !important;"
+                    class="inline-flex cursor-pointer items-center rounded-md bg-amber-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-500 focus:outline-none focus-visible:outline-none">
+                Save & Deploy
+            </button>
             <button type="submit"
                     class="inline-flex cursor-pointer items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus:outline-none focus-visible:outline-none">
                 Save Changes
@@ -237,7 +242,9 @@
 const moduleDefaults = @json($moduleDefaults ?? []);
 const editorAssetPrefix = '/admin/sites/{{ $site->id }}/media/serve/assets/';
 const canonicalSiteDomain = @json($site->domain);
+const currentSiteId = {{ $site->id }};
 let canonicalManuallyEdited = false;
+let pageActionInProgress = false;
 
 function getCsrfToken() {
     return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
@@ -419,10 +426,11 @@ function parseSectionJson(text, label) {
     return parsed;
 }
 
-async function saveSection(sectionId, container) {
+async function saveSection(sectionId, container, options = {}) {
+    const silent = options.silent === true;
     const contentText = container.querySelector('.section-content').value;
     const content = parseSectionJson(contentText, 'Section content');
-    if (content === false) return;
+    if (content === false) return false;
 
     const response = await fetch(`/api/sections/${sectionId}`, {
         method: 'PUT',
@@ -440,11 +448,16 @@ async function saveSection(sectionId, container) {
 
     if (!response.ok) {
         const message = result.errors ? JSON.stringify(result.errors) : (result.error || result.message || `Request failed with status ${response.status}`);
-        alert('Error: ' + message);
-        return;
+        if (!silent) {
+            alert('Error: ' + message);
+        }
+        return false;
     }
 
-    alert('Module updated.');
+    if (!silent) {
+        alert('Module updated.');
+    }
+    return true;
 }
 
 async function deleteSection(sectionId) {
@@ -669,10 +682,30 @@ async function applyTemplateToSections() {
     window.location.reload();
 }
 
-document.getElementById('page-form').addEventListener('submit', async function (event) {
-    event.preventDefault();
+function setPageActionBusy(busy) {
+    const saveChangesBtn = document.querySelector('#page-form button[type="submit"]');
+    const saveDeployBtn = document.getElementById('save-deploy-btn');
 
-    const formData = new FormData(this);
+    if (saveChangesBtn) {
+        saveChangesBtn.disabled = busy;
+        saveChangesBtn.classList.toggle('opacity-60', busy);
+        saveChangesBtn.classList.toggle('cursor-not-allowed', busy);
+    }
+
+    if (saveDeployBtn) {
+        saveDeployBtn.disabled = busy;
+        saveDeployBtn.classList.toggle('opacity-60', busy);
+        saveDeployBtn.classList.toggle('cursor-not-allowed', busy);
+    }
+}
+
+async function savePageSettings() {
+    const pageForm = document.getElementById('page-form');
+    if (!pageForm) {
+        return false;
+    }
+
+    const formData = new FormData(pageForm);
     const data = Object.fromEntries(formData);
 
     if (!String(data.canonical || '').trim()) {
@@ -680,10 +713,10 @@ document.getElementById('page-form').addEventListener('submit', async function (
     }
 
     const ogData = parseJsonField(data.og_data || '', 'OpenGraph Data');
-    if (ogData === false) return;
+    if (ogData === false) return false;
 
     const jsonLd = parseJsonField(data.json_ld || '', 'JSON-LD');
-    if (jsonLd === false) return;
+    if (jsonLd === false) return false;
 
     // Sync all module editors before saving
     document.querySelectorAll('.section-item').forEach(container => {
@@ -696,32 +729,123 @@ document.getElementById('page-form').addEventListener('submit', async function (
     if (ogData !== null) data.og_data = ogData;
     if (jsonLd !== null) data.json_ld = jsonLd;
 
+    const response = await fetch('/api/pages/{{ $page->id }}', {
+        method: 'PUT',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': getCsrfToken(),
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(data),
+    });
+
+    const result = await readApiResponse(response);
+
+    if (!response.ok) {
+        const message = result.errors ? JSON.stringify(result.errors) : (result.error || result.message || `Request failed with status ${response.status}`);
+        alert('Error: ' + message);
+        return false;
+    }
+
+    return true;
+}
+
+async function saveAllSectionsSilently() {
+    const containers = document.querySelectorAll('.section-item');
+
+    for (const container of containers) {
+        const sectionId = container.dataset.sectionId;
+        if (!sectionId) {
+            continue;
+        }
+
+        const ok = await saveSection(sectionId, container, { silent: true });
+        if (!ok) {
+            alert(`Module save failed (section #${sectionId}). Deploy aborted.`);
+            return false;
+        }
+    }
+
+    return true;
+}
+
+async function deploySiteWithSettings() {
+    const response = await fetch(`/api/sites/${currentSiteId}/deploy`, {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': getCsrfToken(),
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+            run_post_deploy_commands: true,
+        }),
+    });
+
+    const result = await readApiResponse(response);
+
+    if (!response.ok) {
+        alert('Deployment failed: ' + (result.error || result.message || `HTTP ${response.status}`));
+        return false;
+    }
+
+    if (result.status !== 'completed') {
+        alert('Deployment failed: ' + (result.error_message || result.message || 'Unknown deployment error'));
+        return false;
+    }
+
+    return result;
+}
+
+async function handlePageSave(options = {}) {
+    const deployAfterSave = options.deployAfterSave === true;
+
+    if (pageActionInProgress) {
+        return;
+    }
+
+    pageActionInProgress = true;
+    setPageActionBusy(true);
+
     try {
-        const response = await fetch('/api/pages/{{ $page->id }}', {
-            method: 'PUT',
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': getCsrfToken(),
-                'X-Requested-With': 'XMLHttpRequest',
-            },
-            credentials: 'same-origin',
-            body: JSON.stringify(data),
-        });
-
-        const result = await readApiResponse(response);
-
-        if (!response.ok) {
-            const message = result.errors ? JSON.stringify(result.errors) : (result.error || result.message || `Request failed with status ${response.status}`);
-            alert('Error: ' + message);
+        const pageSaved = await savePageSettings();
+        if (!pageSaved) {
             return;
         }
 
-        alert('Page updated successfully.');
+        if (!deployAfterSave) {
+            alert('Page updated successfully.');
+            window.location.href = '{{ route('admin.pages.index', $site->id) }}';
+            return;
+        }
+
+        const sectionsSaved = await saveAllSectionsSilently();
+        if (!sectionsSaved) {
+            return;
+        }
+
+        const deployment = await deploySiteWithSettings();
+        if (!deployment) {
+            return;
+        }
+
+        alert(`Page saved and deployed successfully to ${deployment.sftp_host}${deployment.remote_path}`);
         window.location.href = '{{ route('admin.pages.index', $site->id) }}';
     } catch (error) {
         alert('Error: ' + error.message);
+    } finally {
+        pageActionInProgress = false;
+        setPageActionBusy(false);
     }
+}
+
+document.getElementById('page-form')?.addEventListener('submit', async function (event) {
+    event.preventDefault();
+    await handlePageSave({ deployAfterSave: false });
 });
 
 document.querySelectorAll('.section-item').forEach((container) => {
@@ -962,6 +1086,7 @@ function syncFromTinyMCE(container) {
 
     try {
         let content = JSON.parse(jsonTextarea.value);
+        const wasDirty = editor.isDirty();
         let html = editor.getContent();
         
         // Clean up junk attributes injected by browser extensions (like bis_size)
@@ -969,6 +1094,9 @@ function syncFromTinyMCE(container) {
         html = toStorageAssetUrls(html);
         
         content.raw_html = html;
+        if (wasDirty) {
+            content.render_mode = 'raw_html';
+        }
         jsonTextarea.value = JSON.stringify(content, null, 4);
     } catch (e) {
         console.error('Failed to sync TinyMCE to JSON:', e);
@@ -1012,6 +1140,15 @@ document.getElementById('clear-all-btn')?.addEventListener('click', async () => 
     } catch (error) {
         alert('Error: ' + error.message);
     }
+});
+
+document.getElementById('save-deploy-btn')?.addEventListener('click', async () => {
+    const confirmed = confirm('Save page and deploy site to remote server using current site settings?');
+    if (!confirmed) {
+        return;
+    }
+
+    await handlePageSave({ deployAfterSave: true });
 });
 
 </script>

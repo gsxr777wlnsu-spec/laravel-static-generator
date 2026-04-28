@@ -207,11 +207,53 @@ class SiteController extends Controller
             ], 202);
         }
 
-        $deployment = $this->deploy->deploy($site);
-        
-        $this->audit->log('site.deployed', Site::class, $site->id);
+        try {
+            // 1. Generate full static site to prepare staging files for deployment.
+            $generation = $this->generator->generateSite($site);
+            if (($generation['success'] ?? false) !== true) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Generation failed',
+                    'generation_errors' => $generation['errors'] ?? [],
+                    'message' => 'HTML generation failed, deployment skipped.',
+                ], 422);
+            }
 
-        return response()->json($deployment);
+            // 2. Test SFTP connection.
+            $sftpConnected = $this->sftp->testConnection($site);
+            if (!$sftpConnected) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'SFTP connection failed',
+                    'message' => 'Could not connect to SFTP server. Please check SFTP settings.'
+                ], 400);
+            }
+
+            // 3. Deploy generated files and run post-deploy SSH commands by default.
+            $runPostDeployCommands = (bool) $request->boolean('run_post_deploy_commands', true);
+            $deployment = $this->deploy->deploy($site, $runPostDeployCommands);
+            if ($deployment->status !== 'completed') {
+                return response()->json([
+                    'success' => false,
+                    'error' => $deployment->error_message ?: 'Deployment failed',
+                    'message' => 'Deployment finished with failure.',
+                    'site_id' => $site->id,
+                    'sftp_host' => $site->sftp_host,
+                    'remote_path' => $site->sftp_remote_path,
+                    'deployment' => $deployment,
+                ], 422);
+            }
+
+            $this->audit->log('site.deployed', Site::class, $site->id);
+
+            return response()->json($deployment);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+                'message' => 'Deploy failed: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     public function importAndDeploy(Request $request, int $id): JsonResponse

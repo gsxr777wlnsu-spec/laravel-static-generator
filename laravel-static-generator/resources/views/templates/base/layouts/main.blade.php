@@ -205,9 +205,31 @@
         </div>
     </footer>
     
-    <script defer src="/assets/js/main.js"></script>
-    <script defer src="/assets/js/lightbox.js"></script>
-    <script defer src="/assets/js/faq.js"></script>
+    @php
+        $slugOrTemplate = (string) ($page->template_key ?? $page->slug ?? '');
+
+        $scriptMap = [
+            'app' => ['/assets/js/main.js', '/assets/js/sliders.js', '/assets/js/lightbox.js', '/assets/js/faq.js'],
+            'authors' => ['/assets/js/main.js', '/assets/js/faq.js'],
+            'bonuses' => ['/assets/js/main.js', '/assets/js/faq.js'],
+            'comparison' => ['/assets/js/main.js', '/assets/js/lightbox.js', '/assets/js/faq.js'],
+            'contact-us' => ['/assets/js/main.js', '/assets/js/form.js'],
+            'cookie-policy' => ['/assets/js/main.js'],
+            'demo' => ['/assets/js/main.js', '/assets/js/faq.js'],
+            'index' => ['/assets/js/main.js', '/assets/js/lightbox.js', '/assets/js/faq.js'],
+            'privacy-policy' => ['/assets/js/main.js'],
+            'reviews' => ['/assets/js/main.js', '/assets/js/faq.js', '/assets/js/form.js'],
+            'sitemap' => ['/assets/js/main.js'],
+            'terms-and-conditions' => ['/assets/js/main.js'],
+            'tips' => ['/assets/js/main.js', '/assets/js/faq.js'],
+        ];
+
+        $scripts = $scriptMap[$slugOrTemplate] ?? ['/assets/js/main.js'];
+    @endphp
+
+    @foreach($scripts as $script)
+        <script defer src="{{ $script }}"></script>
+    @endforeach
     @endif
 </body>
 </html>

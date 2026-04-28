@@ -51,6 +51,11 @@ class SectionService implements SectionServiceInterface
             }
         }
 
+        if (isset($data['content']) && is_array($data['content']) && array_key_exists('raw_html', $data['content'])) {
+            $rawHtml = $data['content']['raw_html'];
+            $data['raw_html'] = is_string($rawHtml) && trim($rawHtml) !== '' ? $rawHtml : null;
+        }
+
         return $this->repository->update($section, $data);
     }
 

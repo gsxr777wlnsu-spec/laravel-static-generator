@@ -1,3 +1,6 @@
+@if(($render_mode ?? null) === 'raw_html' && isset($raw_html) && is_string($raw_html) && trim($raw_html) !== '')
+    {!! $raw_html !!}
+@else
 <section class="form background--characteristics mb50" id="form">
     <div class="form__inner">
         <h2 class="form__title">{{ $formTitle ?? 'Contact Form' }}</h2>
@@ -23,3 +26,4 @@
         </form>
     </div>
 </section>
+@endif

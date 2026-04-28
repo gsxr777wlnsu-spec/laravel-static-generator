@@ -15,14 +15,14 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
                 </svg>
                 Import & Deploy
-                <input type="file" id="import-deploy-file" accept=".md,.yaml,.yml,.txt" class="hidden" onchange="handleImportAndDeployFile(this)">
+                <input type="file" id="import-deploy-file" accept=".md,.yaml,.yml,.txt" class="hidden" multiple onchange="handleImportAndDeployFile(this)">
             </label>
             <label style="background-color: #059669;" class="inline-flex items-center rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 cursor-pointer">
                 <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
                 </svg>
                 Import
-                <input type="file" id="import-file" accept=".md,.yaml,.yml,.txt" class="hidden" onchange="handleImportFile(this)">
+                <input type="file" id="import-file" accept=".md,.yaml,.yml,.txt" class="hidden" multiple onchange="handleImportFile(this)">
             </label>
             <a href="{{ route('admin.sites.create') }}" style="background-color: #4f46e5;" class="inline-flex items-center rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
                 Create Site
@@ -136,10 +136,14 @@ async function deploySite(siteId) {
             method: 'POST',
             headers: {
                 'Accept': 'application/json',
+                'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': getCsrfToken(),
                 'X-Requested-With': 'XMLHttpRequest',
             },
             credentials: 'same-origin',
+            body: JSON.stringify({
+                run_post_deploy_commands: true,
+            }),
         });
         const data = await readApiResponse(response);
 
@@ -190,75 +194,109 @@ async function deleteSite(siteId, siteName) {
 }
 
 async function handleImportFile(input) {
-    const file = input.files?.[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    try {
-        const response = await fetch('/api/import', {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': getCsrfToken(),
-                'X-Requested-With': 'XMLHttpRequest',
-            },
-            credentials: 'same-origin',
-            body: formData,
-        });
-
-        const data = await readApiResponse(response);
-
-        if (!response.ok) {
-            alert('Import failed: ' + (data.error || data.message || `HTTP ${response.status}`));
-            return;
-        }
-
-        alert(`Import successful!\n\nImported ${data.pages_count} page(s) for site: ${data.site.domain}\n\nSite ID: ${data.site.id}`);
-
-        window.location.reload();
-    } catch (error) {
-        alert('Error: ' + error.message);
-    }
-
-    input.value = '';
+    await processImportBatch(input, {
+        endpoint: '/api/import',
+        actionTitle: 'Import',
+        showDeploymentInfo: false,
+    });
 }
 
 async function handleImportAndDeployFile(input) {
-    const file = input.files?.[0];
-    if (!file) return;
+    await processImportBatch(input, {
+        endpoint: '/api/import/deploy',
+        actionTitle: 'Import & Deploy',
+        showDeploymentInfo: true,
+    });
+}
 
-    const formData = new FormData();
-    formData.append('file', file);
+let importBatchInProgress = false;
 
-    try {
-        const response = await fetch('/api/import/deploy', {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': getCsrfToken(),
-                'X-Requested-With': 'XMLHttpRequest',
-            },
-            credentials: 'same-origin',
-            body: formData,
-        });
-
-        const data = await readApiResponse(response);
-
-        if (!response.ok) {
-            alert('Import & Deploy failed: ' + (data.error || data.message || `HTTP ${response.status}`));
-            return;
-        }
-
-        alert(`Import & Deploy completed!\n\nImported ${data.pages_count} page(s)\nDeployed to: ${data.deployment.sftp_host}${data.deployment.remote_path}`);
-        
-        window.location.reload();
-    } catch (error) {
-        alert('Error: ' + error.message);
+async function processImportBatch(input, options) {
+    const files = Array.from(input.files || []);
+    if (!files.length) {
+        return;
     }
 
-    input.value = '';
+    if (importBatchInProgress) {
+        alert('Another import batch is already running. Please wait for it to finish.');
+        input.value = '';
+        return;
+    }
+
+    const invalidFiles = files.filter((file) => !/\.(md|yaml|yml|txt)$/i.test(file.name));
+    if (invalidFiles.length > 0) {
+        alert(`Unsupported file type(s):\n${invalidFiles.map((file) => `- ${file.name}`).join('\n')}`);
+        input.value = '';
+        return;
+    }
+
+    const runConfirmed = confirm(`${options.actionTitle}: process ${files.length} file(s) sequentially?`);
+    if (!runConfirmed) {
+        input.value = '';
+        return;
+    }
+
+    importBatchInProgress = true;
+    const results = [];
+
+    try {
+        for (let index = 0; index < files.length; index++) {
+            const file = files[index];
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch(options.endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': getCsrfToken(),
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    credentials: 'same-origin',
+                    body: formData,
+                });
+
+                const data = await readApiResponse(response);
+
+                if (!response.ok) {
+                    const message = data.error || data.message || `HTTP ${response.status}`;
+                    results.push({ file: file.name, ok: false, message });
+                    continue;
+                }
+
+                const pagesCount = data.pages_count ?? 0;
+                const siteDomain = data.site?.domain || `site_id:${data.site?.id ?? 'unknown'}`;
+                let message = `OK: ${pagesCount} page(s), ${siteDomain}`;
+
+                if (options.showDeploymentInfo && data.deployment?.sftp_host) {
+                    message += `, deployed to ${data.deployment.sftp_host}${data.deployment.remote_path || ''}`;
+                }
+
+                results.push({ file: file.name, ok: true, message });
+            } catch (error) {
+                results.push({ file: file.name, ok: false, message: error.message });
+            }
+        }
+
+        const successCount = results.filter((item) => item.ok).length;
+        const failCount = results.length - successCount;
+        const summaryLines = results.map((item) => `${item.ok ? '[OK]' : '[FAIL]'} ${item.file}: ${item.message}`);
+
+        alert(
+            `${options.actionTitle} batch finished.\n` +
+            `Success: ${successCount}\n` +
+            `Failed: ${failCount}\n\n` +
+            summaryLines.join('\n')
+        );
+
+        if (successCount > 0) {
+            window.location.reload();
+        }
+    } finally {
+        importBatchInProgress = false;
+        input.value = '';
+    }
 }
 
 async function importAndDeploy(siteId) {

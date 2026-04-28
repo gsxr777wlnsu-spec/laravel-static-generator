@@ -1,0 +1,14 @@
+@php
+    $stepsSectionClass = isset($class) && is_string($class) && trim($class) !== ''
+        ? trim($class)
+        : 'steps steps--1win background--characteristics';
+    $stepsSectionId = isset($id) && is_string($id) && trim($id) !== ''
+        ? trim($id)
+        : 'steps';
+@endphp
+
+@include('templates.test.modules._generic_section', [
+    'module_slug' => 'steps-1win',
+    'class' => $stepsSectionClass,
+    'id' => $stepsSectionId,
+])

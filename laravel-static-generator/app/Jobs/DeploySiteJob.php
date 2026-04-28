@@ -3,6 +3,8 @@
 namespace App\Jobs;
 
 use App\Contracts\DeployServiceInterface;
+use App\Contracts\HtmlGeneratorInterface;
+use App\Contracts\SftpClientInterface;
 use App\Models\Site;
 use App\Models\User;
 use App\Notifications\DeploymentStatusNotification;
@@ -23,10 +25,23 @@ class DeploySiteJob implements ShouldQueue
         public ?int $userId = null
     ) {}
 
-    public function handle(DeployServiceInterface $deploy): void
+    public function handle(
+        DeployServiceInterface $deploy,
+        HtmlGeneratorInterface $generator,
+        SftpClientInterface $sftp
+    ): void
     {
         try {
-            $deployment = $deploy->deploy($this->site);
+            $generation = $generator->generateSite($this->site);
+            if (($generation['success'] ?? false) !== true) {
+                throw new \RuntimeException('HTML generation failed, deployment skipped.');
+            }
+
+            if (!$sftp->testConnection($this->site)) {
+                throw new \RuntimeException('Could not connect to SFTP server. Please check SFTP settings.');
+            }
+
+            $deployment = $deploy->deploy($this->site, true);
 
             if ($this->userId) {
                 $user = User::find($this->userId);

@@ -242,7 +242,7 @@ class ImportService
         }
 
         if ($hasSections) {
-            $this->importSections($page, $data['sections']);
+            $this->importSections($site, $page, $data['sections']);
         } elseif ($bootstrapSections && $templateKey && $templateKey !== 'blank') {
             $this->bootstrapSectionsFromEtalon($page, $templateKey);
         }
@@ -274,7 +274,7 @@ class ImportService
         libxml_use_internal_errors($previous);
 
         $xpath = new \DOMXPath($dom);
-        $nodes = $xpath->query('//section[not(ancestor::footer) and not(contains(@id, "footer")) and not(contains(@class, "footer"))]');
+        $nodes = $xpath->query('//section[not(ancestor::footer) and not(contains(@id, "footer")) and not(contains(@class, "footer"))] | //div[@id="text"]');
 
         if ($nodes === false || $nodes->length === 0) {
             return;
@@ -354,8 +354,266 @@ class ImportService
 
             $base = preg_replace('/(--|__).*$/', '', $token);
 
-            if ($base === 'hero' && $templateKey === 'sitemap') {
-                return 'hero-sitemap';
+            if (
+                $base === 'casino'
+                && $templateKey === '1win'
+                && $idAttr === 'bonuses'
+            ) {
+                return 'casino-1win';
+            }
+
+            if (
+                $base === 'casino'
+                && $templateKey === 'bonuses'
+                && $idAttr === 'casino'
+            ) {
+                return 'casino-bonuses';
+            }
+
+            if (
+                $base === 'casino'
+                && $templateKey === 'bonuses'
+                && $idAttr === 'casino-2'
+            ) {
+                return 'casino-bonuses-2';
+            }
+
+            if (
+                $base === 'casino'
+                && $templateKey === 'comparison'
+                && $idAttr === 'casino'
+            ) {
+                return 'casino-comparison';
+            }
+
+            if (
+                $base === 'casino'
+                && $templateKey === 'reviews'
+                && $idAttr === 'casino'
+            ) {
+                return 'casino-reviews';
+            }
+
+            if (
+                $base === 'casino'
+                && $templateKey === 'reviews'
+                && $idAttr === 'text'
+            ) {
+                return 'text-reviews';
+            }
+
+            if (
+                $base === 'casino'
+                && $templateKey === 'demo'
+                && $idAttr === 'casino'
+            ) {
+                return 'casino-demo';
+            }
+
+            if (
+                $base === 'casino'
+                && $templateKey === 'tips'
+                && $idAttr === 'casino'
+            ) {
+                return 'casino-tips';
+            }
+
+            if (
+                $base === 'casino'
+                && $templateKey === 'tips'
+                && $idAttr === 'casino-2'
+            ) {
+                return 'casino-tips-2';
+            }
+
+            if (
+                $base === 'casino'
+                && $templateKey === 'demo'
+                && $idAttr === 'casino-2'
+            ) {
+                return 'casino-demo-2';
+            }
+
+            if (
+                $base === 'casino'
+                && in_array((string) $templateKey, ['app', 'app-copy'], true)
+                && $idAttr === 'casino'
+            ) {
+                return 'casino-review-app';
+            }
+
+            if (
+                $base === 'casino'
+                && in_array((string) $templateKey, ['app', 'app-copy'], true)
+                && $idAttr === 'where-to-play'
+            ) {
+                return 'casino-where-to-play-app';
+            }
+
+            if (
+                $base === 'download'
+                && in_array((string) $templateKey, ['app', 'app-copy'], true)
+                && $idAttr === 'download'
+            ) {
+                return 'download-app';
+            }
+
+            if (
+                $base === 'form'
+                && $templateKey === 'reviews'
+                && $idAttr === 'form'
+            ) {
+                return 'form-reviews';
+            }
+
+            if (
+                $base === 'level'
+                && $templateKey === 'contact-us'
+                && $idAttr === 'level'
+            ) {
+                return 'level-map';
+            }
+
+            if (
+                $base === 'steps'
+                && $templateKey === 'demo'
+                && $idAttr === 'steps'
+            ) {
+                return 'steps-demo';
+            }
+
+            if (
+                $base === 'steps'
+                && $templateKey === 'bonuses'
+                && $idAttr === 'steps'
+            ) {
+                return 'steps-bonuses';
+            }
+
+            if (
+                $base === 'steps'
+                && $templateKey === 'tips'
+                && $idAttr === 'steps'
+            ) {
+                return 'steps-tips';
+            }
+
+            if (
+                $base === 'benefits'
+                && $templateKey === 'demo'
+                && $idAttr === 'benefits'
+            ) {
+                return 'benefits-demo';
+            }
+
+            if (
+                $base === 'symbols'
+                && $templateKey === '1win'
+                && $idAttr === 'details'
+            ) {
+                return 'symbols-1win';
+            }
+
+            if (
+                $base === 'steps'
+                && $templateKey === '1win'
+                && $idAttr === 'steps'
+            ) {
+                return 'steps-1win';
+            }
+
+            if (
+                $base === 'review'
+                && $templateKey === '1win'
+                && $idAttr === 'mobile-app'
+            ) {
+                return 'review-1win';
+            }
+
+            if (
+                $base === 'review'
+                && $templateKey === '1win'
+                && $idAttr === 'demo'
+            ) {
+                return 'review-demo-1win';
+            }
+
+            if (
+                $base === 'review'
+                && $templateKey === '1win'
+                && $idAttr === 'support'
+            ) {
+                return 'review-support-1win';
+            }
+
+            if (
+                $base === 'characteristics'
+                && $templateKey === '1win'
+                && $idAttr === 'characteristics'
+            ) {
+                return 'characteristics-1win';
+            }
+
+            if (
+                $base === 'characteristics'
+                && $templateKey === 'comparison'
+                && $idAttr === 'characteristics'
+            ) {
+                return 'characteristics-comparison';
+            }
+
+            if (
+                $base === 'review'
+                && $templateKey === 'comparison'
+                && $idAttr === 'review'
+            ) {
+                return 'review-comparison';
+            }
+
+            if (
+                $base === 'symbols'
+                && $templateKey === 'comparison'
+                && $idAttr === 'symbols'
+            ) {
+                return 'symbols-comparison';
+            }
+
+            if (
+                $base === 'rtp'
+                && $templateKey === 'comparison'
+                && $idAttr === 'rtp'
+            ) {
+                return 'rtp-comparison';
+            }
+
+            if (
+                $base === 'steps'
+                && $templateKey === 'comparison'
+                && $idAttr === 'steps'
+            ) {
+                return 'steps-comparison';
+            }
+
+            if ($base === 'hero') {
+                if ($templateKey === 'index') {
+                    return 'hero-main';
+                }
+
+                if ($templateKey === 'demo') {
+                    return 'hero-demo';
+                }
+
+                if ($templateKey === 'authors') {
+                    return 'hero-authors';
+                }
+
+                if (in_array($templateKey, ['1win', 'app', 'app-copy', 'bonuses', 'comparison', 'reviews', 'tips'], true)) {
+                    return 'hero-breadcrumbs';
+                }
+
+                if (in_array($templateKey, ['contact-us', 'sitemap'], true)) {
+                    return 'hero';
+                }
             }
 
             if ($base === 'footer') {
@@ -418,7 +676,7 @@ class ImportService
         return trim($html);
     }
 
-    private function importSections(Page $page, array $sectionsData): void
+    private function importSections(Site $site, Page $page, array $sectionsData): void
     {
         Section::where('page_id', $page->id)->delete();
 
@@ -428,6 +686,12 @@ class ImportService
             
             // Save ALL fields from YAML in content JSON (not just standard fields)
             $contentFields = array_filter($sectionData, fn($v) => $v !== null);
+            if (!isset($contentFields['raw_html']) || !is_string($contentFields['raw_html']) || trim($contentFields['raw_html']) === '') {
+                $generatedRawHtml = $this->generateRawHtmlFromModuleView($site, $page, $sectionData);
+                if ($generatedRawHtml !== null) {
+                    $contentFields['raw_html'] = $generatedRawHtml;
+                }
+            }
 
             Section::create([
                 'page_id' => $page->id,
@@ -438,7 +702,7 @@ class ImportService
                 'heading' => $sectionData['heading'] ?? null,
                 'subheading' => $sectionData['subheading'] ?? null,
                 'description' => $sectionData['description'] ?? null,
-                'raw_html' => $sectionData['raw_html'] ?? null,
+                'raw_html' => $sectionData['raw_html'] ?? ($contentFields['raw_html'] ?? null),
                 'class' => $sectionData['class'] ?? null,
                 'identifier' => $sectionData['id'] ?? null,
                 'settings' => isset($sectionData['settings']) && is_array($sectionData['settings'])
@@ -447,6 +711,36 @@ class ImportService
                 'content' => $contentFields,
             ]);
         }
+    }
+
+    private function generateRawHtmlFromModuleView(Site $site, Page $page, array $sectionData): ?string
+    {
+        $module = trim((string) ($sectionData['module'] ?? ($sectionData['module_key'] ?? '')));
+        if ($module === '') {
+            return null;
+        }
+
+        $templateSet = trim((string) ($site->template_set ?? 'base'));
+        if ($templateSet === '') {
+            $templateSet = 'base';
+        }
+
+        $viewName = "templates.{$templateSet}.modules.{$module}";
+        if (!view()->exists($viewName)) {
+            return null;
+        }
+
+        try {
+            $rendered = trim((string) view($viewName, array_merge($sectionData, [
+                'section' => (object) $sectionData,
+                'page' => $page,
+                'site' => $site,
+            ]))->render());
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return $rendered !== '' ? $rendered : null;
     }
 
     public function listImportTemplates(): array

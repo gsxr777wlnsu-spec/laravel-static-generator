@@ -35,7 +35,9 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
 
         $templatePath = $this->resolvePageTemplatePath($page);
 
-        return View::make($templatePath, $data)->render();
+        $html = View::make($templatePath, $data)->render();
+
+        return $this->normalizeGoogleMapEmbeds($html);
     }
 
     public function generateSite(Site $site, ?callable $onProgress = null): array
@@ -332,5 +334,47 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         $normalized = str_replace('/', '.', $normalized);
 
         return (string) Str::of($normalized)->replaceMatches('/[^A-Za-z0-9._-]/', '-');
+    }
+
+    private function normalizeGoogleMapEmbeds(string $html): string
+    {
+        // Legacy imported markup may contain <embed class="google-map__iframe">.
+        $html = preg_replace_callback(
+            '/<embed\b([^>]*)>/i',
+            static function (array $matches): string {
+                $attributes = $matches[1] ?? '';
+
+                $hasMapClass = preg_match('/\bclass\s*=\s*["\'][^"\']*\bgoogle-map__iframe\b[^"\']*["\']/i', $attributes) === 1;
+                $hasGoogleMapsSrc = preg_match('/\bsrc\s*=\s*["\'][^"\']*(maps\.google\.com\/maps|www\.google\.com\/maps\/embed)[^"\']*["\']/i', $attributes) === 1;
+
+                if (!$hasMapClass || !$hasGoogleMapsSrc) {
+                    return $matches[0];
+                }
+
+                $cleanAttributes = trim($attributes);
+                return '<iframe ' . $cleanAttributes . '></iframe>';
+            },
+            $html
+        ) ?? $html;
+
+        // sandbox="" blocks Google Maps scripts inside iframe.
+        $html = preg_replace_callback(
+            '/<iframe\b([^>]*)>/i',
+            static function (array $matches): string {
+                $attributes = $matches[1] ?? '';
+
+                $hasGoogleMapsSrc = preg_match('/\bsrc\s*=\s*["\'][^"\']*(maps\.google\.com\/maps|www\.google\.com\/maps\/embed)[^"\']*["\']/i', $attributes) === 1;
+                if (!$hasGoogleMapsSrc) {
+                    return $matches[0];
+                }
+
+                $cleanAttributes = preg_replace('/\s+sandbox(?:\s*=\s*(?:"[^"]*"|\'[^\']*\'|[^\s>]+))?/i', '', $attributes) ?? $attributes;
+
+                return '<iframe' . $cleanAttributes . '>';
+            },
+            $html
+        ) ?? $html;
+
+        return $html;
     }
 }

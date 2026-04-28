@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Contracts\DeployServiceInterface;
 use App\Contracts\HtmlGeneratorInterface;
+use App\Contracts\SftpClientInterface;
 use App\Http\Controllers\Controller;
 use App\Services\ImportService;
 use Illuminate\Http\JsonResponse;
@@ -14,22 +15,14 @@ class ImportController extends Controller
     public function __construct(
         private ImportService $importService,
         private DeployServiceInterface $deployService,
-        private HtmlGeneratorInterface $htmlGenerator
+        private HtmlGeneratorInterface $htmlGenerator,
+        private SftpClientInterface $sftp
     ) {}
 
     public function import(Request $request): JsonResponse
     {
-        $request->validate([
-            'file' => 'required|file|mimes:md,yaml,yml,txt',
-        ]);
-
         try {
-            $file = $request->file('file');
-            $tempPath = $file->getRealPath();
-
-            $result = $this->importService->importFromMdFile($tempPath);
-            $site = $result['site'];
-            $pagesCount = $result['pages_count'];
+            [$site, $pagesCount] = $this->importUploadedFile($request);
 
             return response()->json([
                 'success' => true,
@@ -51,19 +44,27 @@ class ImportController extends Controller
 
     public function importAndDeploy(Request $request): JsonResponse
     {
-        $request->validate([
-            'file' => 'required|file|mimes:md,yaml,yml,txt',
-        ]);
-
         try {
-            $file = $request->file('file');
-            $tempPath = $file->getRealPath();
+            [$site, $pagesCount] = $this->importUploadedFile($request);
 
-            $result = $this->importService->importFromMdFile($tempPath);
-            $site = $result['site'];
-            $pagesCount = $result['pages_count'];
+            $generation = $this->htmlGenerator->generateSite($site);
+            if (($generation['success'] ?? false) !== true) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Generation failed',
+                    'generation_errors' => $generation['errors'] ?? [],
+                ], 422);
+            }
 
-            $this->htmlGenerator->generateSite($site);
+            $sftpConnected = $this->sftp->testConnection($site);
+            if (!$sftpConnected) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'SFTP connection failed',
+                    'message' => 'Could not connect to SFTP server. Please check SFTP settings.',
+                ], 400);
+            }
+
             $deployment = $this->deployService->deploy($site, true);
             if ($deployment->status !== 'completed') {
                 return response()->json([
@@ -110,5 +111,21 @@ class ImportController extends Controller
         return response()->json([
             'templates' => $templates,
         ]);
+    }
+
+    private function importUploadedFile(Request $request): array
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:md,yaml,yml,txt',
+        ]);
+
+        $file = $request->file('file');
+        $tempPath = $file->getRealPath();
+
+        $result = $this->importService->importFromMdFile($tempPath);
+        $site = $result['site'];
+        $pagesCount = (int) ($result['pages_count'] ?? 0);
+
+        return [$site, $pagesCount];
     }
 }

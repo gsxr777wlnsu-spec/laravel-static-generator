@@ -1,0 +1,67 @@
+<header class="header" id="header">
+    <div class="header__inner">
+        <div class="header__logo">
+            <a class="header__logo-wrapper" href="/" aria-label="To the main page">
+                <img src="/assets/images/logo/logo.webp" width="141" height="41" alt="Aviator">
+            </a>
+        </div>
+        <nav class="header__nav menu" aria-label="Main navigation">
+            <ul class="menu__list">
+                <li class="menu__item">
+                    <a class="menu__link" href="app.html">App</a>
+                </li>
+                <li class="menu__item">
+                    <a class="menu__link" href="demo.html">Demo</a>
+                </li>
+                <li class="menu__item">
+                    <a class="menu__link" href="tips.html">Tips</a>
+                </li>
+                <li class="menu__item">
+                    <a class="menu__link" href="bonuses.html">Bonuses</a>
+                </li>
+                <li class="menu__item">
+                    <a class="menu__link" href="reviews.html">Reviews</a>
+                </li>
+                <li class="menu__item">
+                    <a class="menu__link" href="contact-us.html">Contact Us</a>
+                </li>
+                <li class="menu__item menu__item--has-submenu">
+                    <a class="menu__link" href="#" aria-haspopup="true" aria-expanded="false" data-desktop-submenu-trigger>New Versions</a>
+                    <ul class="menu__submenu" aria-label="New Versions submenu">
+                        <li class="menu__submenu-item">
+                            <a class="menu__submenu-link" href="authors.html">Author's</a>
+                        </li>
+                        <li class="menu__submenu-item">
+                            <a class="menu__submenu-link" href="1win.html">1WIN</a>
+                        </li>
+                        <li class="menu__submenu-item">
+                            <a class="menu__submenu-link" href="comparison.html">Comparison</a>
+                        </li>
+                        <li class="menu__submenu-item">
+                            <a class="menu__submenu-link" href="sitemap.html">Sitemap</a>
+                        </li>
+                    </ul>
+                </li>
+                <li class="menu__item menu__item--has-submenu menu__item--lang lang-item lang-item-en">
+                    <a class="menu__link menu__link--lang" href="#" aria-haspopup="true" aria-expanded="false" data-desktop-submenu-trigger>
+                        <span class="menu__lang">
+                            <img class="menu__lang-flag" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAALCAMAAABBPP0LAAAAmVBMVEViZsViZMJiYrf9gnL8eWrlYkjgYkjZYkj8/PujwPybvPz4+PetraBEgfo+fvo3efkydfkqcvj8Y2T8UlL8Q0P8MzP9k4Hz8/Lu7u4DdPj9/VrKysI9fPoDc/EAZ7z7IiLHYkjp6ekCcOTk5OIASbfY/v21takAJrT5Dg6sYkjc3Nn94t2RkYD+y8KeYkjs/v7l5fz0dF22YkjWvcOLAAAAgElEQVR4AR2KNULFQBgGZ5J13KGGKvc/Cw1uPe62eb9+Jr1EUBFHSgxxjP2Eca6AfUSfVlUfBvm1Ui1bqafctqMndNkXpb01h5TLx4b6TIXgwOCHfjv+/Pz+5vPRw7txGWT2h6yO0/GaYltIp5PT1dEpLNPL/SdWjYjAAZtvRPgHJX4Xio+DSrkAAAAASUVORK5CYII=" alt="" width="16" height="11" loading="lazy">
+                            <span class="menu__lang-text">English</span>
+                        </span>
+                    </a>
+                    <ul class="menu__submenu" aria-label="Language submenu">
+                        <li class="menu__submenu-item">
+                            <a class="menu__submenu-link" href="/es/" hreflang="es-ES" lang="es-ES">
+                                <span class="menu__lang">
+                                    <img class="menu__lang-flag" src="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2716%27%20height%3D%2711%27%20viewBox%3D%270%200%2016%2011%27%3E%3Crect%20width%3D%2716%27%20height%3D%2711%27%20fill%3D%27%23AA151B%27%2F%3E%3Crect%20y%3D%272.75%27%20width%3D%2716%27%20height%3D%275.5%27%20fill%3D%27%23F1BF00%27%2F%3E%3C%2Fsvg%3E" alt="" width="16" height="11" loading="lazy">
+                                    <span class="menu__lang-text">Español</span>
+                                </span>
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+            </ul>
+            <a class="btn__cta" href="#play-now">Play now!</a>
+        </nav>
+    </div>
+</header>
