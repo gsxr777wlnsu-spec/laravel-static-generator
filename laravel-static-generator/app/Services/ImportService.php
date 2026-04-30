@@ -224,6 +224,8 @@ class ImportService
                 'meta_description' => $data['meta_description'] ?? null,
                 'meta_keywords' => $data['meta_keywords'] ?? null,
                 'canonical' => $data['canonical'] ?? null,
+                'og_data' => $this->pageOgData($data),
+                'json_ld' => isset($data['json_ld']) && is_array($data['json_ld']) ? $data['json_ld'] : null,
                 'locale' => $data['locale'] ?? 'en',
             ]);
         } else {
@@ -237,6 +239,8 @@ class ImportService
                 'meta_description' => $data['meta_description'] ?? null,
                 'meta_keywords' => $data['meta_keywords'] ?? null,
                 'canonical' => $data['canonical'] ?? null,
+                'og_data' => $this->pageOgData($data),
+                'json_ld' => isset($data['json_ld']) && is_array($data['json_ld']) ? $data['json_ld'] : null,
                 'locale' => $data['locale'] ?? 'en',
             ]);
         }
@@ -248,6 +252,19 @@ class ImportService
         }
 
         return $page;
+    }
+
+    private function pageOgData(array $data): ?array
+    {
+        $ogData = isset($data['og_data']) && is_array($data['og_data']) ? $data['og_data'] : [];
+
+        foreach (['head_meta', 'head_links', 'head_extra', 'body_extra'] as $key) {
+            if (array_key_exists($key, $data)) {
+                $ogData[$key] = $data[$key];
+            }
+        }
+
+        return count($ogData) > 0 ? $ogData : null;
     }
 
     private function bootstrapSectionsFromEtalon(Page $page, string $templateKey): void
@@ -754,16 +771,23 @@ class ImportService
         }
 
         $viewName = "templates.{$templateSet}.modules.{$module}";
+
         if (!view()->exists($viewName)) {
             return null;
         }
 
         try {
+            $section = (object) array_merge($sectionData, [
+                'content' => $sectionData,
+                'raw_html' => $sectionData['raw_html'] ?? null,
+            ]);
+
             $rendered = trim((string) view($viewName, array_merge($sectionData, [
-                'section' => (object) $sectionData,
+                'section' => $section,
                 'page' => $page,
                 'site' => $site,
             ]))->render());
+
         } catch (\Throwable) {
             return null;
         }

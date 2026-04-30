@@ -10,6 +10,15 @@
                 : '';
             $dbRawHtml = is_string($section->raw_html) ? trim($section->raw_html) : '';
             $resolvedRawHtml = $contentRawHtml !== '' ? $contentRawHtml : $dbRawHtml;
+            $resolvedRawHtml = preg_replace_callback('/\[\[([A-Za-z0-9_.-]+)\]\]/', function ($matches) use ($sectionContent) {
+                $key = $matches[1];
+
+                if (!array_key_exists($key, $sectionContent) || is_array($sectionContent[$key])) {
+                    return $matches[0];
+                }
+
+                return e((string) $sectionContent[$key]);
+            }, $resolvedRawHtml) ?? $resolvedRawHtml;
         @endphp
 
         @if($renderMode === 'raw_html' && $resolvedRawHtml !== '')

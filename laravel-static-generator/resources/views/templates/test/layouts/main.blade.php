@@ -93,11 +93,41 @@
 }
 </script>
 
+        @php
+            $pageOgData = is_array($page->og_data ?? null) ? $page->og_data : [];
+        @endphp
+
         @if(isset($languageVersions) && count($languageVersions) > 0)
             @foreach($languageVersions as $version)
             <link rel="alternate" hreflang="{{ $version->locale }}" href="{{ $version->canonical ?? url($version->slug) }}">
             @endforeach
             <link rel="alternate" hreflang="x-default" href="{{ $page->canonical ?? url($page->slug) }}">
+        @endif
+        @if(isset($pageOgData['head_meta']) && is_array($pageOgData['head_meta']))
+            @foreach($pageOgData['head_meta'] as $meta)
+                @continue(!is_array($meta))
+            <meta
+                @if(isset($meta['name'])) name="{{ $meta['name'] }}" @endif
+                @if(isset($meta['property'])) property="{{ $meta['property'] }}" @endif
+                @if(isset($meta['http_equiv'])) http-equiv="{{ $meta['http_equiv'] }}" @endif
+                @if(isset($meta['content'])) content="{{ $meta['content'] }}" @endif
+            >
+            @endforeach
+        @endif
+        @if(isset($pageOgData['head_links']) && is_array($pageOgData['head_links']))
+            @foreach($pageOgData['head_links'] as $link)
+                @continue(!is_array($link) || !isset($link['href']))
+                @continue(isset($link['rel']) && strtolower((string) $link['rel']) === 'stylesheet')
+            <link
+                @if(isset($link['rel'])) rel="{{ $link['rel'] }}" @endif
+                href="{{ $link['href'] }}"
+                @if(isset($link['type'])) type="{{ $link['type'] }}" @endif
+                @if(isset($link['sizes'])) sizes="{{ $link['sizes'] }}" @endif
+            >
+            @endforeach
+        @endif
+        @if(isset($pageOgData['head_extra']) && is_string($pageOgData['head_extra']) && trim($pageOgData['head_extra']) !== '')
+            {!! $pageOgData['head_extra'] !!}
         @endif
 </head>
 <body class="body" id="body">
@@ -194,5 +224,8 @@
     @foreach($scripts as $script)
         <script defer src="{{ $script }}"></script>
     @endforeach
+    @if(isset($pageOgData['body_extra']) && is_string($pageOgData['body_extra']) && trim($pageOgData['body_extra']) !== '')
+        {!! $pageOgData['body_extra'] !!}
+    @endif
 </body>
 </html>

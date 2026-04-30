@@ -1,5 +1,6 @@
 @php
-    $sectionContent = is_array($section->content ?? null) ? $section->content : [];
+    $rawSectionContent = $section->content ?? null;
+    $sectionContent = is_array($rawSectionContent) ? $rawSectionContent : (is_string($rawSectionContent) ? json_decode($rawSectionContent, true) ?: [] : []);
 
     $moduleKey = $sectionContent['module'] ?? $sectionContent['module_key'] ?? null;
     $sectionId = $sectionContent['id'] ?? null;
@@ -36,6 +37,8 @@
     $viewCandidates = [];
 
     if ($moduleKey) {
+        $viewCandidates[] = "templates.{$templateSet}.modules.{$moduleKey}";
+        $viewCandidates[] = "templates.base.modules.{$moduleKey}";
         $viewCandidates[] = "templates.{$templateSet}.modules.shared.{$moduleKey}";
         $viewCandidates[] = "templates.base.modules.shared.{$moduleKey}";
     }
@@ -64,7 +67,11 @@
 @endphp
 
 @if($resolvedView)
-    @include($resolvedView, ['section' => $section, 'page' => $page, 'site' => $site])
+    @include($resolvedView, array_merge([
+        'section' => $section,
+        'page' => $page,
+        'site' => $site,
+    ], $sectionContent))
 @else
     {{-- Fallback if no module/component exists for this section --}}
     <section class="section section--missing-template" data-section-type="{{ $section->type }}">

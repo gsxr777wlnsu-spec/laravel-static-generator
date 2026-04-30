@@ -94,6 +94,176 @@ class ImportServiceTest extends TestCase
         $this->assertEquals(1, $result['pages_count']);
     }
 
+    public function test_import_ignores_universal_content_blocks(): void
+    {
+        $data = [
+            'domain' => 'universal-import.com',
+            'template' => 'test',
+            'pages' => [
+                [
+                    'slug' => 'index',
+                    'title' => 'Index',
+                    'template_key' => 'index',
+                    'status' => 'published',
+                    'sections' => [
+                        [
+                            'module' => 'characteristics',
+                            'module_key' => 'characteristics',
+                            'contentBlocks' => [
+                                [
+                                    'type' => 'h6',
+                                    'text' => 'TEST Heading 6',
+                                ],
+                                [
+                                    'type' => 'ordered_list',
+                                    'items' => ['Step one', 'Step two'],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $this->service->importSite($data);
+        $section = $result['pages'][0]->sections()->first();
+
+        $this->assertStringContainsString('<section class="characteristics"', $section->raw_html);
+        $this->assertStringNotContainsString('<h6>TEST Heading 6</h6>', $section->raw_html);
+        $this->assertStringNotContainsString('Step one', $section->raw_html);
+    }
+
+    public function test_import_replaces_default_module_text_from_section_fields(): void
+    {
+        $data = [
+            'domain' => 'module-text-import.com',
+            'template' => 'test',
+            'pages' => [
+                [
+                    'slug' => 'index',
+                    'title' => 'Index',
+                    'template_key' => 'index',
+                    'status' => 'published',
+                    'sections' => [
+                        [
+                            'module' => 'characteristics',
+                            'module_key' => 'characteristics',
+                            'heading' => 'Changed Characteristics Heading',
+                            'description' => 'Changed characteristics description.',
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $this->service->importSite($data);
+        $section = $result['pages'][0]->sections()->first();
+
+        $this->assertStringContainsString('<section class="characteristics"', $section->raw_html);
+        $this->assertStringContainsString('Changed Characteristics Heading', $section->raw_html);
+        $this->assertStringContainsString('Changed characteristics description.', $section->raw_html);
+    }
+
+    public function test_import_replaces_default_module_text_from_content_blocks(): void
+    {
+        $data = [
+            'domain' => 'module-content-blocks-import.com',
+            'template' => 'test',
+            'pages' => [
+                [
+                    'slug' => 'index',
+                    'title' => 'Index',
+                    'template_key' => 'index',
+                    'status' => 'published',
+                    'sections' => [
+                        [
+                            'module' => 'characteristics',
+                            'module_key' => 'characteristics',
+                            'contentBlocks' => [
+                                [
+                                    'type' => 'paragraph',
+                                    'text' => 'Changed paragraph from contentBlocks.',
+                                ],
+                                [
+                                    'type' => 'table',
+                                    'rows' => [
+                                        ['Changed Label', 'Changed Value'],
+                                    ],
+                                ],
+                                [
+                                    'type' => 'paragraph',
+                                    'text' => 'Changed limited paragraph from contentBlocks.',
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $this->service->importSite($data);
+        $section = $result['pages'][0]->sections()->first();
+
+        $this->assertStringContainsString('class="characteristics__description">Changed paragraph from contentBlocks.</p>', $section->raw_html);
+        $this->assertStringContainsString('<span class="characteristics__label">Changed Label</span>', $section->raw_html);
+        $this->assertStringContainsString('class="characteristics__cell characteristics__value">Changed Value</td>', $section->raw_html);
+        $this->assertStringContainsString('class="text text--limited">Changed limited paragraph from contentBlocks.</p>', $section->raw_html);
+    }
+
+    public function test_import_replaces_payment_table_and_bottom_paragraph_from_content_blocks(): void
+    {
+        $data = [
+            'domain' => 'rtp-content-blocks-import.com',
+            'template' => 'test',
+            'pages' => [
+                [
+                    'slug' => 'index',
+                    'title' => 'Index',
+                    'template_key' => 'index',
+                    'status' => 'published',
+                    'sections' => [
+                        [
+                            'module' => 'rtp',
+                            'module_key' => 'rtp',
+                            'contentBlocks' => [
+                                [
+                                    'type' => 'h2',
+                                    'text' => 'Changed RTP Heading',
+                                ],
+                                [
+                                    'type' => 'paragraph',
+                                    'text' => 'Changed RTP top paragraph.',
+                                ],
+                                [
+                                    'type' => 'table',
+                                    'rows' => [
+                                        ['Changed Method', 'Changed Availability', 'Changed Minimum', 'Changed Time', 'Changed Fees'],
+                                    ],
+                                ],
+                                [
+                                    'type' => 'paragraph',
+                                    'text' => 'Changed RTP bottom paragraph.',
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $this->service->importSite($data);
+        $section = $result['pages'][0]->sections()->first();
+
+        $this->assertStringContainsString('<h2 class="symbols__title">Changed RTP Heading</h2>', $section->raw_html);
+        $this->assertStringContainsString('class="symbols__description">Changed RTP top paragraph.</p>', $section->raw_html);
+        $this->assertStringContainsString('<td class="payments__cell">Changed Method</td>', $section->raw_html);
+        $this->assertStringContainsString('<td class="payments__cell">Changed Availability</td>', $section->raw_html);
+        $this->assertStringContainsString('<td class="payments__cell">Changed Minimum</td>', $section->raw_html);
+        $this->assertStringContainsString('<td class="payments__cell">Changed Time</td>', $section->raw_html);
+        $this->assertStringContainsString('<td class="payments__cell">Changed Fees</td>', $section->raw_html);
+        $this->assertStringContainsString('class="text text--pt20">Changed RTP bottom paragraph.</p>', $section->raw_html);
+    }
+
     public function test_import_requires_domain(): void
     {
         $this->expectException(\RuntimeException::class);
