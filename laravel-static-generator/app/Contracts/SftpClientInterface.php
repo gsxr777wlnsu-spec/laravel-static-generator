@@ -8,7 +8,10 @@ interface SftpClientInterface
 {
     public function connect(Site $site): bool;
     public function testConnection(Site $site): bool;
+    public function backupDirectory(Site $site, string $remotePath, string $backupPath): bool;
+    public function restoreDirectory(Site $site, string $backupPath, string $remotePath): bool;
     public function uploadDirectory(Site $site, string $localPath, string $remotePath): bool;
+    public function verifyUploadedFiles(Site $site, string $localPath, string $remotePath): bool;
     public function uploadFile(Site $site, string $localFilePath, string $remoteFilePath): bool;
     public function deleteDirectory(Site $site, string $remotePath): bool;
     public function deleteFile(Site $site, string $remoteFilePath): bool;

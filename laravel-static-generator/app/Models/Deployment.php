@@ -19,6 +19,7 @@ class Deployment extends Model
         'deployed_by',
         'sftp_host',
         'remote_path',
+        'backup_path',
     ];
 
     protected $casts = [
