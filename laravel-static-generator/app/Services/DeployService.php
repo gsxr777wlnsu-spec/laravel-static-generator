@@ -26,6 +26,11 @@ class DeployService implements DeployServiceInterface
             'started_at' => now(),
         ]);
 
+        $backupPath = null;
+        $backupReady = false;
+        $connected = false;
+        $remotePath = null;
+
         try {
             $stagingPath = "site{$site->id}";
             
@@ -44,9 +49,20 @@ class DeployService implements DeployServiceInterface
             if (!$this->sftp->connect($site)) {
                 throw new \RuntimeException('Failed to connect to SFTP server');
             }
+            $connected = true;
+
+            $backupPath = rtrim($remotePath, '/') . '.backup-' . now()->format('YmdHis') . '-' . $deployment->id;
+            if (!$this->sftp->backupDirectory($site, $remotePath, $backupPath)) {
+                throw new \RuntimeException('Failed to create remote backup before deployment');
+            }
+            $backupReady = true;
 
             if (!$this->sftp->uploadDirectory($site, $stagingPath, $remotePath)) {
                 throw new \RuntimeException('Failed to upload files to SFTP server');
+            }
+
+            if (!$this->sftp->verifyUploadedFiles($site, $stagingPath, $remotePath)) {
+                throw new \RuntimeException('Uploaded files verification failed');
             }
 
             if ($runPostDeployCommands) {
@@ -64,10 +80,22 @@ class DeployService implements DeployServiceInterface
                 'files_count' => $filesCount,
                 'sftp_host' => $site->sftp_host,
                 'remote_path' => $remotePath,
-                'log' => 'Deployment completed successfully',
+                'backup_path' => $backupPath,
+                'log' => 'Deployment completed successfully. Backup path: ' . $backupPath,
             ]);
 
         } catch (\Exception $e) {
+            $restoreMessage = null;
+            if ($connected && $backupReady && $backupPath !== null && $remotePath !== null) {
+                try {
+                    $restoreMessage = $this->sftp->restoreDirectory($site, $backupPath, $remotePath)
+                        ? 'Rollback restored from backup: ' . $backupPath
+                        : 'Rollback failed from backup: ' . $backupPath;
+                } catch (\Throwable $rollbackException) {
+                    $restoreMessage = 'Rollback failed: ' . $rollbackException->getMessage();
+                }
+            }
+
             try {
                 $this->sftp->disconnect();
             } catch (\Throwable) {
@@ -78,7 +106,8 @@ class DeployService implements DeployServiceInterface
                 'status' => 'failed',
                 'completed_at' => now(),
                 'error_message' => $e->getMessage(),
-                'log' => 'Deployment failed: ' . $e->getMessage(),
+                'backup_path' => $backupPath,
+                'log' => trim('Deployment failed: ' . $e->getMessage() . "\n" . ($restoreMessage ?? '')),
             ]);
 
             \Log::error('Deployment failed', [
@@ -99,8 +128,27 @@ class DeployService implements DeployServiceInterface
     public function rollback(Deployment $deployment): bool
     {
         try {
+            $deployment->loadMissing('site');
+            $site = $deployment->site;
+
+            if (!$site || !$deployment->backup_path || !$deployment->remote_path) {
+                return false;
+            }
+
+            if (!$this->sftp->connect($site)) {
+                return false;
+            }
+
+            if (!$this->sftp->restoreDirectory($site, $deployment->backup_path, $deployment->remote_path)) {
+                $this->sftp->disconnect();
+                return false;
+            }
+
+            $this->sftp->disconnect();
+
             $this->deployments->update($deployment, [
                 'status' => 'rolled_back',
+                'log' => trim((string) $deployment->log . "\nManual rollback restored from backup: " . $deployment->backup_path),
             ]);
 
             return true;

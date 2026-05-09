@@ -199,7 +199,7 @@ class SiteCrudTest extends TestCase
         $this->assertFalse(Storage::disk('staging')->exists("site{$site->id}"));
     }
 
-    public function test_destroy_removes_remote_directory_when_sftp_is_configured(): void
+    public function test_destroy_keeps_remote_directory_when_sftp_is_configured(): void
     {
         $this->useTemporaryStorageRoots();
 
@@ -220,14 +220,9 @@ class SiteCrudTest extends TestCase
         ]);
 
         $mockSftp = \Mockery::mock(SftpClientInterface::class);
-        $mockSftp->shouldReceive('connect')->once()->withArgs(function (Site $argSite) use ($site) {
-            return $argSite->id === $site->id;
-        })->andReturn(true);
-        $mockSftp->shouldReceive('deleteDirectory')->once()->withArgs(function (Site $argSite, string $remotePath) use ($site) {
-            return $argSite->id === $site->id
-                && $remotePath === 'var/www/html/remote-delete.example';
-        })->andReturn(true);
-        $mockSftp->shouldReceive('disconnect')->once();
+        $mockSftp->shouldNotReceive('connect');
+        $mockSftp->shouldNotReceive('deleteDirectory');
+        $mockSftp->shouldNotReceive('disconnect');
 
         $this->app->instance(SftpClientInterface::class, $mockSftp);
 

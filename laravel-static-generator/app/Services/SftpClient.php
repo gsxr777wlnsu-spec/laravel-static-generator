@@ -83,6 +83,75 @@ class SftpClient implements SftpClientInterface
         }
     }
 
+    public function backupDirectory(Site $site, string $remotePath, string $backupPath): bool
+    {
+        try {
+            if (!$this->filesystem && !$this->connect($site)) {
+                return false;
+            }
+
+            $sourcePath = trim($remotePath, '/');
+            $targetPath = trim($backupPath, '/');
+
+            if (!$this->isSafeRemoteDirectoryPath($sourcePath) || !$this->isSafeRemoteDirectoryPath($targetPath)) {
+                return false;
+            }
+
+            if ($this->filesystem->directoryExists($targetPath)) {
+                $this->filesystem->deleteDirectory($targetPath);
+            }
+
+            if (!$this->filesystem->directoryExists($sourcePath)) {
+                $this->filesystem->createDirectory($targetPath, ['visibility' => 'public']);
+                return true;
+            }
+
+            return $this->copyRemoteDirectory($sourcePath, $targetPath);
+        } catch (\Exception $e) {
+            \Log::error('SFTP backup failed', [
+                'site_id' => $site->id,
+                'remote_path' => $remotePath,
+                'backup_path' => $backupPath,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
+    public function restoreDirectory(Site $site, string $backupPath, string $remotePath): bool
+    {
+        try {
+            if (!$this->filesystem && !$this->connect($site)) {
+                return false;
+            }
+
+            $sourcePath = trim($backupPath, '/');
+            $targetPath = trim($remotePath, '/');
+
+            if (!$this->isSafeRemoteDirectoryPath($sourcePath) || !$this->isSafeRemoteDirectoryPath($targetPath)) {
+                return false;
+            }
+
+            if (!$this->filesystem->directoryExists($sourcePath)) {
+                return false;
+            }
+
+            if ($this->filesystem->directoryExists($targetPath)) {
+                $this->filesystem->deleteDirectory($targetPath);
+            }
+
+            return $this->copyRemoteDirectory($sourcePath, $targetPath);
+        } catch (\Exception $e) {
+            \Log::error('SFTP restore failed', [
+                'site_id' => $site->id,
+                'backup_path' => $backupPath,
+                'remote_path' => $remotePath,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
     public function uploadDirectory(Site $site, string $localPath, string $remotePath): bool
     {
         try {
@@ -130,6 +199,42 @@ class SftpClient implements SftpClientInterface
             \Log::error('SFTP upload failed', [
                 'site_id' => $site->id,
                 'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    public function verifyUploadedFiles(Site $site, string $localPath, string $remotePath): bool
+    {
+        try {
+            if (!$this->filesystem && !$this->connect($site)) {
+                return false;
+            }
+
+            $normalizedRemotePath = trim($remotePath, '/');
+            if (!$this->isSafeRemoteDirectoryPath($normalizedRemotePath)) {
+                return false;
+            }
+
+            foreach (Storage::disk('generated')->allFiles($localPath) as $file) {
+                $relativePath = str_replace($localPath . '/', '', $file);
+                $remoteFile = $normalizedRemotePath . '/' . ltrim($relativePath, '/');
+
+                if (!$this->filesystem->fileExists($remoteFile)) {
+                    return false;
+                }
+
+                if ($this->filesystem->fileSize($remoteFile) !== Storage::disk('generated')->size($file)) {
+                    return false;
+                }
+            }
+
+            return true;
+        } catch (\Exception $e) {
+            \Log::error('SFTP upload verification failed', [
+                'site_id' => $site->id,
+                'remote_path' => $remotePath,
+                'error' => $e->getMessage(),
             ]);
             return false;
         }
@@ -334,6 +439,35 @@ class SftpClient implements SftpClientInterface
             $errorSuffix = $cleanOutput !== '' ? ' Output: ' . $cleanOutput : '';
             throw new \RuntimeException("Remote command failed ({$exitCode}): {$command}.{$errorSuffix}");
         }
+    }
+
+    private function copyRemoteDirectory(string $sourcePath, string $targetPath): bool
+    {
+        $this->filesystem->createDirectory($targetPath, ['visibility' => 'public']);
+
+        foreach ($this->filesystem->listContents($sourcePath, true) as $item) {
+            $sourceItemPath = $item->path();
+            $relativePath = ltrim(substr($sourceItemPath, strlen($sourcePath)), '/');
+            if ($relativePath === '') {
+                continue;
+            }
+
+            $targetItemPath = $targetPath . '/' . $relativePath;
+
+            if ($item->isDir()) {
+                $this->filesystem->createDirectory($targetItemPath, ['visibility' => 'public']);
+                continue;
+            }
+
+            $targetDir = dirname($targetItemPath);
+            if ($targetDir !== '.' && !$this->filesystem->directoryExists($targetDir)) {
+                $this->filesystem->createDirectory($targetDir, ['visibility' => 'public']);
+            }
+
+            $this->filesystem->write($targetItemPath, $this->filesystem->read($sourceItemPath));
+        }
+
+        return true;
     }
 
     private function decryptIfNeeded(string $value): string

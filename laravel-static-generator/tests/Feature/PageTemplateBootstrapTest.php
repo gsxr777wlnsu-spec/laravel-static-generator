@@ -73,7 +73,7 @@ class PageTemplateBootstrapTest extends TestCase
         $this->assertNotNull($firstSection);
         $this->assertSame('module', $firstSection->type);
         $this->assertSame(0, (int) $firstSection->order);
-        $this->assertSame('hero', $firstSection->content['module'] ?? null);
+        $this->assertSame('hero-main', $firstSection->content['module'] ?? null);
     }
 
     public function test_creating_page_auto_generates_canonical_from_site_domain_and_slug(): void

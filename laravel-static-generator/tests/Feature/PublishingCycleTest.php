@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Contracts\SftpClientInterface;
 use App\Contracts\DeployServiceInterface;
+use App\Models\Deployment;
 use App\Models\Page;
 use App\Models\Section;
 use App\Models\Site;
@@ -241,7 +242,17 @@ class PublishingCycleTest extends TestCase
         $mockSftp->shouldReceive('connect')->once()->withArgs(function (Site $argSite) use ($site) {
             return $argSite->id === $site->id;
         })->andReturn(true);
+        $mockSftp->shouldReceive('backupDirectory')->once()->withArgs(function (Site $argSite, string $remotePath, string $backupPath) use ($site) {
+            return $argSite->id === $site->id
+                && $remotePath === '/var/www/deploy.example'
+                && str_starts_with($backupPath, '/var/www/deploy.example.backup-');
+        })->andReturn(true);
         $mockSftp->shouldReceive('uploadDirectory')->once()->withArgs(function (Site $argSite, string $localPath, string $remotePath) use ($site) {
+            return $argSite->id === $site->id
+                && $localPath === "site{$site->id}"
+                && $remotePath === '/var/www/deploy.example';
+        })->andReturn(true);
+        $mockSftp->shouldReceive('verifyUploadedFiles')->once()->withArgs(function (Site $argSite, string $localPath, string $remotePath) use ($site) {
             return $argSite->id === $site->id
                 && $localPath === "site{$site->id}"
                 && $remotePath === '/var/www/deploy.example';
@@ -250,7 +261,9 @@ class PublishingCycleTest extends TestCase
 
         $this->app->instance(SftpClientInterface::class, $mockSftp);
 
-        $deployResponse = $this->actingAs($this->admin)->postJson("/api/sites/{$site->id}/deploy");
+        $deployResponse = $this->actingAs($this->admin)->postJson("/api/sites/{$site->id}/deploy", [
+            'run_post_deploy_commands' => false,
+        ]);
         $deployResponse->assertOk();
         $deployResponse->assertJsonPath('status', 'completed');
 
@@ -284,7 +297,17 @@ class PublishingCycleTest extends TestCase
         $mockSftp->shouldReceive('connect')->once()->withArgs(function (Site $argSite) use ($site) {
             return $argSite->id === $site->id;
         })->andReturn(true);
+        $mockSftp->shouldReceive('backupDirectory')->once()->withArgs(function (Site $argSite, string $remotePath, string $backupPath) use ($site) {
+            return $argSite->id === $site->id
+                && $remotePath === '/var/www/import.example'
+                && str_starts_with($backupPath, '/var/www/import.example.backup-');
+        })->andReturn(true);
         $mockSftp->shouldReceive('uploadDirectory')->once()->withArgs(function (Site $argSite, string $localPath, string $remotePath) use ($site) {
+            return $argSite->id === $site->id
+                && $localPath === "site{$site->id}"
+                && $remotePath === '/var/www/import.example';
+        })->andReturn(true);
+        $mockSftp->shouldReceive('verifyUploadedFiles')->once()->withArgs(function (Site $argSite, string $localPath, string $remotePath) use ($site) {
             return $argSite->id === $site->id
                 && $localPath === "site{$site->id}"
                 && $remotePath === '/var/www/import.example';
@@ -305,6 +328,88 @@ class PublishingCycleTest extends TestCase
             'status' => 'completed',
             'remote_path' => '/var/www/import.example',
         ]);
+    }
+
+    public function test_manual_rollback_restores_remote_backup(): void
+    {
+        $site = Site::create([
+            'name' => 'Rollback Site',
+            'domain' => 'rollback.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/rollback',
+            'status' => 'active',
+            'locale' => 'en',
+            'default_locale' => 'en',
+            'sftp_host' => 'sftp.example.com',
+            'sftp_username' => 'deploy-user',
+            'sftp_auth_method' => 'password',
+            'sftp_remote_path' => '/var/www/rollback.example',
+        ]);
+
+        $deployment = Deployment::create([
+            'site_id' => $site->id,
+            'status' => 'completed',
+            'remote_path' => '/var/www/rollback.example',
+            'backup_path' => '/var/www/rollback.example.backup-20260509000000-1',
+            'log' => 'Deployment completed successfully',
+        ]);
+
+        $mockSftp = \Mockery::mock(SftpClientInterface::class);
+        $mockSftp->shouldReceive('connect')->once()->withArgs(fn (Site $argSite) => $argSite->id === $site->id)->andReturn(true);
+        $mockSftp->shouldReceive('restoreDirectory')->once()->withArgs(function (Site $argSite, string $backupPath, string $remotePath) use ($site) {
+            return $argSite->id === $site->id
+                && $backupPath === '/var/www/rollback.example.backup-20260509000000-1'
+                && $remotePath === '/var/www/rollback.example';
+        })->andReturn(true);
+        $mockSftp->shouldReceive('disconnect')->once();
+
+        $this->app->instance(SftpClientInterface::class, $mockSftp);
+
+        $this->assertTrue($this->app->make(DeployServiceInterface::class)->rollback($deployment));
+
+        $this->assertDatabaseHas('deployments', [
+            'id' => $deployment->id,
+            'status' => 'rolled_back',
+        ]);
+    }
+
+    public function test_failed_deploy_restores_backup(): void
+    {
+        $this->useTemporaryGeneratedDisk();
+
+        $site = Site::create([
+            'name' => 'Failed Deploy Site',
+            'domain' => 'failed-deploy.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/failed-deploy',
+            'status' => 'active',
+            'locale' => 'en',
+            'default_locale' => 'en',
+            'sftp_host' => 'sftp.example.com',
+            'sftp_username' => 'deploy-user',
+            'sftp_auth_method' => 'password',
+            'sftp_remote_path' => '/var/www/failed-deploy.example',
+        ]);
+
+        Storage::disk('generated')->put("site{$site->id}/index.html", '<html>ok</html>');
+
+        $mockSftp = \Mockery::mock(SftpClientInterface::class);
+        $mockSftp->shouldReceive('connect')->once()->withArgs(fn (Site $argSite) => $argSite->id === $site->id)->andReturn(true);
+        $mockSftp->shouldReceive('backupDirectory')->once()->andReturn(true);
+        $mockSftp->shouldReceive('uploadDirectory')->once()->andReturn(false);
+        $mockSftp->shouldReceive('restoreDirectory')->once()->withArgs(function (Site $argSite, string $backupPath, string $remotePath) use ($site) {
+            return $argSite->id === $site->id
+                && str_starts_with($backupPath, '/var/www/failed-deploy.example.backup-')
+                && $remotePath === '/var/www/failed-deploy.example';
+        })->andReturn(true);
+        $mockSftp->shouldReceive('disconnect')->once();
+
+        $this->app->instance(SftpClientInterface::class, $mockSftp);
+
+        $deployment = $this->app->make(DeployServiceInterface::class)->deploy($site);
+
+        $this->assertSame('failed', $deployment->status);
+        $this->assertStringContainsString('Rollback restored from backup', (string) $deployment->log);
     }
 
     private function useTemporaryGeneratedDisk(): void
