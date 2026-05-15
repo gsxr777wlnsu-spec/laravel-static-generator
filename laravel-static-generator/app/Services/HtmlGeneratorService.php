@@ -456,8 +456,8 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
 
     private function rewriteAssetPathsForPreview(string $html): string
     {
-        $html = preg_replace('/(href|src)="\/assets\/([^"]*)"/', '$1="assets/$2"', $html);
-        $html = preg_replace('/(href|src)="\/js\/([^"]*)"/', '$1="js/$2"', $html);
+        $html = preg_replace('/(href|src)=(["\'])\/assets\/([^"\']*)\2/', '$1=$2assets/$3$2', $html);
+        $html = preg_replace('/(href|src)=(["\'])\/js\/([^"\']*)\2/', '$1=$2js/$3$2', $html);
         
         return $html;
     }
@@ -478,6 +478,34 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         $previewAssetsPath = "preview/{$previewToken}/assets";
         $this->copyStorageDirectory('generated', $sourceAssetPath, 'generated', $previewAssetsPath);
         $this->ensureMainScriptAlias('generated', $previewAssetsPath);
+        $this->rewritePreviewCssAssetPaths($previewAssetsPath, $previewToken);
+    }
+
+    private function rewritePreviewCssAssetPaths(string $previewAssetsPath, string $previewToken): void
+    {
+        $disk = Storage::disk('generated');
+        $cssDir = trim($previewAssetsPath, '/').'/css';
+
+        if (!$disk->exists($cssDir)) {
+            return;
+        }
+
+        foreach ($disk->allFiles($cssDir) as $cssFile) {
+            if (!Str::endsWith($cssFile, '.css')) {
+                continue;
+            }
+
+            $css = $disk->get($cssFile);
+            $rewritten = preg_replace(
+                '/url\(\s*(["\']?)\/assets\/([^)"\']+)\1\s*\)/',
+                "url(\$1/api/preview/{$previewToken}/assets/\$2\$1)",
+                $css
+            );
+
+            if ($rewritten !== null && $rewritten !== $css) {
+                $disk->put($cssFile, $rewritten);
+            }
+        }
     }
 
     private function copyAssetsToSite(int $siteId): void

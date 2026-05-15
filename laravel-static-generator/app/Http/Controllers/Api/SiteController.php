@@ -15,7 +15,9 @@ use App\Services\ImportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 class SiteController extends Controller
@@ -39,6 +41,22 @@ class SiteController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        // TODO(PROD): remove temporary site-create deep debug tracing (debug_id, detailed step logs, debug headers/body fields).
+        $debugId = $this->resolveSiteCreateDebugId($request);
+        $requestStartedAt = microtime(true);
+        $userId = (int) (auth()->id() ?? 0);
+
+        Log::withContext([
+            'site_create_debug_id' => $debugId,
+            'site_create_user_id' => $userId,
+        ]);
+
+        Log::info('site.create.request_received', [
+            'ip' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'payload_keys' => array_keys($request->all()),
+        ]);
+
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'domain' => 'required|string|unique:sites,domain',
@@ -60,10 +78,24 @@ class SiteController extends Controller
             'ai_field_prompts.*.file' => 'required_with:ai_field_prompts|string|max:255',
             'ai_field_prompts.*.path' => 'required_with:ai_field_prompts|string|max:1000',
             'ai_field_prompts.*.prompt' => 'required_with:ai_field_prompts|string|max:10000',
+            'ai_field_edits' => 'nullable|array',
+            'ai_field_edits.*.file' => 'required_with:ai_field_edits|string|max:255',
+            'ai_field_edits.*.path' => 'required_with:ai_field_edits|string|max:1000',
+            'ai_field_edits.*.value' => 'present|string|max:100000',
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+            Log::warning('site.create.validation_failed', [
+                'errors' => $validator->errors()->toArray(),
+                'duration_ms' => $this->elapsedMilliseconds($requestStartedAt),
+            ]);
+
+            return response()
+                ->json([
+                    'errors' => $validator->errors(),
+                    'debug_id' => $debugId,
+                ], 422)
+                ->header('X-Site-Create-Debug-Id', $debugId);
         }
 
         $data = $validator->validated();
@@ -79,27 +111,84 @@ class SiteController extends Controller
         $aiCloneTemplates = (bool) ($data['ai_clone_templates'] ?? false);
         $aiSourceDomain = trim((string) ($data['ai_source_domain'] ?? 'test.com'));
         $aiFieldPrompts = $data['ai_field_prompts'] ?? [];
+        $aiFieldEdits = $data['ai_field_edits'] ?? [];
 
-        unset($data['ai_clone_templates'], $data['ai_source_domain'], $data['ai_field_prompts']);
+        Log::info('site.create.validated', [
+            'name' => $data['name'] ?? null,
+            'domain' => $data['domain'] ?? null,
+            'template_set' => $data['template_set'] ?? null,
+            'output_path' => $data['output_path'] ?? null,
+            'ai_clone_templates' => $aiCloneTemplates,
+            'ai_source_domain' => $aiSourceDomain,
+            'ai_prompt_count' => is_array($aiFieldPrompts) ? count($aiFieldPrompts) : 0,
+            'ai_edit_count' => is_array($aiFieldEdits) ? count($aiFieldEdits) : 0,
+            'ai_prompt_summary' => $this->summarizeFieldEntries(
+                is_array($aiFieldPrompts) ? $aiFieldPrompts : [],
+                'prompt'
+            ),
+            'ai_edit_summary' => $this->summarizeFieldEntries(
+                is_array($aiFieldEdits) ? $aiFieldEdits : [],
+                'value'
+            ),
+        ]);
+
+        unset($data['ai_clone_templates'], $data['ai_source_domain'], $data['ai_field_prompts'], $data['ai_field_edits']);
 
         $site = $this->sites->create($data);
+        Log::info('site.create.site_row_created', [
+            'site_id' => $site->id,
+            'domain' => $site->domain,
+        ]);
+
         $aiGeneration = [
             'enabled' => $aiCloneTemplates,
             'updated_fields' => 0,
             'updated_files' => 0,
             'updated_paths' => [],
+            'manual_updated_fields' => 0,
+            'manual_updated_files' => 0,
+            'manual_updated_paths' => [],
         ];
 
+        $aiPipelineStartedAt = microtime(true);
         try {
             if ($aiCloneTemplates) {
+                Log::info('site.create.ai_pipeline.start', [
+                    'site_id' => $site->id,
+                    'source_domain' => $aiSourceDomain !== '' ? $aiSourceDomain : 'test.com',
+                ]);
+
                 $aiGeneration = $this->processAiTemplateGeneration(
                     site: $site,
-                    userId: (int) (auth()->id() ?? 0),
+                    userId: $userId,
                     sourceDomain: $aiSourceDomain !== '' ? $aiSourceDomain : 'test.com',
-                    prompts: is_array($aiFieldPrompts) ? $aiFieldPrompts : []
+                    prompts: is_array($aiFieldPrompts) ? $aiFieldPrompts : [],
+                    fieldEdits: is_array($aiFieldEdits) ? $aiFieldEdits : [],
+                    debugId: $debugId
                 );
+
+                Log::info('site.create.ai_pipeline.completed', [
+                    'site_id' => $site->id,
+                    'duration_ms' => $this->elapsedMilliseconds($aiPipelineStartedAt),
+                    'updated_fields' => $aiGeneration['updated_fields'] ?? 0,
+                    'updated_files' => $aiGeneration['updated_files'] ?? 0,
+                    'manual_updated_fields' => $aiGeneration['manual_updated_fields'] ?? 0,
+                    'manual_updated_files' => $aiGeneration['manual_updated_files'] ?? 0,
+                ]);
+            } else {
+                Log::info('site.create.ai_pipeline.skipped', [
+                    'site_id' => $site->id,
+                ]);
             }
         } catch (\Throwable $e) {
+            Log::error('site.create.ai_pipeline.failed', [
+                'site_id' => $site->id,
+                'duration_ms' => $this->elapsedMilliseconds($aiPipelineStartedAt),
+                'exception_class' => $e::class,
+                'message' => $e->getMessage(),
+            ]);
+
+            $templatesDeleted = false;
             try {
                 $templatesRoot = (string) config(
                     'services.ai_agent.templates_root',
@@ -107,26 +196,58 @@ class SiteController extends Controller
                 );
                 $targetDir = rtrim($templatesRoot, '/') . '/' . $site->domain;
                 if (is_dir($targetDir)) {
-                    File::deleteDirectory($targetDir);
+                    $templatesDeleted = File::deleteDirectory($targetDir);
                 }
-            } catch (\Throwable) {
-                // best effort cleanup
+            } catch (\Throwable $cleanupError) {
+                Log::error('site.create.rollback.templates_cleanup_failed', [
+                    'site_id' => $site->id,
+                    'exception_class' => $cleanupError::class,
+                    'message' => $cleanupError->getMessage(),
+                ]);
             }
 
-            $this->sites->delete($site);
+            $siteDeleted = false;
+            try {
+                $siteDeleted = $this->sites->delete($site);
+            } catch (\Throwable $deleteError) {
+                Log::error('site.create.rollback.site_delete_failed', [
+                    'site_id' => $site->id,
+                    'exception_class' => $deleteError::class,
+                    'message' => $deleteError->getMessage(),
+                ]);
+            }
 
-            return response()->json([
-                'error' => 'AI template generation failed',
-                'message' => $e->getMessage(),
-            ], 422);
+            Log::warning('site.create.rollback.completed', [
+                'site_id' => $site->id,
+                'templates_deleted' => $templatesDeleted,
+                'site_deleted' => $siteDeleted,
+                'duration_ms' => $this->elapsedMilliseconds($requestStartedAt),
+            ]);
+
+            return response()
+                ->json([
+                    'error' => 'AI template generation failed',
+                    'message' => $e->getMessage(),
+                    'debug_id' => $debugId,
+                ], 422)
+                ->header('X-Site-Create-Debug-Id', $debugId);
         }
 
         $this->audit->log('site.created', Site::class, $site->id, null, $site->toArray());
 
         $payload = $site->toArray();
         $payload['ai_generation'] = $aiGeneration;
+        $payload['debug_id'] = $debugId;
 
-        return response()->json($payload, 201);
+        Log::info('site.create.completed', [
+            'site_id' => $site->id,
+            'domain' => $site->domain,
+            'duration_ms' => $this->elapsedMilliseconds($requestStartedAt),
+        ]);
+
+        return response()
+            ->json($payload, 201)
+            ->header('X-Site-Create-Debug-Id', $debugId);
     }
 
     public function show(int $id): JsonResponse
@@ -431,30 +552,110 @@ class SiteController extends Controller
         Site $site,
         int $userId,
         string $sourceDomain,
-        array $prompts
+        array $prompts,
+        array $fieldEdits,
+        ?string $debugId = null
     ): array {
         if ($userId <= 0) {
             throw new RuntimeException('Authenticated user is required for AI template generation.');
         }
 
+        $stepStartedAt = microtime(true);
+        Log::info('site.create.ai.clone.start', [
+            'site_id' => $site->id,
+            'source_domain' => $sourceDomain,
+            'target_domain' => $site->domain,
+            'debug_id' => $debugId,
+        ]);
         $this->aiAgentService->cloneDomainTemplates($sourceDomain, $site->domain);
+        Log::info('site.create.ai.clone.completed', [
+            'site_id' => $site->id,
+            'duration_ms' => $this->elapsedMilliseconds($stepStartedAt),
+        ]);
+
         $this->audit->log('ai.templates.cloned', Site::class, $site->id, null, [
             'source_domain' => $sourceDomain,
             'target_domain' => $site->domain,
         ]);
 
+        $stepStartedAt = microtime(true);
+        Log::info('site.create.ai.manual_edits.start', [
+            'site_id' => $site->id,
+            'rows' => count($fieldEdits),
+        ]);
+        $manualResult = $this->aiAgentService->applyFieldEditsToDomain($site->domain, $fieldEdits);
+        $manualUpdatedPaths = [];
+        foreach (($manualResult['details'] ?? []) as $detail) {
+            if (!is_array($detail)) {
+                continue;
+            }
+
+            foreach (($detail['updated_paths'] ?? []) as $path) {
+                if (is_string($path) && $path !== '') {
+                    $manualUpdatedPaths[] = $path;
+                }
+            }
+        }
+        $manualUpdatedPaths = array_values(array_unique($manualUpdatedPaths));
+        Log::info('site.create.ai.manual_edits.completed', [
+            'site_id' => $site->id,
+            'duration_ms' => $this->elapsedMilliseconds($stepStartedAt),
+            'updated_fields' => $manualResult['updated_fields'] ?? 0,
+            'updated_files' => $manualResult['updated_files'] ?? 0,
+        ]);
+
+        if (($manualResult['updated_fields'] ?? 0) > 0) {
+            $this->audit->log('ai.templates.manual_updated', Site::class, $site->id, null, [
+                'updated_fields' => $manualResult['updated_fields'],
+                'updated_files' => $manualResult['updated_files'],
+                'updated_paths' => $manualUpdatedPaths,
+            ]);
+        }
+
         if ($prompts === []) {
+            Log::info('site.create.ai.prompts.skipped', [
+                'site_id' => $site->id,
+            ]);
+
+            $stepStartedAt = microtime(true);
+            Log::info('site.create.ai.import.start', [
+                'site_id' => $site->id,
+            ]);
             $importStats = $this->importClonedTemplatesIntoSite($site);
+            Log::info('site.create.ai.import.completed', [
+                'site_id' => $site->id,
+                'duration_ms' => $this->elapsedMilliseconds($stepStartedAt),
+                'files_count' => $importStats['files_count'] ?? 0,
+                'pages_count' => $importStats['pages_count'] ?? 0,
+            ]);
             $this->audit->log('ai.templates.imported', Site::class, $site->id, null, $importStats);
             return [
                 'enabled' => true,
                 'updated_fields' => 0,
                 'updated_files' => 0,
                 'updated_paths' => [],
+                'manual_updated_fields' => (int) ($manualResult['updated_fields'] ?? 0),
+                'manual_updated_files' => (int) ($manualResult['updated_files'] ?? 0),
+                'manual_updated_paths' => $manualUpdatedPaths,
             ];
         }
 
+        $stepStartedAt = microtime(true);
+        Log::info('site.create.ai.prompts.start', [
+            'site_id' => $site->id,
+            'rows' => count($prompts),
+            'summary' => $this->summarizeFieldEntries($prompts, 'prompt'),
+        ]);
+
         $config = $this->aiConfigs->findForUser($userId);
+        Log::info('site.create.ai.config.loaded', [
+            'site_id' => $site->id,
+            'provider' => $config?->provider,
+            'model_name' => $config?->model_name,
+            'is_active' => (bool) ($config?->is_active ?? false),
+            'has_api_key' => trim((string) ($config?->api_key ?? '')) !== '',
+        ]);
+
         $result = $this->aiAgentService->applyPromptsToDomain(
             targetDomain: $site->domain,
             fieldPrompts: $prompts,
@@ -463,6 +664,12 @@ class SiteController extends Controller
             // in allowed_sites ahead of time. Path access rules still apply.
             siteId: null
         );
+        Log::info('site.create.ai.prompts.completed', [
+            'site_id' => $site->id,
+            'duration_ms' => $this->elapsedMilliseconds($stepStartedAt),
+            'updated_fields' => $result['updated_fields'] ?? 0,
+            'updated_files' => $result['updated_files'] ?? 0,
+        ]);
 
         $updatedPaths = [];
         foreach (($result['details'] ?? []) as $detail) {
@@ -484,7 +691,17 @@ class SiteController extends Controller
             'updated_paths' => $updatedPaths,
         ]);
 
+        $stepStartedAt = microtime(true);
+        Log::info('site.create.ai.import.start', [
+            'site_id' => $site->id,
+        ]);
         $importStats = $this->importClonedTemplatesIntoSite($site);
+        Log::info('site.create.ai.import.completed', [
+            'site_id' => $site->id,
+            'duration_ms' => $this->elapsedMilliseconds($stepStartedAt),
+            'files_count' => $importStats['files_count'] ?? 0,
+            'pages_count' => $importStats['pages_count'] ?? 0,
+        ]);
         $this->audit->log('ai.templates.imported', Site::class, $site->id, null, $importStats);
 
         return [
@@ -492,6 +709,9 @@ class SiteController extends Controller
             'updated_fields' => (int) ($result['updated_fields'] ?? 0),
             'updated_files' => (int) ($result['updated_files'] ?? 0),
             'updated_paths' => $updatedPaths,
+            'manual_updated_fields' => (int) ($manualResult['updated_fields'] ?? 0),
+            'manual_updated_files' => (int) ($manualResult['updated_files'] ?? 0),
+            'manual_updated_paths' => $manualUpdatedPaths,
         ];
     }
 
@@ -535,6 +755,55 @@ class SiteController extends Controller
             'files_count' => count($files),
             'pages_count' => $pagesCount,
         ];
+    }
+
+    private function resolveSiteCreateDebugId(Request $request): string
+    {
+        $headerId = trim((string) $request->header('X-Site-Create-Debug-Id', ''));
+        if ($headerId !== '') {
+            return Str::limit($headerId, 80, '');
+        }
+
+        $bodyId = trim((string) $request->input('debug_request_id', ''));
+        if ($bodyId !== '') {
+            return Str::limit($bodyId, 80, '');
+        }
+
+        return 'site-create-' . Str::uuid();
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $items
+     * @return array<int, array<string, mixed>>
+     */
+    private function summarizeFieldEntries(array $items, string $textField): array
+    {
+        $summary = [];
+
+        foreach ($items as $index => $item) {
+            if ($index >= 25) {
+                $summary[] = ['truncated' => true, 'remaining' => count($items) - 25];
+                break;
+            }
+
+            $file = (string) ($item['file'] ?? '');
+            $path = (string) ($item['path'] ?? '');
+            $text = (string) ($item[$textField] ?? '');
+
+            $summary[] = [
+                'file' => $file,
+                'path' => $path,
+                'text_len' => mb_strlen($text),
+                'text_preview' => mb_substr(preg_replace('/\s+/', ' ', trim($text)) ?? '', 0, 180),
+            ];
+        }
+
+        return $summary;
+    }
+
+    private function elapsedMilliseconds(float $startedAt): int
+    {
+        return (int) round((microtime(true) - $startedAt) * 1000);
     }
 
 }

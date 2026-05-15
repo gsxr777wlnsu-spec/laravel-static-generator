@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Symfony\Component\Yaml\Yaml;
 use Tests\TestCase;
 
 class SiteCrudTest extends TestCase
@@ -179,6 +180,22 @@ class SiteCrudTest extends TestCase
         Storage::disk('generated')->put('delete-site/index.html', '<html></html>');
         Storage::disk('staging')->put("site{$site->id}/keep.txt", 'temp');
 
+        $templatesRoot = '/tmp/laravel-static-generator-tests/ai-templates-delete-' . Str::uuid();
+        $siteTemplateDir = $templatesRoot . '/delete-site.example';
+        File::ensureDirectoryExists($siteTemplateDir);
+        config()->set('services.ai_agent.templates_root', $templatesRoot);
+
+        $templateYaml = Yaml::dump([
+            'domain' => 'delete-site.example',
+            'name' => 'delete-site.example',
+            'template' => 'test',
+            'output_path' => 'generated/delete-site.example',
+            'status' => 'active',
+            'locale' => 'en',
+            'pages' => [],
+        ], 8, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
+        File::put($siteTemplateDir . '/index-raw_html.md', "---\n" . $templateYaml);
+
         $response = $this->actingAs($this->admin)->deleteJson("/api/sites/{$site->id}");
         $response->assertOk();
 
@@ -197,6 +214,7 @@ class SiteCrudTest extends TestCase
         $this->assertFalse(Storage::disk('generated')->exists("site{$site->id}"));
         $this->assertFalse(Storage::disk('generated')->exists('delete-site'));
         $this->assertFalse(Storage::disk('staging')->exists("site{$site->id}"));
+        $this->assertFalse(File::isDirectory($siteTemplateDir));
     }
 
     public function test_destroy_keeps_remote_directory_when_sftp_is_configured(): void

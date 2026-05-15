@@ -39,10 +39,6 @@ Route::middleware(['web', 'auth', 'throttle:api'])->group(function () {
         Route::post('/{id}/sections/bootstrap', [PageController::class, 'bootstrapSections']);
     });
 
-    Route::prefix('preview')->group(function () {
-        Route::get('/{token}/{path?}', [PageController::class, 'servePreview'])->where('path', '.*');
-    });
-
     Route::prefix('sections')->group(function () {
         Route::get('/', [SectionController::class, 'index']);
         Route::post('/', [SectionController::class, 'store']);
@@ -95,4 +91,8 @@ Route::middleware(['web', 'auth', 'throttle:api'])->group(function () {
         Route::post('/read-all', [NotificationController::class, 'markAllAsRead']);
     });
 
+});
+
+Route::middleware(['throttle:api'])->prefix('preview')->group(function () {
+    Route::get('/{token}/{path?}', [PageController::class, 'servePreview'])->where('path', '.*');
 });

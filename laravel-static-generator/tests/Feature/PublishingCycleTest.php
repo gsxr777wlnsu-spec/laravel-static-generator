@@ -71,6 +71,9 @@ class PublishingCycleTest extends TestCase
         ]);
 
         Storage::disk('sites')->put("{$site->id}/assets/js/app.js", 'console.log("from app.js");');
+        Storage::disk('sites')->put("{$site->id}/assets/css/style.css", '.hero{background-image:url("/assets/images/hero/hero-background.webp")}');
+        Storage::disk('sites')->put("{$site->id}/assets/images/hero/hero-background.webp", 'preview-image');
+        Storage::disk('sites')->put("{$site->id}/assets/images/favicon/site.webmanifest", '{"name":"Preview Site"}');
 
         $mockGitService = \Mockery::mock(GitService::class);
         $mockGitService->shouldReceive('setRepositoryPath')->andReturnSelf();
@@ -105,8 +108,16 @@ class PublishingCycleTest extends TestCase
         $this->assertArrayHasKey(1, $matches);
         $previewToken = $matches[1];
         Storage::disk('generated')->assertExists("preview/{$previewToken}/assets/js/main.js");
+        Storage::disk('generated')->assertExists("preview/{$previewToken}/assets/css/style.css");
+        $previewCss = Storage::disk('generated')->get("preview/{$previewToken}/assets/css/style.css");
+        $this->assertStringContainsString("/api/preview/{$previewToken}/assets/images/hero/hero-background.webp", $previewCss);
+        $this->assertStringNotContainsString('url("/assets/', $previewCss);
 
-        $previewResponse = $this->actingAs($this->admin)->get($previewUrl);
+        $manifestResponse = $this->get("/api/preview/{$previewToken}/assets/images/favicon/site.webmanifest");
+        $manifestResponse->assertOk();
+        $manifestResponse->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+
+        $previewResponse = $this->get($previewUrl);
 
         $previewResponse->assertOk();
         $previewResponse->assertSee('Home Page');

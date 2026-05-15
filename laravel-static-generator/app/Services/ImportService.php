@@ -260,7 +260,7 @@ class ImportService
     {
         $ogData = isset($data['og_data']) && is_array($data['og_data']) ? $data['og_data'] : [];
 
-        foreach (['head_meta', 'head_links', 'head_extra', 'body_extra'] as $key) {
+        foreach (['head_meta', 'head_links', 'head_extra', 'head_custom', 'body_extra'] as $key) {
             if (array_key_exists($key, $data)) {
                 $ogData[$key] = $data[$key];
             }

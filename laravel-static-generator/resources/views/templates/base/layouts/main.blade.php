@@ -1,6 +1,124 @@
 <!DOCTYPE html>
 <html lang="{{ $page->locale ?? 'en' }}">
 <head>
+        @php
+            $pageOgData = is_array($page->og_data ?? null) ? $page->og_data : [];
+            $headMetaItems = isset($pageOgData['head_meta']) && is_array($pageOgData['head_meta']) ? $pageOgData['head_meta'] : [];
+            $headLinkItems = isset($pageOgData['head_links']) && is_array($pageOgData['head_links']) ? $pageOgData['head_links'] : [];
+            $domain = (string) ($site->domain ?? 'site.com');
+
+            $metaKey = static function (array $meta): ?string {
+                $name = strtolower(trim((string) ($meta['name'] ?? '')));
+                if ($name !== '') {
+                    return 'name:' . $name;
+                }
+
+                $property = strtolower(trim((string) ($meta['property'] ?? '')));
+                if ($property !== '') {
+                    return 'property:' . $property;
+                }
+
+                $httpEquiv = strtolower(trim((string) ($meta['http_equiv'] ?? '')));
+                if ($httpEquiv !== '') {
+                    return 'http-equiv:' . $httpEquiv;
+                }
+
+                return null;
+            };
+
+            $defaultHeadMeta = [
+                ['name' => 'robots', 'content' => 'all'],
+                ['name' => 'telegram:channel', 'content' => '@WP_WooCom'],
+                ['name' => 'telegram:bot', 'content' => '@WP_WooCom_bot'],
+                ['property' => 'vk:image', 'content' => '/assets/images/logo/logo.png'],
+                ['property' => 'vk:app_id', 'content' => ''],
+                ['name' => 'og:type', 'property' => 'og:type', 'content' => 'website'],
+                ['property' => 'og:locale', 'content' => ($page->locale ?? 'en') . '_' . strtoupper($page->locale ?? 'en')],
+                ['name' => 'og:title', 'property' => 'og:title', 'content' => (string) ($page->meta_title ?? $page->title ?? '')],
+                ['name' => 'og:description', 'property' => 'og:description', 'content' => (string) ($page->meta_description ?? '')],
+                ['property' => 'article:published_time', 'content' => '2016'],
+                ['property' => 'article:author', 'content' => $domain],
+                ['name' => 'twitter:card', 'content' => 'summary_large_image'],
+                ['name' => 'twitter:title', 'content' => (string) ($page->meta_title ?? $page->title ?? '')],
+                ['name' => 'twitter:description', 'content' => (string) ($page->meta_description ?? '')],
+                ['name' => 'twitter:site', 'content' => $domain],
+                ['name' => 'twitter:creator', 'content' => $domain],
+                ['name' => 'twitter:image', 'content' => (string) ($page->og_image ?? '/assets/images/aviator.jpg')],
+                ['property' => 'og:image', 'content' => (string) ($page->og_image ?? '/assets/images/aviator.jpg')],
+                ['name' => 'geo.region', 'content' => 'EN'],
+                ['name' => 'geo.position', 'content' => '55.71881; 37.555728'],
+                ['name' => 'ICBM', 'content' => '55.71881, 37.555728'],
+                ['name' => 'contact', 'content' => 'support@' . $domain],
+                ['name' => 'copyright', 'content' => $domain],
+                ['name' => 'designer', 'content' => 'gsxr777'],
+                ['name' => 'generator', 'content' => $domain . ' CMS'],
+                ['name' => 'author', 'content' => $domain],
+                ['name' => 'rating', 'content' => 'general'],
+            ];
+
+            $mergedMetaMap = [];
+            foreach ($defaultHeadMeta as $meta) {
+                $key = $metaKey($meta);
+                if ($key === null) {
+                    continue;
+                }
+                $mergedMetaMap[$key] = $meta;
+            }
+
+            foreach ($headMetaItems as $meta) {
+                if (!is_array($meta) || !array_key_exists('content', $meta)) {
+                    continue;
+                }
+
+                $key = $metaKey($meta);
+                if ($key === null) {
+                    continue;
+                }
+
+                $mergedMetaMap[$key] = [
+                    'name' => isset($meta['name']) ? (string) $meta['name'] : null,
+                    'property' => isset($meta['property']) ? (string) $meta['property'] : null,
+                    'http_equiv' => isset($meta['http_equiv']) ? (string) $meta['http_equiv'] : null,
+                    'content' => (string) $meta['content'],
+                ];
+            }
+
+            $mergedHeadMeta = array_values($mergedMetaMap);
+            $publishedIndex = null;
+            $modifiedIndex = null;
+            foreach ($mergedHeadMeta as $idx => $meta) {
+                $property = strtolower(trim((string) ($meta['property'] ?? '')));
+                if ($property === 'article:published_time') {
+                    $publishedIndex = $idx;
+                }
+                if ($property === 'article:modified_time') {
+                    $modifiedIndex = $idx;
+                }
+            }
+
+            if ($publishedIndex !== null && $modifiedIndex !== null && $modifiedIndex !== $publishedIndex + 1) {
+                $modifiedMeta = $mergedHeadMeta[$modifiedIndex];
+                array_splice($mergedHeadMeta, $modifiedIndex, 1);
+
+                if ($modifiedIndex < $publishedIndex) {
+                    $publishedIndex--;
+                }
+
+                array_splice($mergedHeadMeta, $publishedIndex + 1, 0, [$modifiedMeta]);
+            }
+
+            $publisherHref = 'https://' . $domain . '/';
+            foreach ($headLinkItems as $link) {
+                if (!is_array($link) || !isset($link['href'])) {
+                    continue;
+                }
+
+                $rel = strtolower(trim((string) ($link['rel'] ?? '')));
+                if ($rel === 'publisher') {
+                    $publisherHref = (string) $link['href'];
+                }
+            }
+        @endphp
         <meta charset="utf-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,60 +126,84 @@
         <meta name="description" content="{{ $page->meta_description ?? '' }}">
         <meta name="keywords" content="{{ $page->meta_keywords ?? 'game, play, bet, aviator' }}">
         <link rel="canonical" href="{{ $page->canonical ?? url($page->slug) }}">
-        <meta name="robots" content="all">
-        <meta name="telegram:channel" content="@WP_WooCom">
-        <meta name="telegram:bot" content="@WP_WooCom_bot">
-        <meta property="vk:image" content="/assets/images/logo/logo.png">
-        <meta property="vk:app_id" content="">
-        <meta name="og:type" property="og:type" content="website">
-        <meta property="og:locale" content="{{ $page->locale ?? 'en' }}_{{ strtoupper($page->locale ?? 'en') }}">
-        <meta name="og:title" property="og:title" content="{{ $page->meta_title ?? $page->title }}">
-        <meta name="og:description" property="og:description" content="{{ $page->meta_description ?? '' }}">
-        <meta property="article:published_time" content="2016">
-        <meta property="article:author" content="{{ $site->domain ?? 'site.com' }}">
-        <meta name="twitter:card" content="summary_large_image">
-        <meta name="twitter:title" content="{{ $page->meta_title ?? $page->title }}">
-        <meta name="twitter:description" content="{{ $page->meta_description ?? '' }}">
-        <meta name="twitter:site" content="{{ $site->domain ?? 'site.com' }}">
-        <meta name="twitter:creator" content="{{ $site->domain ?? 'site.com' }}">
-        <meta name="twitter:image" content="{{ $page->og_image ?? '/assets/images/aviator.jpg' }}">
-        <meta property="og:image" content="{{ $page->og_image ?? '/assets/images/aviator.jpg' }}">
-        <meta name="geo.region" content="EN">
-        <meta name="geo.position" content="55.71881; 37.555728">
-        <meta name="ICBM" content="55.71881, 37.555728">
-        <meta name="contact" content="support@{{ $site->domain ?? 'site.com' }}">
-        <meta name="copyright" content="{{ $site->domain ?? 'site.com' }}">
-        <meta name="designer" content="gsxr777">
-        <meta name="generator" content="{{ $site->domain ?? 'site.com' }} CMS">
-        <link rel="publisher" href="https://{{ $site->domain ?? 'site.com' }}/">
-        <meta name="author" content="{{ $site->domain ?? 'site.com' }}">
-        <meta name="rating" content="general">
+@php
+foreach ($mergedHeadMeta as $meta) {
+    if (!is_array($meta) || !array_key_exists('content', $meta)) {
+        continue;
+    }
+
+    $metaAttributes = [];
+    if (!empty($meta['name'])) {
+        $metaAttributes[] = 'name="' . e((string) $meta['name']) . '"';
+    }
+    if (!empty($meta['property'])) {
+        $metaAttributes[] = 'property="' . e((string) $meta['property']) . '"';
+    }
+    if (!empty($meta['http_equiv'])) {
+        $metaAttributes[] = 'http-equiv="' . e((string) $meta['http_equiv']) . '"';
+    }
+    $metaAttributes[] = 'content="' . e((string) $meta['content']) . '"';
+
+    echo '        <meta ' . implode(' ', $metaAttributes) . '>' . PHP_EOL;
+}
+@endphp
+        <link rel="publisher" href="{{ $publisherHref }}">
         <link href="/assets/css/style.css" rel="stylesheet">
         <link rel="icon" type="image/png" href="/assets/images/favicon/favicon-96x96.png" sizes="96x96">
         <link rel="icon" type="image/svg+xml" href="/assets/images/favicon/favicon.svg">
         <link rel="shortcut icon" href="/assets/images/favicon/favicon.ico">
         <link rel="apple-touch-icon" sizes="180x180" href="/assets/images/favicon/apple-touch-icon.png">
         <link rel="manifest" href="/assets/images/favicon/site.webmanifest">
-        <script type="application/ld+json">
-{
-    "@{!! 'context' !!}": "https://schema.org",
-    "@type": "WebPage",
-    "@id": "https://{{ $site->domain ?? 'site.com' }}/#webpage",
-    "url": "https://{{ $site->domain ?? 'site.com' }}/"
+@php
+foreach ($headLinkItems as $link) {
+    if (!is_array($link) || !isset($link['href'])) {
+        continue;
+    }
+
+    $rel = strtolower(trim((string) ($link['rel'] ?? '')));
+    if (in_array($rel, ['stylesheet', 'publisher', 'icon', 'shortcut icon', 'apple-touch-icon', 'manifest'], true)) {
+        continue;
+    }
+
+    $linkAttributes = [];
+    if (isset($link['rel'])) {
+        $linkAttributes[] = 'rel="' . e((string) $link['rel']) . '"';
+    }
+    $linkAttributes[] = 'href="' . e((string) $link['href']) . '"';
+    if (isset($link['type'])) {
+        $linkAttributes[] = 'type="' . e((string) $link['type']) . '"';
+    }
+    if (isset($link['sizes'])) {
+        $linkAttributes[] = 'sizes="' . e((string) $link['sizes']) . '"';
+    }
+
+    echo '        <link ' . implode(' ', $linkAttributes) . '>' . PHP_EOL;
 }
-</script>
-        <script type="application/ld+json">
+@endphp
+
+        @if(isset($pageOgData['head_extra']) && is_string($pageOgData['head_extra']) && trim($pageOgData['head_extra']) !== '')
+            {!! $pageOgData['head_extra'] !!}
+        @else
+            <script type="application/ld+json">
 {
-    "@{!! 'context' !!}": "https://schema.org",
-    "@type": "VideoGame",
+    "@@context": "https://schema.org",
+    "@@type": "WebPage",
+    "@@id": "https://{{ $domain }}/#webpage",
+    "url": "https://{{ $domain }}/"
+}
+            </script>
+            <script type="application/ld+json">
+{
+    "@@context": "https://schema.org",
+    "@@type": "VideoGame",
     "additionalType": "https://schema.org/WebApplication",
-    "@id": "https://{{ $site->domain ?? 'site.com' }}/#aviator-game",
+    "@@id": "https://{{ $domain }}/#aviator-game",
     "name": "Aviator",
     "description": "Play Aviator Game — a thrilling legal online game with a maximum win of 1000x your bet. Created by Spribe, this crash game has a high chance for players to win with 97% RTP.",
-    "url": "https://{{ $site->domain ?? 'site.com' }}/",
-    "image": "https://{{ $site->domain ?? 'site.com' }}/assets/images/aviator.jpg",
+    "url": "https://{{ $domain }}/",
+    "image": "https://{{ $domain }}/assets/images/aviator.jpg",
     "author": {
-        "@type": "Organization",
+        "@@type": "Organization",
         "name": "Spribe"
     },
     "gamePlatform": ["Web Browser", "Mobile", "Desktop"],
@@ -69,29 +211,33 @@
     "applicationCategory": "GameApplication",
     "operatingSystem": "Web Browser",
     "aggregateRating": {
-        "@type": "AggregateRating",
+        "@@type": "AggregateRating",
         "ratingValue": "4.7",
         "bestRating": "5",
         "worstRating": "1",
         "ratingCount": "44"
     }
 }
-</script>
-        <script type="application/ld+json">
+            </script>
+            <script type="application/ld+json">
 {
-    "@{!! 'context' !!}": "https://schema.org",
-    "@type": "Organization",
-    "@id": "https://{{ $site->domain ?? 'site.com' }}/#organization",
+    "@@context": "https://schema.org",
+    "@@type": "Organization",
+    "@@id": "https://{{ $domain }}/#organization",
     "name": "Aviator Game",
-    "url": "https://{{ $site->domain ?? 'site.com' }}/",
+    "url": "https://{{ $domain }}/",
     "logo": {
-        "@type": "ImageObject",
-        "url": "https://{{ $site->domain ?? 'site.com' }}/assets/images/favicon/apple-touch-icon.png",
+        "@@type": "ImageObject",
+        "url": "https://{{ $domain }}/assets/images/favicon/apple-touch-icon.png",
         "width": 180,
         "height": 180
     }
 }
-</script>
+            </script>
+        @endif
+        @if(isset($pageOgData['head_custom']) && is_string($pageOgData['head_custom']) && trim($pageOgData['head_custom']) !== '')
+            {!! $pageOgData['head_custom'] !!}
+        @endif
 
         @if(isset($languageVersions) && count($languageVersions) > 0)
             @foreach($languageVersions as $version)

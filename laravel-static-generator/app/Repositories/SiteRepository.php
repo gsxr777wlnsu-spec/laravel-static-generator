@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Symfony\Component\Yaml\Yaml;
 
 class SiteRepository implements SiteRepositoryInterface
 {
@@ -53,7 +54,7 @@ class SiteRepository implements SiteRepositoryInterface
         });
 
         if ($deleted) {
-            $this->cleanupSiteFilesystemArtifacts($siteId, $outputPath);
+            $this->cleanupSiteFilesystemArtifacts($siteId, $outputPath, (string) $site->domain);
         }
 
         return $deleted;
@@ -130,7 +131,7 @@ class SiteRepository implements SiteRepositoryInterface
             ->delete();
     }
 
-    private function cleanupSiteFilesystemArtifacts(int $siteId, string $outputPath): void
+    private function cleanupSiteFilesystemArtifacts(int $siteId, string $outputPath, string $siteDomain): void
     {
         $this->deleteDirectoryOnDisk('sites', (string) $siteId);
         $this->deleteDirectoryOnDisk('generated', 'site' . $siteId);
@@ -142,6 +143,8 @@ class SiteRepository implements SiteRepositoryInterface
         if ($normalizedOutputPath !== null) {
             $this->deleteDirectoryOnDisk('generated', $normalizedOutputPath);
         }
+
+        $this->cleanupAiTemplateDirectory($siteDomain);
 
         $templatePath = resource_path("views/templates/site{$siteId}");
         try {
@@ -201,6 +204,80 @@ class SiteRepository implements SiteRepositoryInterface
         }
 
         return $normalized;
+    }
+
+    private function cleanupAiTemplateDirectory(string $siteDomain): void
+    {
+        $domain = strtolower(trim($siteDomain));
+        if ($domain === '' || str_contains($domain, '..')) {
+            return;
+        }
+
+        $templatesRoot = (string) config(
+            'services.ai_agent.templates_root',
+            storage_path('import-deploy/md/test/raw_html')
+        );
+
+        $templatesRoot = rtrim(str_replace('\\', '/', $templatesRoot), '/');
+        if ($templatesRoot === '' || !is_dir($templatesRoot)) {
+            return;
+        }
+
+        $targetDirectory = $templatesRoot . '/' . $domain;
+        $normalizedTarget = str_replace('\\', '/', $targetDirectory);
+        if (!is_dir($normalizedTarget)) {
+            return;
+        }
+
+        if (!str_starts_with($normalizedTarget, $templatesRoot . '/')) {
+            return;
+        }
+
+        if (!$this->isSafeToDeleteTemplateDirectory($normalizedTarget, $domain)) {
+            return;
+        }
+
+        try {
+            if (!File::deleteDirectory($normalizedTarget)) {
+                \Log::warning('Failed to delete AI template directory', [
+                    'domain' => $domain,
+                    'path' => $normalizedTarget,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('Failed to delete AI template directory', [
+                'domain' => $domain,
+                'path' => $normalizedTarget,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function isSafeToDeleteTemplateDirectory(string $directory, string $domain): bool
+    {
+        $files = glob($directory . '/*-raw_html.md') ?: [];
+        if ($files === []) {
+            return true;
+        }
+
+        foreach ($files as $file) {
+            try {
+                $data = Yaml::parseFile($file);
+            } catch (\Throwable) {
+                continue;
+            }
+
+            if (!is_array($data)) {
+                continue;
+            }
+
+            $fileDomain = strtolower(trim((string) ($data['domain'] ?? '')));
+            if ($fileDomain === $domain) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function cloneFromStaging(string $stagingPath, array $siteData): ?Site
