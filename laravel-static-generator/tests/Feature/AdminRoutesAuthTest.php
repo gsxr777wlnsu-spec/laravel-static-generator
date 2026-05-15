@@ -31,6 +31,7 @@ class AdminRoutesAuthTest extends TestCase
 
         $routes = [
             '/admin',
+            '/admin/ai-agent',
             '/admin/sites',
             "/admin/sites/{$site->id}/pages",
             "/admin/sites/{$site->id}/pages/{$page->id}/edit",
@@ -52,6 +53,11 @@ class AdminRoutesAuthTest extends TestCase
             ->get('/admin')
             ->assertOk()
             ->assertSee('Dashboard');
+
+        $this->actingAs($admin)
+            ->get('/admin/ai-agent')
+            ->assertOk()
+            ->assertSee('AI Agent Configuration');
 
         $this->actingAs($admin)
             ->get('/admin/sites')

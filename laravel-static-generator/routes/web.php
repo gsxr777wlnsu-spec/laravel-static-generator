@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\MediaController;
 use App\Http\Controllers\Admin\PageController;
 use App\Http\Controllers\Admin\SiteController;
+use App\Http\Controllers\Admin\AiAgentController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -12,6 +13,8 @@ Route::get('/', function () {
 
 Route::prefix('admin')->name('admin.')->middleware(['auth'])->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+
+    Route::get('/ai-agent', [AiAgentController::class, 'edit'])->name('ai-agent.edit');
     
     Route::prefix('sites')->name('sites.')->group(function () {
         Route::get('/', [SiteController::class, 'index'])->name('index');

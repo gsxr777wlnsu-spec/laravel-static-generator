@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AiContentController;
+use App\Http\Controllers\Api\AiAgentController;
 use App\Http\Controllers\Api\ImportController;
 use App\Http\Controllers\Api\MediaController;
 use App\Http\Controllers\Api\PageController;
@@ -63,6 +64,11 @@ Route::middleware(['web', 'auth', 'throttle:api'])->group(function () {
     Route::prefix('ai')->group(function () {
         Route::post('/process-markdown', [AiContentController::class, 'processMarkdown']);
         Route::post('/generate', [AiContentController::class, 'generate']);
+    });
+
+    Route::prefix('ai-agent')->group(function () {
+        Route::get('/config', [AiAgentController::class, 'show']);
+        Route::put('/config', [AiAgentController::class, 'upsert']);
     });
 
     Route::prefix('templates')->group(function () {

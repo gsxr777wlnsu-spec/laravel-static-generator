@@ -10,10 +10,51 @@
     "*-html.md": "yaml"
   },
   "yaml.embedded.languages": {
-    "html": ["html"],
-    "xml": ["xml"],
-    "json": ["json"],
-    "javascript": ["js", "javascript"],
-    "css": ["css"]
+    "html": [
+      "html"
+    ],
+    "xml": [
+      "xml"
+    ],
+    "json": [
+      "json"
+    ],
+    "javascript": [
+      "js",
+      "javascript"
+    ],
+    "css": [
+      "css"
+    ]
+  },
+  /* --- НАСТРОЙКИ ДЛЯ СНИЖЕНИЯ НАГРУЗКИ НА СЕРВЕР --- */
+  // Отключаем следование по символическим ссылкам (частая причина зацикливания rg)
+  "search.followSymlinks": false,
+  // Ограничиваем количество результатов, чтобы поиск быстрее завершался
+  "search.maxResults": 1000,
+  // Исключаем тяжелые папки из поиска (rg не будет в них заходить)
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/bower_components": true,
+    "**/.git": true,
+    "**/tmp": true,
+    "**/logs": true,
+    "**/dist": true,
+    "**/build": true,
+    "**/wp-content/uploads": true, // Важно для WordPress
+    "**/wp-content/cache": true, // Важно для WordPress
+    "**/var/cache": true, // Для Symfony/Joomla
+    "**/*.log": true
+  },
+  // Отключаем слежение за изменениями в этих папках (снижает нагрузку на CPU)
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/**": true,
+    "**/wp-content/uploads/**": true,
+    "**/wp-content/cache/**": true,
+    "**/var/cache/**": true,
+    "**/dist/**": true,
+    "**/build/**": true
   }
 }

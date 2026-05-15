@@ -69,6 +69,10 @@
                                class="inline-flex items-center border-b-2 {{ request()->routeIs('admin.sites.*') ? 'border-indigo-500 text-gray-900 dark:text-white' : 'border-transparent text-gray-500 dark:text-gray-400 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-300' }} px-1 pt-1 text-sm font-medium">
                                 Sites
                             </a>
+                            <a href="{{ route('admin.ai-agent.edit') }}"
+                               class="inline-flex items-center border-b-2 {{ request()->routeIs('admin.ai-agent.*') ? 'border-indigo-500 text-gray-900 dark:text-white' : 'border-transparent text-gray-500 dark:text-gray-400 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-300' }} px-1 pt-1 text-sm font-medium">
+                                AI Agent
+                            </a>
                         </div>
                     </div>
                     <div class="flex items-center">

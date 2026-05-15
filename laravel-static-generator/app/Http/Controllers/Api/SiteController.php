@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Contracts\AiAgentConfigRepositoryInterface;
 use App\Contracts\AuditLogServiceInterface;
 use App\Contracts\DeployServiceInterface;
 use App\Contracts\HtmlGeneratorInterface;
@@ -9,9 +10,13 @@ use App\Contracts\SiteRepositoryInterface;
 use App\Contracts\SftpClientInterface;
 use App\Http\Controllers\Controller;
 use App\Models\Site;
+use App\Services\AiAgentService;
+use App\Services\ImportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Validator;
+use RuntimeException;
 
 class SiteController extends Controller
 {
@@ -20,7 +25,10 @@ class SiteController extends Controller
         private HtmlGeneratorInterface $generator,
         private DeployServiceInterface $deploy,
         private SftpClientInterface $sftp,
-        private AuditLogServiceInterface $audit
+        private AuditLogServiceInterface $audit,
+        private AiAgentService $aiAgentService,
+        private AiAgentConfigRepositoryInterface $aiConfigs,
+        private ImportService $importService
     ) {}
 
     public function index(): JsonResponse
@@ -46,6 +54,12 @@ class SiteController extends Controller
             'sftp_private_key' => 'nullable|string',
             'sftp_auth_method' => 'nullable|in:password,key',
             'sftp_remote_path' => 'nullable|string',
+            'ai_clone_templates' => 'nullable|boolean',
+            'ai_source_domain' => 'nullable|string|max:255',
+            'ai_field_prompts' => 'nullable|array',
+            'ai_field_prompts.*.file' => 'required_with:ai_field_prompts|string|max:255',
+            'ai_field_prompts.*.path' => 'required_with:ai_field_prompts|string|max:1000',
+            'ai_field_prompts.*.prompt' => 'required_with:ai_field_prompts|string|max:10000',
         ]);
 
         if ($validator->fails()) {
@@ -62,11 +76,57 @@ class SiteController extends Controller
             $data['sftp_private_key'] = encrypt($data['sftp_private_key']);
         }
 
+        $aiCloneTemplates = (bool) ($data['ai_clone_templates'] ?? false);
+        $aiSourceDomain = trim((string) ($data['ai_source_domain'] ?? 'test.com'));
+        $aiFieldPrompts = $data['ai_field_prompts'] ?? [];
+
+        unset($data['ai_clone_templates'], $data['ai_source_domain'], $data['ai_field_prompts']);
+
         $site = $this->sites->create($data);
-        
+        $aiGeneration = [
+            'enabled' => $aiCloneTemplates,
+            'updated_fields' => 0,
+            'updated_files' => 0,
+            'updated_paths' => [],
+        ];
+
+        try {
+            if ($aiCloneTemplates) {
+                $aiGeneration = $this->processAiTemplateGeneration(
+                    site: $site,
+                    userId: (int) (auth()->id() ?? 0),
+                    sourceDomain: $aiSourceDomain !== '' ? $aiSourceDomain : 'test.com',
+                    prompts: is_array($aiFieldPrompts) ? $aiFieldPrompts : []
+                );
+            }
+        } catch (\Throwable $e) {
+            try {
+                $templatesRoot = (string) config(
+                    'services.ai_agent.templates_root',
+                    storage_path('import-deploy/md/test/raw_html')
+                );
+                $targetDir = rtrim($templatesRoot, '/') . '/' . $site->domain;
+                if (is_dir($targetDir)) {
+                    File::deleteDirectory($targetDir);
+                }
+            } catch (\Throwable) {
+                // best effort cleanup
+            }
+
+            $this->sites->delete($site);
+
+            return response()->json([
+                'error' => 'AI template generation failed',
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+
         $this->audit->log('site.created', Site::class, $site->id, null, $site->toArray());
 
-        return response()->json($site, 201);
+        $payload = $site->toArray();
+        $payload['ai_generation'] = $aiGeneration;
+
+        return response()->json($payload, 201);
     }
 
     public function show(int $id): JsonResponse
@@ -362,6 +422,119 @@ class SiteController extends Controller
             'success' => $success,
             'message' => $success ? 'Connection successful' : 'Connection failed'
         ]);
+    }
+
+    /**
+     * @param  array<int, array{file?:string,path?:string,prompt?:string}>  $prompts
+     */
+    private function processAiTemplateGeneration(
+        Site $site,
+        int $userId,
+        string $sourceDomain,
+        array $prompts
+    ): array {
+        if ($userId <= 0) {
+            throw new RuntimeException('Authenticated user is required for AI template generation.');
+        }
+
+        $this->aiAgentService->cloneDomainTemplates($sourceDomain, $site->domain);
+        $this->audit->log('ai.templates.cloned', Site::class, $site->id, null, [
+            'source_domain' => $sourceDomain,
+            'target_domain' => $site->domain,
+        ]);
+
+        if ($prompts === []) {
+            $importStats = $this->importClonedTemplatesIntoSite($site);
+            $this->audit->log('ai.templates.imported', Site::class, $site->id, null, $importStats);
+            return [
+                'enabled' => true,
+                'updated_fields' => 0,
+                'updated_files' => 0,
+                'updated_paths' => [],
+            ];
+        }
+
+        $config = $this->aiConfigs->findForUser($userId);
+        $result = $this->aiAgentService->applyPromptsToDomain(
+            targetDomain: $site->domain,
+            fieldPrompts: $prompts,
+            config: $config,
+            // During initial site creation, the site is new and cannot be pre-listed
+            // in allowed_sites ahead of time. Path access rules still apply.
+            siteId: null
+        );
+
+        $updatedPaths = [];
+        foreach (($result['details'] ?? []) as $detail) {
+            if (!is_array($detail)) {
+                continue;
+            }
+
+            foreach (($detail['updated_paths'] ?? []) as $path) {
+                if (is_string($path) && $path !== '') {
+                    $updatedPaths[] = $path;
+                }
+            }
+        }
+        $updatedPaths = array_values(array_unique($updatedPaths));
+
+        $this->audit->log('ai.templates.generated', Site::class, $site->id, null, [
+            'updated_fields' => $result['updated_fields'],
+            'updated_files' => $result['updated_files'],
+            'updated_paths' => $updatedPaths,
+        ]);
+
+        $importStats = $this->importClonedTemplatesIntoSite($site);
+        $this->audit->log('ai.templates.imported', Site::class, $site->id, null, $importStats);
+
+        return [
+            'enabled' => true,
+            'updated_fields' => (int) ($result['updated_fields'] ?? 0),
+            'updated_files' => (int) ($result['updated_files'] ?? 0),
+            'updated_paths' => $updatedPaths,
+        ];
+    }
+
+    /**
+     * Import cloned per-page md templates into pages/sections of the created site.
+     *
+     * @return array{files_count:int,pages_count:int}
+     */
+    private function importClonedTemplatesIntoSite(Site $site): array
+    {
+        $templatesRoot = (string) config(
+            'services.ai_agent.templates_root',
+            storage_path('import-deploy/md/test/raw_html')
+        );
+        $domainDir = rtrim($templatesRoot, '/') . '/' . $site->domain;
+
+        if (!is_dir($domainDir)) {
+            throw new RuntimeException("Cloned template directory not found: {$domainDir}");
+        }
+
+        $files = glob($domainDir . '/*-raw_html.md') ?: [];
+        sort($files);
+
+        if ($files === []) {
+            throw new RuntimeException("No md templates found in cloned directory: {$domainDir}");
+        }
+
+        $pagesCount = 0;
+
+        foreach ($files as $filePath) {
+            $result = $this->importService->importFromMdFile(
+                $filePath,
+                $site->id,
+                false // keep SFTP values from create form, do not override from template file
+            );
+
+            $pagesCount += (int) ($result['pages_count'] ?? 0);
+        }
+
+        return [
+            'files_count' => count($files),
+            'pages_count' => $pagesCount,
+        ];
     }
 
 }

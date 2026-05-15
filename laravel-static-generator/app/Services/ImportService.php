@@ -17,7 +17,7 @@ class ImportService
         private SiteRepositoryInterface $sites
     ) {}
 
-    public function importFromMdFile(string $filePath, ?int $siteId = null): array
+    public function importFromMdFile(string $filePath, ?int $siteId = null, bool $allowSftpUpdates = true): array
     {
         if (!file_exists($filePath)) {
             throw new \RuntimeException("File not found: {$filePath}");
@@ -37,10 +37,10 @@ class ImportService
             throw new \RuntimeException('Invalid YAML structure: root value must be a map/object');
         }
 
-        return $this->importSite($data, $siteId);
+        return $this->importSite($data, $siteId, $allowSftpUpdates);
     }
 
-    public function importSite(array $data, ?int $siteId = null): array
+    public function importSite(array $data, ?int $siteId = null, bool $allowSftpUpdates = true): array
     {
         $domain = $data['domain'] ?? null;
         if (!$domain) {
@@ -88,22 +88,24 @@ class ImportService
         $importedPages = [];
 
         $hasSftpUpdates = false;
-        foreach ([
-            'sftp_host',
-            'sftp_port',
-            'sftp_username',
-            'sftp_password',
-            'sftp_private_key',
-            'sftp_auth_method',
-            'sftp_remote_path',
-        ] as $sftpKey) {
-            if (array_key_exists($sftpKey, $data)) {
-                $hasSftpUpdates = true;
-                break;
+        if ($allowSftpUpdates) {
+            foreach ([
+                'sftp_host',
+                'sftp_port',
+                'sftp_username',
+                'sftp_password',
+                'sftp_private_key',
+                'sftp_auth_method',
+                'sftp_remote_path',
+            ] as $sftpKey) {
+                if (array_key_exists($sftpKey, $data)) {
+                    $hasSftpUpdates = true;
+                    break;
+                }
             }
         }
 
-        if ($hasSftpUpdates) {
+        if ($allowSftpUpdates && $hasSftpUpdates) {
             $authMethod = $site->sftp_auth_method;
             if (isset($data['sftp_auth_method'])) {
                 $candidate = strtolower((string) $data['sftp_auth_method']);

@@ -224,6 +224,84 @@ class Media extends Model
 }
 ```
 
+#### AiAgentConfig Model
+```php
+class AiAgentConfig extends Model
+{
+    protected $fillable = [
+        'user_id',
+        'provider',
+        'api_key',
+        'model_name',
+        'allowed_paths',
+        'allowed_sites',
+        'is_active'
+    ];
+
+    protected $casts = [
+        'allowed_paths' => 'array',
+        'allowed_sites' => 'array',
+        'is_active' => 'boolean',
+    ];
+
+    protected $hidden = [
+        'api_key',
+    ];
+
+    public function user(): BelongsTo;
+    public function isPathAllowed(string $path): bool;
+    public function isSiteAllowed(int $siteId): bool;
+}
+```
+
+#### SiteRedirect Model
+```php
+class SiteRedirect extends Model
+{
+    protected $fillable = [
+        'site_id',
+        'source_path',
+        'target_path',
+        'status_code',
+        'is_active'
+    ];
+
+    protected $casts = [
+        'status_code' => 'integer',
+        'is_active' => 'boolean',
+    ];
+
+    public function site(): BelongsTo;
+}
+```
+
+#### Deployment Model
+```php
+class Deployment extends Model
+{
+    protected $fillable = [
+        'site_id',
+        'status',
+        'started_at',
+        'completed_at',
+        'duration',
+        'files_count',
+        'log',
+        'error_message',
+        'deployed_by'
+    ];
+
+    protected $casts = [
+        'status' => DeploymentStatus::class,
+        'started_at' => 'datetime',
+        'completed_at' => 'datetime',
+    ];
+
+    public function site(): BelongsTo;
+    public function deployer(): BelongsTo;
+}
+```
+
 ### 2. Service Layer
 
 #### HtmlGeneratorService
@@ -265,72 +343,7 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         // 6. Copy media files
         // 7. Return result with stats
     }
-
-    public function generatePreview(Page $page): array
-    {
-        // 1. Load page with sections
-        // 2. Generate HTML from Blade template
-        // 3. Rewrite absolute asset paths to relative (/assets/... -> assets/...)
-        //    Handles: /assets/, /css/, /js/, /images/, /fonts/, /media/, etc.
-        // 4. Save HTML to preview storage with unique token
-        // 5. Copy all static resource directories from site's generated directory:
-        //    - Source: storage/generated/site{id}/{assets,css,js,images,fonts,media,...}/
-        //    - Destination: storage/generated/preview/{token}/{assets,css,js,images,fonts,media,...}/
-        //    - Maintains full directory structure
-        // 6. Return preview URL and expiration time
-        // Resources are then served at: /api/preview/{token}/css/..., /api/preview/{token}/assets/..., etc.
-    }
 }
-```
-
-**Preview Feature with Assets:**
-When a user clicks the Preview button on a page editing interface, the system:
-1. Generates a temporary preview token
-2. Renders the page HTML from its Blade template
-3. **Rewrites all absolute asset paths to relative paths** so they resolve in preview context:
-   - `/assets/...` → `assets/...`
-   - `/css/...` → `css/...`
-   - `/js/...` → `js/...`
-   - `/images/...` → `images/...`
-   - `/fonts/...` → `fonts/...`
-   - And any other static resource directory
-4. **Copies all static directories** from the site's generated folder to the preview folder:
-   - Includes: assets/, css/, js/, images/, fonts/, media/, img/, static/, dist/
-   - Maintains full directory structure for correct path resolution
-5. Stores everything in temporary storage with automatic cleanup after 30 minutes
-6. Returns a preview URL that can be opened in a new browser tab
-
-This approach allows users to:
-- Preview pages with complete styling and functionality
-- Immediately edit assets and styles for testing
-- See changes exactly as they would appear on the production site
-- Test all media files, CSS, JavaScript, and other resources without needing to deploy
-
-**Asset Path Rewriting:**
-The system detects and rewrites all absolute paths to static resources:
-```
-Original HTML: <link href="/css/style.css" rel="stylesheet">
-Preview HTML:  <link href="css/style.css" rel="stylesheet">
-
-Original HTML: <script src="/js/app.js"></script>
-Preview HTML:  <script src="js/app.js"></script>
-
-Original HTML: <img src="/assets/images/logo.png" alt="Logo">
-Preview HTML:  <img src="assets/images/logo.png" alt="Logo">
-```
-
-The relative paths resolve correctly within the preview directory structure, allowing all resources to load without modification to the file system structure.
-
-**Supported Resource Directories:**
-The system automatically copies these common static directories if they exist:
-- `assets/` - General static assets (CSS, JS, images, fonts)
-- `css/` - Stylesheets
-- `js/` - JavaScript files
-- `images/` or `img/` - Image files
-- `fonts/` - Font files
-- `media/` - Media files
-- `static/` - Static resources
-- `dist/` - Distribution files
 ```
 
 #### MediaManagerService
@@ -492,6 +505,165 @@ class AiContentService implements AiContentServiceInterface
 }
 ```
 
+#### AiAgentService
+```php
+interface AiAgentServiceInterface
+{
+    public function generateBladeTemplate(string $prompt, string $mdTemplate, AiAgentConfig $config): string;
+    public function validateAccess(AiAgentConfig $config, string $targetPath): bool;
+    public function saveGeneratedFile(string $content, string $path, AiAgentConfig $config): bool;
+    public function switchModel(AiAgentConfig $config, string $newModel): AiAgentConfig;
+}
+
+class AiAgentService implements AiAgentServiceInterface
+{
+    public function __construct(
+        private AiClient $aiClient,
+        private AuditLogService $auditLog,
+        private StorageManager $storage
+    ) {}
+
+    public function generateBladeTemplate(string $prompt, string $mdTemplate, AiAgentConfig $config): string
+    {
+        // 1. Validate config is active
+        // 2. Prepare prompt with MD template
+        // 3. Send request to AI provider (OpenAI/Anthropic)
+        // 4. Parse response and extract Blade code
+        // 5. Return generated Blade template
+    }
+
+    public function validateAccess(AiAgentConfig $config, string $targetPath): bool
+    {
+        // 1. Check if path is in allowed_paths
+        // 2. Check if path belongs to allowed_sites
+        // 3. Return true if allowed, false otherwise
+    }
+
+    public function saveGeneratedFile(string $content, string $path, AiAgentConfig $config): bool
+    {
+        // 1. Validate access to target path
+        // 2. Save file to storage
+        // 3. Create audit log entry
+        // 4. Return success status
+    }
+
+    public function switchModel(AiAgentConfig $config, string $newModel): AiAgentConfig
+    {
+        // 1. Update model_name in config
+        // 2. Save to database
+        // 3. Return updated config
+    }
+}
+```
+
+#### NginxConfigService
+```php
+interface NginxConfigServiceInterface
+{
+    public function generateConfig(Site $site): string;
+    public function updateRemoteConfig(Site $site, string $config): bool;
+    public function reloadNginx(Site $site): bool;
+    public function testConfig(Site $site): bool;
+    public function rollbackConfig(Site $site): bool;
+}
+
+class NginxConfigService implements NginxConfigServiceInterface
+{
+    public function __construct(
+        private SshClient $ssh,
+        private DeploymentRepository $deployments
+    ) {}
+
+    public function generateConfig(Site $site): string
+    {
+        // 1. Load site redirects from database
+        // 2. Generate Nginx server block
+        // 3. Add redirect rules
+        // 4. Add SSL configuration
+        // 5. Return complete config string
+    }
+
+    public function updateRemoteConfig(Site $site, string $config): bool
+    {
+        // 1. Connect to Production Server via SSH
+        // 2. Backup current config
+        // 3. Write new config to /etc/nginx/sites-available/
+        // 4. Create symlink in sites-enabled
+        // 5. Return success status
+    }
+
+    public function reloadNginx(Site $site): bool
+    {
+        // 1. Connect to Production Server via SSH
+        // 2. Test config: nginx -t
+        // 3. If test passes, reload: systemctl reload nginx
+        // 4. Verify nginx status
+        // 5. Log result to deployment log
+        // 6. Return success status
+    }
+
+    public function testConfig(Site $site): bool
+    {
+        // 1. Connect to Production Server via SSH
+        // 2. Run: nginx -t
+        // 3. Return true if valid, false otherwise
+    }
+
+    public function rollbackConfig(Site $site): bool
+    {
+        // 1. Connect to Production Server via SSH
+        // 2. Restore backup config
+        // 3. Reload nginx
+        // 4. Return success status
+    }
+}
+```
+
+#### BulkEditService
+```php
+interface BulkEditServiceInterface
+{
+    public function bulkUpdateSites(array $siteIds, array $updates): BulkEditResult;
+    public function bulkUpdateRedirects(array $redirectData): BulkEditResult;
+    public function applyNginxChanges(array $siteIds): BulkEditResult;
+}
+
+class BulkEditService implements BulkEditServiceInterface
+{
+    public function __construct(
+        private SiteRepository $sites,
+        private SiteRedirectRepository $redirects,
+        private NginxConfigService $nginxConfig,
+        private AuditLogService $auditLog
+    ) {}
+
+    public function bulkUpdateSites(array $siteIds, array $updates): BulkEditResult
+    {
+        // 1. Validate site IDs exist
+        // 2. Apply updates to each site
+        // 3. Log changes to audit log
+        // 4. Return result with success/failure counts
+    }
+
+    public function bulkUpdateRedirects(array $redirectData): BulkEditResult
+    {
+        // 1. Validate redirect data
+        // 2. Create/update redirect records
+        // 3. Group by site_id
+        // 4. Return result with affected sites
+    }
+
+    public function applyNginxChanges(array $siteIds): BulkEditResult
+    {
+        // 1. For each site, generate new Nginx config
+        // 2. Update remote config
+        // 3. Reload Nginx
+        // 4. Log results
+        // 5. Return result with success/failure per site
+    }
+}
+```
+
 ### 3. Repository Layer
 
 ```php
@@ -512,6 +684,27 @@ interface PageRepositoryInterface
     public function delete(Page $page): bool;
     public function findBySlug(Site $site, string $slug): ?Page;
     public function getActiveBySite(Site $site): Collection;
+}
+
+interface AiAgentConfigRepositoryInterface
+{
+    public function create(array $data): AiAgentConfig;
+    public function update(AiAgentConfig $config, array $data): AiAgentConfig;
+    public function delete(AiAgentConfig $config): bool;
+    public function findById(int $id): ?AiAgentConfig;
+    public function getByUser(int $userId): Collection;
+    public function getActiveByUser(int $userId): Collection;
+}
+
+interface SiteRedirectRepositoryInterface
+{
+    public function create(array $data): SiteRedirect;
+    public function update(SiteRedirect $redirect, array $data): SiteRedirect;
+    public function delete(SiteRedirect $redirect): bool;
+    public function findById(int $id): ?SiteRedirect;
+    public function getBySite(int $siteId): Collection;
+    public function getActiveBySite(int $siteId): Collection;
+    public function findBySourcePath(int $siteId, string $sourcePath): ?SiteRedirect;
 }
 ```
 
@@ -574,6 +767,36 @@ class PageController extends Controller
     public function store(StorePageRequest $request): JsonResponse;
     public function update(UpdatePageRequest $request, Page $page): JsonResponse;
     public function preview(Page $page): Response;
+}
+
+class AiAgentController extends Controller
+{
+    public function __construct(
+        private AiAgentService $aiAgent,
+        private AiAgentConfigRepository $configs
+    ) {}
+
+    public function index(): JsonResponse; // List user's AI configs
+    public function store(StoreAiAgentConfigRequest $request): JsonResponse; // Create config
+    public function update(UpdateAiAgentConfigRequest $request, AiAgentConfig $config): JsonResponse; // Update config
+    public function destroy(AiAgentConfig $config): JsonResponse; // Delete config
+    public function generate(GenerateBladeRequest $request): JsonResponse; // Generate Blade template
+    public function switchModel(SwitchModelRequest $request, AiAgentConfig $config): JsonResponse; // Switch AI model
+}
+
+class BulkEditController extends Controller
+{
+    public function __construct(
+        private BulkEditService $bulkEdit,
+        private SiteRepository $sites
+    ) {}
+
+    public function updateSites(BulkUpdateSitesRequest $request): JsonResponse; // Bulk update sites
+    public function listRedirects(Site $site): JsonResponse; // List site redirects
+    public function storeRedirect(StoreRedirectRequest $request): JsonResponse; // Create redirect
+    public function updateRedirect(UpdateRedirectRequest $request, SiteRedirect $redirect): JsonResponse; // Update redirect
+    public function destroyRedirect(SiteRedirect $redirect): JsonResponse; // Delete redirect
+    public function applyNginxChanges(ApplyNginxChangesRequest $request): JsonResponse; // Apply Nginx config changes
 }
 ```
 
@@ -668,7 +891,8 @@ resources/js/components/
 │   ├── SiteList.vue
 │   ├── SiteForm.vue
 │   ├── SiteCloner.vue
-│   └── RemoteServerConfig.vue
+│   ├── RemoteServerConfig.vue
+│   └── BulkEditSites.vue
 ├── pages/
 │   ├── PageEditor.vue
 │   ├── SectionBuilder.vue
@@ -677,6 +901,15 @@ resources/js/components/
 │   ├── MediaLibrary.vue
 │   ├── MediaUploader.vue
 │   └── MediaEditor.vue
+├── ai-agent/
+│   ├── AiAgentConfig.vue
+│   ├── AiAgentGenerator.vue
+│   ├── ModelSwitcher.vue
+│   └── AccessControl.vue
+├── redirects/
+│   ├── RedirectList.vue
+│   ├── RedirectForm.vue
+│   └── NginxConfigPreview.vue
 └── common/
     ├── Button.vue
     ├── Input.vue
@@ -782,79 +1015,377 @@ export default {
 </script>
 ```
 
-### 5. Gutenberg-like Page Builder (Target UX)
+#### AI Agent Configuration Component
+```vue
+<template>
+  <div class="ai-agent-config">
+    <h3>AI Agent Configuration</h3>
+    
+    <form @submit.prevent="saveConfig">
+      <div class="form-group">
+        <label>AI Provider</label>
+        <select v-model="config.provider" required>
+          <option value="openai">OpenAI</option>
+          <option value="anthropic">Anthropic</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label>API Key</label>
+        <input v-model="config.api_key" type="password" required />
+        <small>API key will be encrypted before storage</small>
+      </div>
+      
+      <div class="form-group">
+        <label>Model Name</label>
+        <input v-model="config.model_name" type="text" 
+               placeholder="gpt-4, claude-3-opus, etc." required />
+      </div>
+      
+      <div class="form-group">
+        <label>Allowed Paths</label>
+        <textarea v-model="allowedPathsText" rows="5" 
+                  placeholder="resources/views/templates/&#10;resources/views/components/"></textarea>
+        <small>One path per line. AI agent can only create files in these directories.</small>
+      </div>
+      
+      <div class="form-group">
+        <label>Allowed Sites</label>
+        <multiselect v-model="config.allowed_sites" 
+                     :options="availableSites" 
+                     :multiple="true"
+                     label="name" 
+                     track-by="id">
+        </multiselect>
+        <small>Select sites that AI agent can modify</small>
+      </div>
+      
+      <div class="form-group">
+        <label>
+          <input v-model="config.is_active" type="checkbox" />
+          Active
+        </label>
+      </div>
+      
+      <div class="form-actions">
+        <button type="submit" class="btn-primary">
+          Save Configuration
+        </button>
+      </div>
+    </form>
+  </div>
+</template>
 
-#### Editor Goal
-Редактор страницы должен работать как блочный конструктор (по аналогии с Gutenberg):
-- На этапе создания страницы пользователь сначала выбирает `Тип страницы`.
-- Поддерживаются типы: `blank`, `1win`, `app-copy`, `app`, `authors`, `bonuses`, `comparison`, `contact-us`, `cookie-policy`, `demo`, `index`, `privacy-policy`, `reviews`, `sitemap`, `terms-and-conditions`, `tips`.
-- После выбора типа страницы система подгружает стартовый набор модулей (для `blank` набор пустой).
-- Пользователь может добавлять, удалять, дублировать, переупорядочивать и редактировать модули.
-- Для контента модуля доступны:
-`визуальные поля` + `медиа` + `HTML source mode`.
-
-#### Editor Layout
-- Верхняя панель: `slug/title/status/locale`, `Save`, `Preview`.
-- Левая колонка: библиотека модулей.
-- Центральная колонка: canvas страницы (drag-and-drop порядок модулей).
-- Правая колонка: настройки выбранного модуля:
-`Content`, `Media`, `Advanced`, `HTML`.
-
-#### Module Catalog (minimum)
-Базовые модули должны быть созданы на основе SCSS-блоков:
-`authors`, `background`, `benefits`, `bonuses`, `breadcrumbs`, `button`, `card`, `casino`, `characteristics`, `comparison`, `conclusion`, `demo`, `download`, `errors`, `faq`, `feature`, `feedback`, `footer`, `form`, `game`, `gameplay`, `header`, `hero`, `installation`, `level`, `lightbox`, `list`, `logo`, `menu`, `other-reviews`, `payments`, `promo`, `pros`, `review`, `rtp`, `screenshots`, `scrollbar`, `sitemap`, `steps`, `strategies`, `symbols`, `table`, `text`, `tips`.
-
-#### Data Contract (Section Content JSON)
-Каждый блок секции хранится в JSON `sections.content`:
-```json
-{
-  "module": "hero",
-  "variant": "default",
-  "id": "hero-main",
-  "class": "hero hero-main",
-  "anchor": "top",
-  "content": {
-    "heading": "Title",
-    "text": "Description"
+<script>
+export default {
+  data() {
+    return {
+      config: {
+        provider: 'openai',
+        api_key: '',
+        model_name: '',
+        allowed_paths: [],
+        allowed_sites: [],
+        is_active: true
+      },
+      availableSites: [],
+      allowedPathsText: ''
+    };
   },
-  "media": {
-    "image": "/media/hero.webp"
+  watch: {
+    allowedPathsText(value) {
+      this.config.allowed_paths = value.split('\n').filter(p => p.trim());
+    }
   },
-  "settings": {
-    "theme": "light",
-    "container": "wide"
+  async mounted() {
+    await this.loadSites();
+  },
+  methods: {
+    async loadSites() {
+      const response = await fetch('/api/sites');
+      this.availableSites = await response.json();
+    },
+    async saveConfig() {
+      await fetch('/api/ai-agent/configs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(this.config)
+      });
+      this.$emit('saved');
+    }
   }
-}
+};
+</script>
 ```
 
-#### Template Bootstrap
-- Для каждого типа страницы хранится `preset` (стартовый массив секций).
-- При создании страницы выбранный preset копируется в секции новой страницы.
-- Пользователь может изменить любой модуль после автозагрузки.
+#### Bulk Edit Sites Component
+```vue
+<template>
+  <div class="bulk-edit-sites">
+    <h3>Bulk Edit Sites</h3>
+    
+    <div class="site-selection">
+      <h4>Select Sites</h4>
+      <div class="site-list">
+        <div v-for="site in sites" :key="site.id" class="site-item">
+          <label>
+            <input type="checkbox" v-model="selectedSites" :value="site.id" />
+            {{ site.name }} ({{ site.domain }})
+          </label>
+        </div>
+      </div>
+      <button @click="selectAll" class="btn-secondary">Select All</button>
+      <button @click="deselectAll" class="btn-secondary">Deselect All</button>
+    </div>
+    
+    <div v-if="selectedSites.length > 0" class="bulk-operations">
+      <h4>Bulk Operations</h4>
+      
+      <div class="form-group">
+        <label>Update Field</label>
+        <select v-model="updateField">
+          <option value="">-- Select Field --</option>
+          <option value="meta_description">Meta Description</option>
+          <option value="meta_keywords">Meta Keywords</option>
+          <option value="status">Status</option>
+        </select>
+      </div>
+      
+      <div v-if="updateField" class="form-group">
+        <label>New Value</label>
+        <textarea v-if="updateField === 'meta_description' || updateField === 'meta_keywords'" 
+                  v-model="updateValue" rows="3"></textarea>
+        <select v-else-if="updateField === 'status'" v-model="updateValue">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+          <option value="draft">Draft</option>
+        </select>
+      </div>
+      
+      <div class="form-actions">
+        <button @click="applyBulkUpdate" class="btn-primary" :disabled="!updateField || !updateValue">
+          Apply to {{ selectedSites.length }} Sites
+        </button>
+      </div>
+    </div>
+    
+    <div v-if="result" class="result" :class="result.success ? 'success' : 'error'">
+      {{ result.message }}
+    </div>
+  </div>
+</template>
 
-#### HTML Editing Mode
-- Режим `HTML source` должен быть доступен минимум на уровне одного модуля.
-- Дополнительно (опционально, этап 2): режим `Edit page HTML` для всего контента страницы.
-- Laravel поддерживает этот сценарий через JS-редактор кода (например CodeMirror/Monaco) и сохранение результата обратно в `sections.content`.
+<script>
+export default {
+  data() {
+    return {
+      sites: [],
+      selectedSites: [],
+      updateField: '',
+      updateValue: '',
+      result: null
+    };
+  },
+  async mounted() {
+    await this.loadSites();
+  },
+  methods: {
+    async loadSites() {
+      const response = await fetch('/api/sites');
+      this.sites = await response.json();
+    },
+    selectAll() {
+      this.selectedSites = this.sites.map(s => s.id);
+    },
+    deselectAll() {
+      this.selectedSites = [];
+    },
+    async applyBulkUpdate() {
+      const response = await fetch('/api/bulk-edit/sites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          site_ids: this.selectedSites,
+          updates: {
+            [this.updateField]: this.updateValue
+          }
+        })
+      });
+      this.result = await response.json();
+    }
+  }
+};
+</script>
+```
 
-#### Backend/API Requirements
-- `GET /api/page-templates` - список типов страниц и доступных preset.
-- `POST /api/pages` - создание страницы с параметром `template_key`.
-- `POST /api/pages/{id}/sections/bootstrap` - пересоздать секции из выбранного шаблона (с подтверждением).
-- `POST /api/pages/{id}/sections/reorder` - массовое обновление `order`.
-- `PUT /api/sections/{id}` - сохранение контента выбранного модуля (включая HTML mode).
+#### Redirect Management Component
+```vue
+<template>
+  <div class="redirect-management">
+    <h3>Site Redirects</h3>
+    
+    <div class="redirect-list">
+      <table>
+        <thead>
+          <tr>
+            <th>Source Path</th>
+            <th>Target Path</th>
+            <th>Status Code</th>
+            <th>Active</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="redirect in redirects" :key="redirect.id">
+            <td>{{ redirect.source_path }}</td>
+            <td>{{ redirect.target_path }}</td>
+            <td>{{ redirect.status_code }}</td>
+            <td>
+              <span :class="redirect.is_active ? 'badge-success' : 'badge-inactive'">
+                {{ redirect.is_active ? 'Active' : 'Inactive' }}
+              </span>
+            </td>
+            <td>
+              <button @click="editRedirect(redirect)" class="btn-sm">Edit</button>
+              <button @click="deleteRedirect(redirect.id)" class="btn-sm btn-danger">Delete</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    
+    <div class="redirect-form">
+      <h4>{{ editingRedirect ? 'Edit' : 'Add' }} Redirect</h4>
+      <form @submit.prevent="saveRedirect">
+        <div class="form-group">
+          <label>Source Path</label>
+          <input v-model="form.source_path" type="text" placeholder="/old-page" required />
+        </div>
+        
+        <div class="form-group">
+          <label>Target Path</label>
+          <input v-model="form.target_path" type="text" placeholder="/new-page" required />
+        </div>
+        
+        <div class="form-group">
+          <label>Status Code</label>
+          <select v-model="form.status_code" required>
+            <option value="301">301 - Permanent</option>
+            <option value="302">302 - Temporary</option>
+            <option value="307">307 - Temporary (Preserve Method)</option>
+            <option value="308">308 - Permanent (Preserve Method)</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label>
+            <input v-model="form.is_active" type="checkbox" />
+            Active
+          </label>
+        </div>
+        
+        <div class="form-actions">
+          <button type="submit" class="btn-primary">Save Redirect</button>
+          <button v-if="editingRedirect" @click="cancelEdit" type="button" class="btn-secondary">Cancel</button>
+        </div>
+      </form>
+    </div>
+    
+    <div class="nginx-actions">
+      <button @click="applyNginxChanges" class="btn-success" :disabled="applying">
+        {{ applying ? 'Applying...' : 'Apply Nginx Configuration' }}
+      </button>
+      <small>This will update Nginx config on production server and reload Nginx</small>
+    </div>
+    
+    <div v-if="applyResult" class="result" :class="applyResult.success ? 'success' : 'error'">
+      {{ applyResult.message }}
+    </div>
+  </div>
+</template>
 
-#### Validation Rules
-- `module` обязателен и должен быть из каталога модулей.
-- `content` и `settings` должны быть объектами JSON.
-- `order` должен оставаться последовательным (0..N без пропусков).
-- Для критичных модулей (например `faq`, `hero`, `table`) задаются schema-правила обязательных полей.
-
-#### Rendering Priority
-При генерации HTML модуль резолвится в порядке:
-1. `templates/base/modules/{module}/{variant}.blade.php`
-2. `templates/base/modules/{module}.blade.php`
-3. fallback по `type` через `components/{type}.blade.php`
+<script>
+export default {
+  props: ['siteId'],
+  data() {
+    return {
+      redirects: [],
+      form: {
+        source_path: '',
+        target_path: '',
+        status_code: 301,
+        is_active: true
+      },
+      editingRedirect: null,
+      applying: false,
+      applyResult: null
+    };
+  },
+  async mounted() {
+    await this.loadRedirects();
+  },
+  methods: {
+    async loadRedirects() {
+      const response = await fetch(`/api/sites/${this.siteId}/redirects`);
+      this.redirects = await response.json();
+    },
+    editRedirect(redirect) {
+      this.editingRedirect = redirect;
+      this.form = { ...redirect };
+    },
+    cancelEdit() {
+      this.editingRedirect = null;
+      this.resetForm();
+    },
+    resetForm() {
+      this.form = {
+        source_path: '',
+        target_path: '',
+        status_code: 301,
+        is_active: true
+      };
+    },
+    async saveRedirect() {
+      const url = this.editingRedirect 
+        ? `/api/redirects/${this.editingRedirect.id}`
+        : '/api/redirects';
+      const method = this.editingRedirect ? 'PUT' : 'POST';
+      
+      await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...this.form, site_id: this.siteId })
+      });
+      
+      await this.loadRedirects();
+      this.cancelEdit();
+    },
+    async deleteRedirect(id) {
+      if (confirm('Delete this redirect?')) {
+        await fetch(`/api/redirects/${id}`, { method: 'DELETE' });
+        await this.loadRedirects();
+      }
+    },
+    async applyNginxChanges() {
+      this.applying = true;
+      this.applyResult = null;
+      
+      try {
+        const response = await fetch('/api/bulk-edit/apply-nginx', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ site_ids: [this.siteId] })
+        });
+        this.applyResult = await response.json();
+      } finally {
+        this.applying = false;
+      }
+    }
+  }
+};
+</script>
+```
 
 ## Data Models
 
@@ -973,6 +1504,37 @@ CREATE TABLE audit_logs (
     INDEX idx_user (user_id),
     INDEX idx_auditable (auditable_type, auditable_id),
     INDEX idx_created (created_at)
+);
+
+-- AI agent configs table
+CREATE TABLE ai_agent_configs (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    provider ENUM('openai', 'anthropic', 'other') NOT NULL,
+    api_key TEXT NOT NULL,
+    model_name VARCHAR(100) NOT NULL,
+    allowed_paths JSON,
+    allowed_sites JSON,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP NULL,
+    updated_at TIMESTAMP NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_active (user_id, is_active)
+);
+
+-- Site redirects table
+CREATE TABLE site_redirects (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    site_id BIGINT UNSIGNED NOT NULL,
+    source_path VARCHAR(500) NOT NULL,
+    target_path VARCHAR(500) NOT NULL,
+    status_code INT UNSIGNED NOT NULL DEFAULT 301,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP NULL,
+    updated_at TIMESTAMP NULL,
+    FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE,
+    INDEX idx_site_active (site_id, is_active),
+    INDEX idx_source_path (source_path(255))
 );
 ```
 
@@ -1423,6 +1985,38 @@ property('site cannot have duplicate slugs')
 **Property 36: Deployment history completeness**
 *For any* deployment history request, the response should include all deployments with date, status, duration, and file count for each entry.
 **Validates: Requirements 17.3**
+
+**Property 37: AI agent access control**
+*For any* AI agent file generation request, if the target path is not in the allowed_paths list or the site is not in allowed_sites, the system should prevent file creation and return an access denied error.
+**Validates: Requirements 23.3, 23.7**
+
+**Property 38: AI agent API key encryption**
+*For any* AI agent config saved to database, the api_key field should be encrypted using Laravel's encryption and never stored in plain text.
+**Validates: Requirements 23.2**
+
+**Property 39: AI agent audit logging**
+*For any* successful AI agent file generation, the system should create an audit log entry with user_id, target path, model used, and timestamp.
+**Validates: Requirements 23.5**
+
+**Property 40: Bulk site update atomicity**
+*For any* bulk site update operation, if any single site update fails validation, the entire operation should be rolled back and no sites should be modified.
+**Validates: Requirements 24.2**
+
+**Property 41: Redirect rule persistence**
+*For any* site redirect created with source_path, target_path, and status_code, the redirect should be saved to database and included in the next Nginx config generation.
+**Validates: Requirements 24.3**
+
+**Property 42: Nginx config generation includes redirects**
+*For any* site with active redirects, the generated Nginx config should contain rewrite or return directives for all redirects with is_active=true.
+**Validates: Requirements 24.4**
+
+**Property 43: Nginx reload rollback on failure**
+*For any* Nginx reload operation that fails (nginx -t returns error), the system should restore the previous config backup and not apply changes.
+**Validates: Requirements 24.7**
+
+**Property 44: SSH command execution logging**
+*For any* SSH command executed on Production Server (nginx reload, config update), the system should log the command, exit code, and output to deployment log.
+**Validates: Requirements 24.5, 24.6**
 
 
 

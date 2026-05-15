@@ -35,4 +35,17 @@ return [
         ],
     ],
 
+    'ai' => [
+        'provider' => env('AI_PROVIDER', 'openai'),
+        'api_key' => env('AI_API_KEY'),
+        'model' => env('AI_MODEL', 'gpt-4o-mini'),
+    ],
+
+    'ai_agent' => [
+        'templates_root' => env(
+            'AI_AGENT_TEMPLATES_ROOT',
+            storage_path('import-deploy/md/test/raw_html')
+        ),
+    ],
+
 ];

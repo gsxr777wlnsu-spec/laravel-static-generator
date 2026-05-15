@@ -495,6 +495,144 @@
   - Add option for specific page generation
   - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
+- [ ] 38. Implement AI agent configuration management
+  - Create AiAgentConfig model and migration with encrypted api_key field
+  - Implement AiAgentConfigRepository with CRUD operations
+  - Create AiAgentService with generateBladeTemplate, validateAccess, saveGeneratedFile methods
+  - Add API key encryption using Laravel encryption
+  - Implement access control validation for paths and sites
+  - Create audit logging for AI agent operations
+  - Add support for multiple AI providers (OpenAI, Anthropic)
+  - _Requirements: 23.1, 23.2, 23.3, 23.5, 23.7_
+
+- [ ]* 38.1 Write property test for AI agent access control
+  - **Property 37: AI agent access control**
+  - **Validates: Requirements 23.3, 23.7**
+
+- [ ]* 38.2 Write property test for API key encryption
+  - **Property 38: AI agent API key encryption**
+  - **Validates: Requirements 23.2**
+
+- [ ]* 38.3 Write property test for AI agent audit logging
+  - **Property 39: AI agent audit logging**
+  - **Validates: Requirements 23.5**
+
+- [ ] 39. Implement AI agent Blade template generation
+  - Create AiClient wrapper for OpenAI and Anthropic APIs
+  - Implement prompt construction with MD template context
+  - Add response parsing to extract Blade code
+  - Create model switching functionality
+  - Implement session context preservation
+  - Add error handling for API failures
+  - Create rate limiting for AI requests
+  - _Requirements: 23.4, 23.6_
+
+- [ ] 40. Create AI agent API endpoints
+  - Create AiAgentController with CRUD operations for configs
+  - Implement config listing endpoint with user filtering
+  - Add config creation endpoint with API key encryption
+  - Create config update endpoint
+  - Implement Blade generation endpoint with prompt and MD template
+  - Add model switching endpoint
+  - Create access validation middleware
+  - _Requirements: 23.1, 23.2, 23.4, 23.6_
+
+- [ ] 41. Create AI agent admin UI
+  - Create AiAgentConfig.vue component for settings page
+  - Implement API provider selection (OpenAI, Anthropic, Other)
+  - Add API key input with secure handling
+  - Create model selector dropdown
+  - Implement allowed paths configuration interface
+  - Add allowed sites multi-select
+  - Create AiAgentGenerator.vue for template generation
+  - Implement ModelSwitcher.vue for quick model switching
+  - Add AccessControl.vue for permissions management
+  - _Requirements: 23.1, 23.2, 23.3, 23.6_
+
+- [ ] 42. Implement site redirect management
+  - Create SiteRedirect model and migration
+  - Implement SiteRedirectRepository with CRUD operations
+  - Add redirect validation (valid paths, status codes)
+  - Create redirect listing by site
+  - Implement redirect activation/deactivation
+  - Add duplicate source path detection
+  - _Requirements: 24.3, 24.8_
+
+- [ ]* 42.1 Write property test for redirect persistence
+  - **Property 41: Redirect rule persistence**
+  - **Validates: Requirements 24.3**
+
+- [ ] 43. Implement Nginx configuration service
+  - Create NginxConfigService with generateConfig method
+  - Implement Nginx server block generation
+  - Add redirect rules generation (rewrite/return directives)
+  - Create SSL configuration inclusion
+  - Implement config backup before update
+  - Add remote config update via SSH
+  - Create nginx -t validation before reload
+  - Implement nginx reload via SSH
+  - Add rollback mechanism on failure
+  - _Requirements: 24.4, 24.5, 24.6, 24.7_
+
+- [ ]* 43.1 Write property test for Nginx config generation
+  - **Property 42: Nginx config generation includes redirects**
+  - **Validates: Requirements 24.4**
+
+- [ ]* 43.2 Write property test for Nginx reload rollback
+  - **Property 43: Nginx reload rollback on failure**
+  - **Validates: Requirements 24.7**
+
+- [ ]* 43.3 Write property test for SSH command logging
+  - **Property 44: SSH command execution logging**
+  - **Validates: Requirements 24.5, 24.6**
+
+- [ ] 44. Implement SSH client for remote operations
+  - Create SshClient wrapper with connection pooling
+  - Implement command execution with output capture
+  - Add connection timeout handling
+  - Create retry logic for failed connections
+  - Implement command logging to deployment log
+  - Add exit code validation
+  - Create connection status checker
+  - _Requirements: 24.5, 24.6_
+
+- [ ] 45. Implement bulk site editing service
+  - Create BulkEditService with bulkUpdateSites method
+  - Implement transaction-based bulk updates
+  - Add validation for bulk operations
+  - Create rollback mechanism on partial failure
+  - Implement bulkUpdateRedirects method
+  - Add site grouping by affected changes
+  - Create applyNginxChanges method for multiple sites
+  - Implement progress tracking for bulk operations
+  - _Requirements: 24.1, 24.2, 24.4, 24.5_
+
+- [ ]* 45.1 Write property test for bulk update atomicity
+  - **Property 40: Bulk site update atomicity**
+  - **Validates: Requirements 24.2**
+
+- [ ] 46. Create bulk edit API endpoints
+  - Create BulkEditController with bulk operations
+  - Implement bulk site update endpoint with site selection
+  - Add redirect listing endpoint per site
+  - Create redirect CRUD endpoints
+  - Implement Nginx config apply endpoint
+  - Add validation for bulk operations
+  - Create progress tracking endpoint
+  - _Requirements: 24.1, 24.2, 24.3, 24.8_
+
+- [ ] 47. Create bulk edit admin UI
+  - Create BulkEditSites.vue component for site selection
+  - Implement multi-select site list with checkboxes
+  - Add bulk text content editing form
+  - Create RedirectList.vue for site redirects
+  - Implement RedirectForm.vue for redirect CRUD
+  - Add NginxConfigPreview.vue for config preview
+  - Create bulk operation progress indicator
+  - Implement error handling and rollback notification
+  - Add success/failure summary display
+  - _Requirements: 24.1, 24.2, 24.3, 24.8_
+
 - [ ] 34. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
@@ -506,6 +644,9 @@
   - Write template development guide
   - Document deployment process
   - Add troubleshooting section
+  - Document AI agent configuration and usage
+  - Add bulk editing guide
+  - Document Nginx redirect management
   - _Requirements: All_
 
 - [ ] 36. Configure production environment
@@ -517,6 +658,7 @@
   - Configure Nginx virtual hosts
   - Set up log rotation
   - Configure backup scripts
+  - Set up SSH keys for remote operations
   - _Requirements: All infrastructure_
 
 - [ ] 37. Final checkpoint - Ensure all tests pass

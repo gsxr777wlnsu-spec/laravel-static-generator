@@ -3,12 +3,14 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use App\Contracts\AiAgentConfigRepositoryInterface;
 use App\Contracts\SiteRepositoryInterface;
 use App\Contracts\PageRepositoryInterface;
 use App\Contracts\SectionRepositoryInterface;
 use App\Contracts\MediaRepositoryInterface;
 use App\Contracts\DeploymentRepositoryInterface;
 use App\Contracts\AuditLogRepositoryInterface;
+use App\Repositories\AiAgentConfigRepository;
 use App\Repositories\SiteRepository;
 use App\Repositories\PageRepository;
 use App\Repositories\SectionRepository;
@@ -20,6 +22,7 @@ class RepositoryServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->bind(AiAgentConfigRepositoryInterface::class, AiAgentConfigRepository::class);
         $this->app->bind(SiteRepositoryInterface::class, SiteRepository::class);
         $this->app->bind(PageRepositoryInterface::class, PageRepository::class);
         $this->app->bind(SectionRepositoryInterface::class, SectionRepository::class);
