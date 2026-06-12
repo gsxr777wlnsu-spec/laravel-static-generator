@@ -14,7 +14,7 @@
 # {site_name} is reused in SEO text fields.
 {site_name} = Play Aviator Game
 # {site} is reused in domain/canonical and prompts.
-{site} = test10.com
+{site} = test11.com
 # {promt_lang} is reused in AI prompts.
 {promt_lang} = английском
 # {meta_description_total} sets the target description length for prompts.
@@ -23,8 +23,8 @@
 {payments__table_min_deposit_withdrawal} = €175/€250
 
 [FORM]
-name = test10
-
+name = test11
+ф
 domain = {site}
 
 template_set = base
