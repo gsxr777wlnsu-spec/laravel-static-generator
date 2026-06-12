@@ -104,9 +104,14 @@ class SiteAiTemplateGenerationTest extends TestCase
         $response->assertJsonPath('ai_generation.updated_fields', 0);
         $response->assertJsonPath('ai_generation.updated_files', 0);
         $response->assertJsonCount(0, 'ai_generation.updated_paths');
+        $response->assertJsonPath('create_report.view_url', route('admin.sites.creation-log', ['id' => 1]));
 
         $targetFile = $this->templatesRoot . '/demo-site.example/index-raw_html.md';
         $this->assertFileExists($targetFile);
+        $reportFile = $this->templatesRoot . '/demo-site.example/site-create-report.txt';
+        $this->assertFileExists($reportFile);
+        $this->assertStringContainsString('Site created successfully.', (string) File::get($reportFile));
+        $this->assertStringContainsString('Domain: demo-site.example', (string) File::get($reportFile));
 
         $cloned = Yaml::parseFile($targetFile);
         $this->assertSame('demo-site.example', $cloned['domain']);
@@ -145,6 +150,59 @@ class SiteAiTemplateGenerationTest extends TestCase
         $this->assertFalse(collect($sectionFields)->contains(
             fn ($field) => str_contains((string) ($field['path'] ?? ''), '.sections.1.')
         ));
+    }
+
+    public function test_site_creation_can_edit_empty_raw_html_image_alt_attribute(): void
+    {
+        $user = User::factory()->create();
+
+        $sourceFile = $this->templatesRoot . '/test.com/index-raw_html.md';
+        $fixture = Yaml::parseFile($sourceFile);
+        $fixture['pages'][0]['sections'][0]['raw_html'] = '<section class="hero"><img class="hero__image" src="/hero.webp" alt=""><h1>Old Heading</h1></section>';
+        file_put_contents($sourceFile, "---\n" . Yaml::dump($fixture, 8, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK));
+
+        $catalog = app(AiAgentService::class)->listTemplateFields('test.com');
+        $indexFile = collect($catalog)->firstWhere('file', 'index-raw_html.md');
+        $sectionFields = $indexFile['section_fields'] ?? [];
+        $altField = collect(is_array($sectionFields) ? $sectionFields : [])->first(
+            fn ($field) => is_array($field)
+                && (($field['target_type'] ?? null) === 'attr')
+                && (($field['tag'] ?? null) === 'img')
+                && (($field['value'] ?? null) === '')
+        );
+
+        $this->assertIsArray($altField);
+        $this->assertSame(0, $altField['length']);
+        $this->assertStringContainsString('.raw_html.__attr__.', (string) $altField['path']);
+
+        $payload = [
+            'name' => 'Manual Alt Site',
+            'domain' => 'manual-alt-site.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/manual-alt-site.example',
+            'status' => 'draft',
+            'locale' => 'en',
+            'default_locale' => 'en',
+            'ai_clone_templates' => true,
+            'ai_source_domain' => 'test.com',
+            'ai_field_prompts' => [],
+            'ai_field_edits' => [[
+                'file' => 'index-raw_html.md',
+                'path' => $altField['path'],
+                'value' => 'Aviator hero image',
+            ]],
+        ];
+
+        $response = $this->actingAs($user)->postJson('/api/sites', $payload);
+        $response->assertStatus(201);
+        $response->assertJsonPath('ai_generation.manual_updated_fields', 1);
+        $response->assertJsonPath('ai_generation.manual_updated_paths.0', $altField['path']);
+
+        $targetFile = $this->templatesRoot . '/manual-alt-site.example/index-raw_html.md';
+        $updated = Yaml::parseFile($targetFile);
+        $rawHtml = (string) data_get($updated, 'pages.0.sections.0.raw_html');
+
+        $this->assertStringContainsString('alt="Aviator hero image"', $rawHtml);
     }
 
     public function test_site_creation_applies_ai_prompts_to_md_fields(): void
@@ -272,6 +330,265 @@ class SiteAiTemplateGenerationTest extends TestCase
 
         $this->assertStringContainsString('<h1>New Heading In Raw Html</h1>', $rawHtml);
         $this->assertStringNotContainsString('<h1>Old Heading</h1>', $rawHtml);
+    }
+
+    public function test_site_creation_can_skip_sending_current_value_to_ai_for_field_prompt(): void
+    {
+        $user = User::factory()->create();
+
+        AiAgentConfig::create([
+            'user_id' => $user->id,
+            'provider' => 'openai',
+            'api_key' => 'test-api-key',
+            'model_name' => 'gpt-4o-mini',
+            'allowed_paths' => [$this->templatesRoot],
+            'is_active' => true,
+        ]);
+
+        Http::fake([
+            'api.openai.com/*' => function (\Illuminate\Http\Client\Request $request) {
+                $body = $request->data();
+                $userMessage = (string) ($body['messages'][1]['content'] ?? '');
+
+                $this->assertStringContainsString('Field path: pages.0.meta_title', $userMessage);
+                $this->assertStringContainsString('Instruction: Rewrite the title without using the existing value.', $userMessage);
+                $this->assertStringNotContainsString('Current value:', $userMessage);
+                $this->assertStringNotContainsString('Old Meta Title', $userMessage);
+
+                return Http::response([
+                    'choices' => [[
+                        'message' => ['content' => 'Fresh Meta Title'],
+                    ]],
+                ], 200);
+            },
+        ]);
+
+        $payload = [
+            'name' => 'Prompt No Current Value Site',
+            'domain' => 'prompt-no-current-value.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/prompt-no-current-value.example',
+            'status' => 'draft',
+            'locale' => 'en',
+            'default_locale' => 'en',
+            'ai_clone_templates' => true,
+            'ai_source_domain' => 'test.com',
+            'ai_field_prompts' => [[
+                'file' => 'index-raw_html.md',
+                'path' => 'pages.0.meta_title',
+                'prompt' => 'Rewrite the title without using the existing value.',
+                'send_current_value' => false,
+            ]],
+        ];
+
+        $response = $this->actingAs($user)->postJson('/api/sites', $payload);
+        $response->assertStatus(201);
+        $response->assertJsonPath('ai_generation.updated_fields', 1);
+        $response->assertJsonPath('ai_generation.updated_paths.0', 'pages.0.meta_title');
+
+        $targetFile = $this->templatesRoot . '/prompt-no-current-value.example/index-raw_html.md';
+        $updated = Yaml::parseFile($targetFile);
+
+        $this->assertSame('Fresh Meta Title', data_get($updated, 'pages.0.meta_title'));
+    }
+
+    public function test_faq_page_json_ld_syncs_from_visible_faq_after_prompt_generation(): void
+    {
+        $user = User::factory()->create();
+
+        AiAgentConfig::create([
+            'user_id' => $user->id,
+            'provider' => 'openai',
+            'api_key' => 'test-api-key',
+            'model_name' => 'gpt-4o-mini',
+            'allowed_paths' => [$this->templatesRoot],
+            'is_active' => true,
+        ]);
+
+        $sourceFile = $this->templatesRoot . '/test.com/index-raw_html.md';
+        $source = Yaml::parseFile($sourceFile);
+        $source['pages'][0]['og_data']['head_extra'] = implode("\n", [
+            '<script type="application/ld+json">{"@type":"BreadcrumbList"}</script>',
+            '<script type="application/ld+json">{"@type":"WebSite"}</script>',
+            '<script type="application/ld+json">{"@type":"Organization"}</script>',
+            '<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Old question?","acceptedAnswer":{"@type":"Answer","text":"Old answer."}}]}</script>',
+        ]);
+        $source['pages'][0]['sections'] = array_pad($source['pages'][0]['sections'], 18, [
+            'module' => 'placeholder',
+            'raw_html' => '<section></section>',
+            'render_mode' => 'raw_html',
+        ]);
+        $source['pages'][0]['sections'][17] = [
+            'module' => 'faq',
+            'module_key' => 'faq',
+            'raw_html' => '<section class="faq"><h2>FAQ</h2><p>Intro text.</p><div><span>Old question?</span><p>Old answer.</p></div></section>',
+            'render_mode' => 'raw_html',
+        ];
+        file_put_contents($sourceFile, "---\n" . Yaml::dump($source, 8, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK));
+
+        $catalog = app(AiAgentService::class)->listTemplateFields('test.com');
+        $indexFile = collect($catalog)->firstWhere('file', 'index-raw_html.md');
+        $sectionFields = collect($indexFile['section_fields'] ?? []);
+        $questionField = $sectionFields->first(fn ($field) => is_array($field) && (($field['value'] ?? null) === 'Old question?'));
+        $answerField = $sectionFields->first(fn ($field) => is_array($field) && (($field['value'] ?? null) === 'Old answer.'));
+
+        $this->assertIsArray($questionField);
+        $this->assertIsArray($answerField);
+
+        Http::fake([
+            'api.openai.com/*' => function (\Illuminate\Http\Client\Request $request) {
+                $userMessage = (string) ($request->data()['messages'][1]['content'] ?? '');
+
+                return Http::response([
+                    'choices' => [[
+                        'message' => ['content' => str_contains($userMessage, 'Old question?')
+                            ? 'New generated question?'
+                            : 'New generated answer.'],
+                    ]],
+                ], 200);
+            },
+        ]);
+
+        $payload = [
+            'name' => 'FAQ Sync Site',
+            'domain' => 'faq-sync.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/faq-sync.example',
+            'status' => 'draft',
+            'locale' => 'en',
+            'default_locale' => 'en',
+            'ai_clone_templates' => true,
+            'ai_source_domain' => 'test.com',
+            'ai_field_prompts' => [
+                [
+                    'file' => 'index-raw_html.md',
+                    'path' => (string) $questionField['path'],
+                    'prompt' => 'Rewrite FAQ question.',
+                ],
+                [
+                    'file' => 'index-raw_html.md',
+                    'path' => (string) $answerField['path'],
+                    'prompt' => 'Rewrite FAQ answer.',
+                ],
+            ],
+        ];
+
+        $response = $this->actingAs($user)->postJson('/api/sites', $payload);
+        $response->assertStatus(201);
+
+        $updated = Yaml::parseFile($this->templatesRoot . '/faq-sync.example/index-raw_html.md');
+        $headExtra = (string) data_get($updated, 'pages.0.og_data.head_extra');
+
+        preg_match_all('/<script\b[^>]*>.*?<\/script>/is', $headExtra, $matches);
+        $faqScript = $matches[0][3] ?? '';
+        $json = trim((string) preg_replace('/^<script\b[^>]*>|<\/script>$/i', '', $faqScript));
+        $schema = json_decode($json, true);
+
+        $this->assertSame('FAQPage', $schema['@type'] ?? null);
+        $this->assertCount(1, $schema['mainEntity'] ?? []);
+        $this->assertSame('New generated question?', $schema['mainEntity'][0]['name'] ?? null);
+        $this->assertSame('New generated answer.', $schema['mainEntity'][0]['acceptedAnswer']['text'] ?? null);
+    }
+
+    public function test_how_to_json_ld_syncs_from_visible_steps_after_prompt_generation(): void
+    {
+        $user = User::factory()->create();
+
+        AiAgentConfig::create([
+            'user_id' => $user->id,
+            'provider' => 'openai',
+            'api_key' => 'test-api-key',
+            'model_name' => 'gpt-4o-mini',
+            'allowed_paths' => [$this->templatesRoot],
+            'is_active' => true,
+        ]);
+
+        $sourceFile = $this->templatesRoot . '/test.com/index-raw_html.md';
+        $source = Yaml::parseFile($sourceFile);
+        $source['pages'][0]['og_data']['head_extra'] = implode("\n", [
+            '<script type="application/ld+json">{"@type":"BreadcrumbList"}</script>',
+            '<script type="application/ld+json">{"@type":"WebSite"}</script>',
+            '<script type="application/ld+json">{"@type":"Organization"}</script>',
+            '<script type="application/ld+json">{"@type":"FAQPage","mainEntity":[]}</script>',
+            '<script type="application/ld+json">{"@context":"https://schema.org","@type":"HowTo","name":"Old steps title","description":"Old steps description.","step":[{"@type":"HowToStep","position":1,"name":"Old step title","text":"Old step text.","image":"https://{site}/assets/images/steps/step.webp"}]}</script>',
+        ]);
+        $source['pages'][0]['sections'] = array_pad($source['pages'][0]['sections'], 11, [
+            'module' => 'placeholder',
+            'raw_html' => '<section></section>',
+            'render_mode' => 'raw_html',
+        ]);
+        $source['pages'][0]['sections'][10] = [
+            'module' => 'steps',
+            'module_key' => 'steps',
+            'raw_html' => '<section class="steps"><h2>Old steps title</h2><p>Old steps description.</p><div class="steps__list"><div class="steps__card"><span>Step 1</span><div>Old step title</div><p>Old step text.</p></div></div></section>',
+            'render_mode' => 'raw_html',
+        ];
+        file_put_contents($sourceFile, "---\n" . Yaml::dump($source, 8, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK));
+
+        $catalog = app(AiAgentService::class)->listTemplateFields('test.com');
+        $indexFile = collect($catalog)->firstWhere('file', 'index-raw_html.md');
+        $sectionFields = collect($indexFile['section_fields'] ?? []);
+        $titleField = $sectionFields->first(fn ($field) => is_array($field) && (($field['value'] ?? null) === 'Old steps title'));
+        $descriptionField = $sectionFields->first(fn ($field) => is_array($field) && (($field['value'] ?? null) === 'Old steps description.'));
+        $stepTitleField = $sectionFields->first(fn ($field) => is_array($field) && (($field['value'] ?? null) === 'Old step title'));
+        $stepTextField = $sectionFields->first(fn ($field) => is_array($field) && (($field['value'] ?? null) === 'Old step text.'));
+
+        $this->assertIsArray($titleField);
+        $this->assertIsArray($descriptionField);
+        $this->assertIsArray($stepTitleField);
+        $this->assertIsArray($stepTextField);
+
+        Http::fake([
+            'api.openai.com/*' => function (\Illuminate\Http\Client\Request $request) {
+                $userMessage = (string) ($request->data()['messages'][1]['content'] ?? '');
+
+                $content = match (true) {
+                    str_contains($userMessage, 'Old steps title') => 'New steps title',
+                    str_contains($userMessage, 'Old steps description.') => 'New steps description.',
+                    str_contains($userMessage, 'Old step title') => 'New step title',
+                    default => 'New step text.',
+                };
+
+                return Http::response(['choices' => [['message' => ['content' => $content]]]], 200);
+            },
+        ]);
+
+        $payload = [
+            'name' => 'HowTo Sync Site',
+            'domain' => 'how-to-sync.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/how-to-sync.example',
+            'status' => 'draft',
+            'locale' => 'en',
+            'default_locale' => 'en',
+            'ai_clone_templates' => true,
+            'ai_source_domain' => 'test.com',
+            'ai_field_prompts' => [
+                ['file' => 'index-raw_html.md', 'path' => (string) $titleField['path'], 'prompt' => 'Rewrite steps title.'],
+                ['file' => 'index-raw_html.md', 'path' => (string) $descriptionField['path'], 'prompt' => 'Rewrite steps description.'],
+                ['file' => 'index-raw_html.md', 'path' => (string) $stepTitleField['path'], 'prompt' => 'Rewrite step title.'],
+                ['file' => 'index-raw_html.md', 'path' => (string) $stepTextField['path'], 'prompt' => 'Rewrite step text.'],
+            ],
+        ];
+
+        $response = $this->actingAs($user)->postJson('/api/sites', $payload);
+        $response->assertStatus(201);
+
+        $updated = Yaml::parseFile($this->templatesRoot . '/how-to-sync.example/index-raw_html.md');
+        $headExtra = (string) data_get($updated, 'pages.0.og_data.head_extra');
+
+        preg_match_all('/<script\b[^>]*>.*?<\/script>/is', $headExtra, $matches);
+        $howToScript = $matches[0][4] ?? '';
+        $json = trim((string) preg_replace('/^<script\b[^>]*>|<\/script>$/i', '', $howToScript));
+        $schema = json_decode($json, true);
+
+        $this->assertSame('HowTo', $schema['@type'] ?? null);
+        $this->assertSame('New steps title', $schema['name'] ?? null);
+        $this->assertSame('New steps description.', $schema['description'] ?? null);
+        $this->assertCount(1, $schema['step'] ?? []);
+        $this->assertSame('New step title', $schema['step'][0]['name'] ?? null);
+        $this->assertSame('New step text.', $schema['step'][0]['text'] ?? null);
+        $this->assertSame('https://{site}/assets/images/steps/step.webp', $schema['step'][0]['image'] ?? null);
     }
 
     public function test_site_creation_strips_outer_quotes_for_text_fields(): void
@@ -468,6 +785,556 @@ class SiteAiTemplateGenerationTest extends TestCase
         $site = Site::where('domain', 'manual-site.example')->firstOrFail();
         $page = Page::where('site_id', $site->id)->where('slug', 'index')->firstOrFail();
         $this->assertSame('Manual Title From Form', $page->title);
+    }
+
+    public function test_site_creation_applies_block_operations_for_index_raw_html(): void
+    {
+        $user = User::factory()->create();
+
+        $catalog = app(AiAgentService::class)->listTemplateFields('test.com');
+        $indexFile = collect($catalog)->firstWhere('file', 'index-raw_html.md');
+        $controls = $indexFile['section_block_controls'] ?? [];
+        $firstSectionControl = is_array($controls) && isset($controls[0]) && is_array($controls[0]) ? $controls[0] : null;
+
+        $this->assertIsArray($firstSectionControl);
+        $sectionPath = (string) ($firstSectionControl['section_path'] ?? '');
+        $this->assertNotSame('', $sectionPath);
+
+        $removableBlocks = $firstSectionControl['removable_blocks'] ?? [];
+        $paragraphBlock = collect(is_array($removableBlocks) ? $removableBlocks : [])->first(
+            fn ($block) => is_array($block) && (($block['tag'] ?? null) === 'p')
+        );
+        $this->assertIsArray($paragraphBlock);
+        $paragraphKey = (string) ($paragraphBlock['key'] ?? '');
+        $this->assertNotSame('', $paragraphKey);
+
+        $payload = [
+            'name' => 'Block Ops Site',
+            'domain' => 'block-ops-site.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/block-ops-site.example',
+            'status' => 'draft',
+            'locale' => 'en',
+            'default_locale' => 'en',
+            'ai_clone_templates' => true,
+            'ai_source_domain' => 'test.com',
+            'ai_field_prompts' => [],
+            'ai_field_edits' => [],
+            'ai_block_operations' => [
+                [
+                    'file' => 'index-raw_html.md',
+                    'section_path' => $sectionPath,
+                    'action' => 'add_text',
+                    'tag' => 'p',
+                    'value' => 'Inserted paragraph from block operation',
+                    'anchor_key' => $paragraphKey,
+                    'anchor_position' => 'before',
+                ],
+                [
+                    'file' => 'index-raw_html.md',
+                    'section_path' => $sectionPath,
+                    'action' => 'add_list_block',
+                    'list_tag' => 'ul',
+                    'class' => 'list list--bulleted',
+                    'item_class' => 'list__item',
+                    'aria_label' => 'Gameplay bullet list',
+                    'items' => [
+                        'We will explore the key features of the Aviator',
+                        'Casino game, discuss its gameplay mechanics',
+                        'User interface and overall experience',
+                    ],
+                    'anchor_key' => $paragraphKey,
+                    'anchor_position' => 'after',
+                ],
+                [
+                    'file' => 'index-raw_html.md',
+                    'section_path' => $sectionPath,
+                    'action' => 'add_table_block',
+                    'class' => 'payments__tables',
+                    'aria_label' => 'Payment methods list',
+                    'headers' => [
+                        'Method',
+                        'Withdrawal Availability',
+                        'Min Deposit/Withdrawal',
+                        'Withdrawal Time',
+                        'Fees',
+                    ],
+                    'rows' => [
+                        ['Visa', 'Yes (limited)', '€25/€50', '1-3 days', '3% on deposit'],
+                        ['Skrill', 'Yes', '€10/€20', '24-48 hours', 'None'],
+                    ],
+                    'anchor_key' => $paragraphKey,
+                    'anchor_position' => 'after',
+                ],
+            ],
+        ];
+
+        $response = $this->actingAs($user)->postJson('/api/sites', $payload);
+        $response->assertStatus(201);
+        $response->assertJsonPath('ai_generation.enabled', true);
+        $response->assertJsonPath('ai_generation.block_updated_fields', 3);
+        $response->assertJsonPath('ai_generation.block_updated_files', 1);
+
+        $targetFile = $this->templatesRoot . '/block-ops-site.example/index-raw_html.md';
+        $updated = Yaml::parseFile($targetFile);
+        $rawHtml = (string) data_get($updated, 'pages.0.sections.0.raw_html');
+
+        $this->assertStringContainsString('Inserted paragraph from block operation', $rawHtml);
+        $this->assertStringContainsString(
+            '</h1><p>Inserted paragraph from block operation</p>',
+            str_replace(["\r", "\n"], '', $rawHtml)
+        );
+        $this->assertStringContainsString('<p>Old Description</p>', str_replace(["\r", "\n"], '', $rawHtml));
+        $this->assertStringContainsString('class="list list--bulleted"', $rawHtml);
+        $this->assertStringContainsString('aria-label="Gameplay bullet list"', $rawHtml);
+        $this->assertStringContainsString('We will explore the key features of the Aviator', $rawHtml);
+        $this->assertStringContainsString('class="payments__tables"', $rawHtml);
+        $this->assertStringContainsString('Payment methods table', $rawHtml);
+        $this->assertStringContainsString('Withdrawal Availability', $rawHtml);
+        $this->assertStringContainsString('Visa', $rawHtml);
+    }
+
+    public function test_site_creation_applies_last_item_and_section_block_operations(): void
+    {
+        $user = User::factory()->create();
+
+        $sourceFile = $this->templatesRoot . '/test.com/index-raw_html.md';
+        $fixture = Yaml::parseFile($sourceFile);
+        $fixture['pages'][0]['sections'][0]['raw_html'] = '<section class="hero"><h1>Old Heading</h1><ul class="hero__list"><li>First item</li><li>Second item</li></ul></section>';
+        file_put_contents($sourceFile, "---\n" . Yaml::dump($fixture, 8, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK));
+
+        $catalog = app(AiAgentService::class)->listTemplateFields('test.com');
+        $indexFile = collect($catalog)->firstWhere('file', 'index-raw_html.md');
+        $controls = $indexFile['section_block_controls'] ?? [];
+        $firstSectionControl = is_array($controls) && isset($controls[0]) && is_array($controls[0]) ? $controls[0] : null;
+
+        $this->assertIsArray($firstSectionControl);
+        $sectionPath = (string) ($firstSectionControl['section_path'] ?? '');
+        $listContainers = $firstSectionControl['list_containers'] ?? [];
+        $listContainer = collect(is_array($listContainers) ? $listContainers : [])->first(
+            fn ($item) => is_array($item) && (($item['tag'] ?? null) === 'ul')
+        );
+
+        $this->assertIsArray($listContainer);
+        $listKey = (string) ($listContainer['key'] ?? '');
+        $this->assertNotSame('', $listKey);
+
+        $payload = [
+            'name' => 'Section Ops Site',
+            'domain' => 'section-ops-site.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/section-ops-site.example',
+            'status' => 'draft',
+            'locale' => 'en',
+            'default_locale' => 'en',
+            'ai_clone_templates' => true,
+            'ai_source_domain' => 'test.com',
+            'ai_field_prompts' => [],
+            'ai_field_edits' => [],
+            'ai_block_operations' => [
+                [
+                    'file' => 'index-raw_html.md',
+                    'section_path' => $sectionPath,
+                    'action' => 'remove_last_list_item',
+                    'container_key' => $listKey,
+                ],
+                [
+                    'file' => 'index-raw_html.md',
+                    'section_path' => $sectionPath,
+                    'action' => 'add_section',
+                    'module' => 'casino',
+                ],
+            ],
+        ];
+
+        $response = $this->actingAs($user)->postJson('/api/sites', $payload);
+        $response->assertStatus(201);
+        $response->assertJsonPath('ai_generation.block_updated_fields', 2);
+
+        $targetFile = $this->templatesRoot . '/section-ops-site.example/index-raw_html.md';
+        $updated = Yaml::parseFile($targetFile);
+        $sections = data_get($updated, 'pages.0.sections');
+
+        $this->assertIsArray($sections);
+        $this->assertStringContainsString('First item', (string) data_get($updated, 'pages.0.sections.0.raw_html'));
+        $this->assertStringNotContainsString('Second item', (string) data_get($updated, 'pages.0.sections.0.raw_html'));
+        $this->assertTrue(collect($sections)->contains(
+            fn ($section) => is_array($section) && (($section['module'] ?? null) === 'casino')
+        ));
+    }
+
+    public function test_site_creation_applies_ai_prompt_to_new_block_operation_fields(): void
+    {
+        $user = User::factory()->create();
+
+        AiAgentConfig::create([
+            'user_id' => $user->id,
+            'provider' => 'openai',
+            'api_key' => 'test-api-key',
+            'model_name' => 'gpt-4o-mini',
+            'allowed_paths' => [$this->templatesRoot],
+            'is_active' => true,
+        ]);
+
+        Http::fake([
+            'api.openai.com/*' => Http::response([
+                'choices' => [[
+                    'message' => ['content' => 'AI generated paragraph for queued block'],
+                ]],
+            ], 200),
+        ]);
+
+        $payload = [
+            'name' => 'Queued Prompt Block Site',
+            'domain' => 'queued-prompt-block.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/queued-prompt-block.example',
+            'status' => 'draft',
+            'locale' => 'en',
+            'default_locale' => 'en',
+            'ai_clone_templates' => true,
+            'ai_source_domain' => 'test.com',
+            'ai_field_prompts' => [],
+            'ai_field_edits' => [],
+            'ai_block_operations' => [
+                [
+                    'file' => 'index-raw_html.md',
+                    'section_path' => 'pages.0.sections.0',
+                    'action' => 'add_text',
+                    'tag' => 'p',
+                    'value' => 'Draft paragraph before AI',
+                    'value_prompt' => 'Rewrite this queued paragraph.',
+                ],
+            ],
+        ];
+
+        $response = $this->actingAs($user)->postJson('/api/sites', $payload);
+        $response->assertStatus(201);
+        $response->assertJsonPath('ai_generation.block_updated_fields', 1);
+
+        $targetFile = $this->templatesRoot . '/queued-prompt-block.example/index-raw_html.md';
+        $updated = Yaml::parseFile($targetFile);
+        $rawHtml = (string) data_get($updated, 'pages.0.sections.0.raw_html');
+
+        $this->assertStringContainsString('AI generated paragraph for queued block', $rawHtml);
+        $this->assertStringNotContainsString('Draft paragraph before AI', $rawHtml);
+    }
+
+    public function test_site_creation_chains_multiple_inserted_blocks_after_same_anchor(): void
+    {
+        $user = User::factory()->create();
+
+        $catalog = app(AiAgentService::class)->listTemplateFields('test.com');
+        $indexFile = collect($catalog)->firstWhere('file', 'index-raw_html.md');
+        $controls = $indexFile['section_block_controls'] ?? [];
+        $targetControl = collect(is_array($controls) ? $controls : [])->first(function ($control) {
+            if (!is_array($control)) {
+                return false;
+            }
+
+            $blocks = $control['removable_blocks'] ?? [];
+            return collect(is_array($blocks) ? $blocks : [])->contains(
+                fn ($block) => is_array($block) && (($block['tag'] ?? null) === 'p')
+            );
+        });
+
+        $this->assertIsArray($targetControl);
+        $sectionPath = (string) ($targetControl['section_path'] ?? '');
+        $removableBlocks = $targetControl['removable_blocks'] ?? [];
+        $paragraphBlock = collect(is_array($removableBlocks) ? $removableBlocks : [])->first(
+            fn ($block) => is_array($block) && (($block['tag'] ?? null) === 'p')
+        );
+
+        $this->assertIsArray($paragraphBlock);
+        $paragraphKey = (string) ($paragraphBlock['key'] ?? '');
+        $this->assertNotSame('', $paragraphKey);
+
+        $payload = [
+            'name' => 'Chained Insert Site',
+            'domain' => 'chained-insert-site.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/chained-insert-site.example',
+            'status' => 'draft',
+            'locale' => 'en',
+            'default_locale' => 'en',
+            'ai_clone_templates' => true,
+            'ai_source_domain' => 'test.com',
+            'ai_field_prompts' => [],
+            'ai_field_edits' => [],
+            'ai_block_operations' => [
+                [
+                    'file' => 'index-raw_html.md',
+                    'section_path' => $sectionPath,
+                    'action' => 'add_text',
+                    'tag' => 'p',
+                    'value' => 'Inserted paragraph one',
+                    'class' => '',
+                    'anchor_key' => $paragraphKey,
+                    'anchor_position' => 'after',
+                ],
+                [
+                    'file' => 'index-raw_html.md',
+                    'section_path' => $sectionPath,
+                    'action' => 'add_text',
+                    'tag' => 'p',
+                    'value' => 'Inserted paragraph two',
+                    'class' => '',
+                    'anchor_key' => $paragraphKey,
+                    'anchor_position' => 'after',
+                ],
+            ],
+        ];
+
+        $response = $this->actingAs($user)->postJson('/api/sites', $payload);
+        $response->assertStatus(201);
+
+        $targetFile = $this->templatesRoot . '/chained-insert-site.example/index-raw_html.md';
+        $updated = Yaml::parseFile($targetFile);
+        preg_match('/pages\.0\.sections\.(\d+)/', $sectionPath, $matches);
+        $sectionIndex = (int) ($matches[1] ?? 0);
+        $rawHtml = str_replace(["\r", "\n"], '', (string) data_get($updated, "pages.0.sections.{$sectionIndex}.raw_html"));
+
+        $this->assertStringContainsString('Inserted paragraph one', $rawHtml);
+        $this->assertStringContainsString('Inserted paragraph two', $rawHtml);
+        $this->assertStringContainsString(
+            'Inserted paragraph one</p><p',
+            $rawHtml
+        );
+        $this->assertStringContainsString(
+            'Inserted paragraph two</p>',
+            $rawHtml
+        );
+        $this->assertLessThan(
+            strpos($rawHtml, 'Inserted paragraph two'),
+            strpos($rawHtml, 'Inserted paragraph one')
+        );
+    }
+
+    public function test_site_creation_keeps_later_anchor_stable_after_earlier_insertions(): void
+    {
+        $user = User::factory()->create();
+
+        $sourceFile = $this->templatesRoot . '/test.com/index-raw_html.md';
+        $fixture = Yaml::parseFile($sourceFile);
+        $fixture['pages'][0]['sections'][0]['raw_html'] = '<section class="hero"><p class="hero__description">First original paragraph.</p><p class="hero__description">Last original paragraph.</p></section>';
+        file_put_contents($sourceFile, "---\n" . Yaml::dump($fixture, 8, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK));
+
+        $catalog = app(AiAgentService::class)->listTemplateFields('test.com');
+        $indexFile = collect($catalog)->firstWhere('file', 'index-raw_html.md');
+        $controls = $indexFile['section_block_controls'] ?? [];
+        $firstSectionControl = is_array($controls) && isset($controls[0]) && is_array($controls[0]) ? $controls[0] : null;
+
+        $this->assertIsArray($firstSectionControl);
+        $sectionPath = (string) ($firstSectionControl['section_path'] ?? '');
+        $this->assertNotSame('', $sectionPath);
+
+        $removableBlocks = array_values(array_filter(
+            $firstSectionControl['removable_blocks'] ?? [],
+            fn ($block) => is_array($block) && (($block['tag'] ?? null) === 'p')
+        ));
+
+        $this->assertGreaterThanOrEqual(2, count($removableBlocks));
+
+        $firstParagraphKey = (string) ($removableBlocks[0]['key'] ?? '');
+        $lastParagraphKey = (string) ($removableBlocks[count($removableBlocks) - 1]['key'] ?? '');
+
+        $this->assertNotSame('', $firstParagraphKey);
+        $this->assertNotSame('', $lastParagraphKey);
+
+        $payload = [
+            'name' => 'Stable Later Anchor Site',
+            'domain' => 'stable-later-anchor.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/stable-later-anchor.example',
+            'status' => 'draft',
+            'locale' => 'en',
+            'default_locale' => 'en',
+            'ai_clone_templates' => true,
+            'ai_source_domain' => 'test.com',
+            'ai_field_prompts' => [],
+            'ai_field_edits' => [],
+            'ai_block_operations' => [
+                [
+                    'file' => 'index-raw_html.md',
+                    'section_path' => $sectionPath,
+                    'action' => 'add_text',
+                    'tag' => 'p',
+                    'value' => 'Inserted after first original.',
+                    'class' => 'hero__description',
+                    'anchor_key' => $firstParagraphKey,
+                    'anchor_position' => 'after',
+                ],
+                [
+                    'file' => 'index-raw_html.md',
+                    'section_path' => $sectionPath,
+                    'action' => 'add_table_block',
+                    'class' => 'payments__tables',
+                    'aria_label' => 'Payment methods list',
+                    'headers' => ['Method', 'Fees'],
+                    'rows' => [
+                        ['Visa', '3% on deposit'],
+                    ],
+                    'anchor_key' => $lastParagraphKey,
+                    'anchor_position' => 'after',
+                ],
+            ],
+        ];
+
+        $response = $this->actingAs($user)->postJson('/api/sites', $payload);
+        $response->assertStatus(201);
+
+        $targetFile = $this->templatesRoot . '/stable-later-anchor.example/index-raw_html.md';
+        $updated = Yaml::parseFile($targetFile);
+        $rawHtml = str_replace(["\r", "\n"], '', (string) data_get($updated, 'pages.0.sections.0.raw_html'));
+
+        $this->assertStringContainsString('First original paragraph.', $rawHtml);
+        $this->assertStringContainsString('Inserted after first original.', $rawHtml);
+        $this->assertStringContainsString('Last original paragraph.', $rawHtml);
+        $this->assertStringContainsString('Payment methods table', $rawHtml);
+        $this->assertStringContainsString(
+            'First original paragraph.</p><p class="hero__description">Inserted after first original.</p><p class="hero__description">Last original paragraph.</p><div class="payments__tables"',
+            $rawHtml
+        );
+        $this->assertStringNotContainsString('data-ai-anchor-key', $rawHtml);
+    }
+
+    public function test_site_creation_keeps_same_anchor_chain_separate_from_later_anchor_chain(): void
+    {
+        $user = User::factory()->create();
+
+        $sourceFile = $this->templatesRoot . '/test.com/index-raw_html.md';
+        $fixture = Yaml::parseFile($sourceFile);
+        $fixture['pages'][0]['sections'][0]['raw_html'] = '<section class="hero"><p class="hero__description">First original paragraph.</p><p class="hero__description">Last original paragraph.</p></section>';
+        file_put_contents($sourceFile, "---\n" . Yaml::dump($fixture, 8, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK));
+
+        $catalog = app(AiAgentService::class)->listTemplateFields('test.com');
+        $indexFile = collect($catalog)->firstWhere('file', 'index-raw_html.md');
+        $controls = collect($indexFile['section_block_controls'] ?? []);
+        $control = $controls->first(fn ($item) => is_array($item) && (($item['section_path'] ?? null) === 'pages.0.sections.0'));
+
+        $this->assertIsArray($control);
+
+        $paragraphBlocks = array_values(array_filter(
+            $control['removable_blocks'] ?? [],
+            fn ($block) => is_array($block) && (($block['tag'] ?? null) === 'p')
+        ));
+
+        $this->assertGreaterThanOrEqual(2, count($paragraphBlocks));
+
+        $firstParagraphKey = (string) ($paragraphBlocks[0]['key'] ?? '');
+        $lastParagraphKey = (string) ($paragraphBlocks[count($paragraphBlocks) - 1]['key'] ?? '');
+
+        $this->assertNotSame('', $firstParagraphKey);
+        $this->assertNotSame('', $lastParagraphKey);
+
+        $payload = [
+            'name' => 'Separate Chains Site',
+            'domain' => 'separate-chains.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/separate-chains.example',
+            'status' => 'draft',
+            'locale' => 'en',
+            'default_locale' => 'en',
+            'ai_clone_templates' => true,
+            'ai_source_domain' => 'test.com',
+            'ai_field_prompts' => [],
+            'ai_field_edits' => [],
+            'ai_block_operations' => [
+                [
+                    'file' => 'index-raw_html.md',
+                    'section_path' => 'pages.0.sections.0',
+                    'action' => 'add_text',
+                    'tag' => 'p',
+                    'value' => 'тест',
+                    'class' => 'hero__description',
+                    'anchor_key' => $firstParagraphKey,
+                    'anchor_position' => 'after',
+                ],
+                [
+                    'file' => 'index-raw_html.md',
+                    'section_path' => 'pages.0.sections.0',
+                    'action' => 'add_text',
+                    'tag' => 'p',
+                    'value' => 'тест2',
+                    'class' => 'hero__description',
+                    'anchor_key' => $firstParagraphKey,
+                    'anchor_position' => 'after',
+                ],
+                [
+                    'file' => 'index-raw_html.md',
+                    'section_path' => 'pages.0.sections.0',
+                    'action' => 'add_text',
+                    'tag' => 'p',
+                    'value' => 'тест3',
+                    'class' => 'hero__description',
+                    'anchor_key' => $firstParagraphKey,
+                    'anchor_position' => 'after',
+                ],
+                [
+                    'file' => 'index-raw_html.md',
+                    'section_path' => 'pages.0.sections.0',
+                    'action' => 'add_text',
+                    'tag' => 'p',
+                    'value' => 'тест4',
+                    'class' => 'hero__description',
+                    'anchor_key' => $firstParagraphKey,
+                    'anchor_position' => 'after',
+                ],
+                [
+                    'file' => 'index-raw_html.md',
+                    'section_path' => 'pages.0.sections.0',
+                    'action' => 'add_text',
+                    'tag' => 'p',
+                    'value' => 'тест5',
+                    'class' => 'hero__description',
+                    'anchor_key' => $firstParagraphKey,
+                    'anchor_position' => 'after',
+                ],
+                [
+                    'file' => 'index-raw_html.md',
+                    'section_path' => 'pages.0.sections.0',
+                    'action' => 'add_table_block',
+                    'class' => 'payments__tables',
+                    'aria_label' => 'Payment methods list',
+                    'headers' => ['Method', 'Fees'],
+                    'rows' => [
+                        ['Visa', '3% on deposit'],
+                    ],
+                    'anchor_key' => $lastParagraphKey,
+                    'anchor_position' => 'after',
+                ],
+                [
+                    'file' => 'index-raw_html.md',
+                    'section_path' => 'pages.0.sections.0',
+                    'action' => 'add_table_block',
+                    'class' => 'payments__tables',
+                    'aria_label' => 'Payment methods list',
+                    'headers' => ['Method', 'Fees'],
+                    'rows' => [
+                        ['Mastercard', '3% on deposit'],
+                    ],
+                    'anchor_key' => $lastParagraphKey,
+                    'anchor_position' => 'after',
+                ],
+            ],
+        ];
+
+        $response = $this->actingAs($user)->postJson('/api/sites', $payload);
+        $response->assertStatus(201);
+
+        $targetFile = $this->templatesRoot . '/separate-chains.example/index-raw_html.md';
+        $updated = Yaml::parseFile($targetFile);
+        $rawHtml = str_replace(["\r", "\n"], '', (string) data_get($updated, 'pages.0.sections.0.raw_html'));
+
+        $this->assertMatchesRegularExpression(
+            '~hero__description">First original paragraph\.</p><p class="hero__description">тест</p><p class="hero__description">тест2</p><p class="hero__description">тест3</p><p class="hero__description">тест4</p><p class="hero__description">тест5</p><p class="hero__description">Last original paragraph\.</p>~u',
+            $rawHtml
+        );
+        $this->assertMatchesRegularExpression(
+            '~hero__description">Last original paragraph\.</p><div class="payments__tables".*?<div class="payments__tables"~u',
+            $rawHtml
+        );
+        $this->assertStringNotContainsString('data-ai-anchor-key', $rawHtml);
     }
 
     public function test_site_creation_persists_manual_edits_for_all_head_text_fields(): void

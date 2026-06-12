@@ -12,6 +12,7 @@
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Provider</label>
                     <select name="provider"
+                            id="ai-provider-select"
                             class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                         @foreach($providers as $provider)
                             <option value="{{ $provider['value'] }}" {{ ($config?->provider ?? 'openai') === $provider['value'] ? 'selected' : '' }}>
@@ -37,6 +38,7 @@
                 <div class="sm:col-span-2">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">API Base URL (optional)</label>
                     <input type="text" name="api_base_url" value="{{ $config?->api_base_url }}"
+                           id="ai-api-base-url"
                            placeholder="https://api.openai.com/v1"
                            class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                 </div>
@@ -124,6 +126,9 @@
             Save Settings
         </button>
     </div>
+    <div id="ai-agent-status" class="hidden rounded-md border px-4 py-3 text-sm shadow-sm">
+        <div id="ai-agent-status-text"></div>
+    </div>
 </form>
 
 <script>
@@ -143,6 +148,49 @@ async function readApiResponse(response) {
 function getCsrfToken() {
     return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 }
+
+function renderAiAgentStatus(message, tone = 'error') {
+    const statusBox = document.getElementById('ai-agent-status');
+    const statusText = document.getElementById('ai-agent-status-text');
+
+    if (!statusBox || !statusText) {
+        return;
+    }
+
+    statusBox.classList.remove(
+        'hidden',
+        'border-emerald-200', 'bg-emerald-50', 'text-emerald-900', 'dark:border-emerald-800', 'dark:bg-emerald-950', 'dark:text-emerald-100',
+        'border-rose-200', 'bg-rose-50', 'text-rose-900', 'dark:border-rose-800', 'dark:bg-rose-950', 'dark:text-rose-100'
+    );
+
+    statusBox.classList.add(...(tone === 'success'
+        ? ['border-emerald-200', 'bg-emerald-50', 'text-emerald-900', 'dark:border-emerald-800', 'dark:bg-emerald-950', 'dark:text-emerald-100']
+        : ['border-rose-200', 'bg-rose-50', 'text-rose-900', 'dark:border-rose-800', 'dark:bg-rose-950', 'dark:text-rose-100']));
+    statusText.textContent = message;
+}
+
+const aiProviderBaseUrls = {
+    openai: 'https://api.openai.com/v1',
+    openrouter: 'https://openrouter.ai/api/v1',
+    closerouter: 'https://api.closerouter.dev/v1',
+    together: 'https://api.together.xyz/v1',
+    fireworks: 'https://api.fireworks.ai/inference/v1',
+    groq: 'https://api.groq.com/openai/v1',
+    deepseek: 'https://api.deepseek.com/v1',
+    xai: 'https://api.x.ai/v1',
+    mistral: 'https://api.mistral.ai/v1',
+};
+
+document.getElementById('ai-provider-select')?.addEventListener('change', function () {
+    const baseUrlInput = document.getElementById('ai-api-base-url');
+    const baseUrl = aiProviderBaseUrls[this.value] || '';
+
+    if (!baseUrlInput || baseUrl === '') {
+        return;
+    }
+
+    baseUrlInput.value = baseUrl;
+});
 
 document.getElementById('ai-agent-form')?.addEventListener('submit', async function (event) {
     event.preventDefault();
@@ -191,14 +239,13 @@ document.getElementById('ai-agent-form')?.addEventListener('submit', async funct
                 ? JSON.stringify(result.errors)
                 : (result?.error || result?.message || `Request failed with status ${response.status}`);
 
-            alert('Error: ' + errorMessage);
+            renderAiAgentStatus('Error: ' + errorMessage, 'error');
             return;
         }
 
-        alert('AI agent settings saved.');
-        window.location.reload();
+        renderAiAgentStatus('AI agent settings saved.', 'success');
     } catch (error) {
-        alert('Error: ' + error.message);
+        renderAiAgentStatus('Error: ' + error.message, 'error');
     }
 });
 </script>

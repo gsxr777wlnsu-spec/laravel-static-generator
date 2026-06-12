@@ -236,6 +236,9 @@
             </div>
         </div>
     </div>
+    <div id="page-edit-status" class="hidden rounded-md border px-4 py-3 text-sm shadow-sm">
+        <div id="page-edit-status-text" class="whitespace-pre-wrap"></div>
+    </div>
 </div>
 
 <script>
@@ -397,6 +400,36 @@ async function readApiResponse(response) {
     };
 }
 
+function renderPageEditStatus(message, tone = 'error') {
+    const statusBox = document.getElementById('page-edit-status');
+    const statusText = document.getElementById('page-edit-status-text');
+
+    if (!statusBox || !statusText) {
+        return false;
+    }
+
+    statusBox.classList.remove(
+        'hidden',
+        'border-emerald-200', 'bg-emerald-50', 'text-emerald-900', 'dark:border-emerald-800', 'dark:bg-emerald-950', 'dark:text-emerald-100',
+        'border-amber-200', 'bg-amber-50', 'text-amber-900', 'dark:border-amber-800', 'dark:bg-amber-950', 'dark:text-amber-100',
+        'border-rose-200', 'bg-rose-50', 'text-rose-900', 'dark:border-rose-800', 'dark:bg-rose-950', 'dark:text-rose-100',
+        'border-blue-200', 'bg-blue-50', 'text-blue-900', 'dark:border-blue-800', 'dark:bg-blue-950', 'dark:text-blue-100'
+    );
+
+    statusBox.classList.add(...(
+        tone === 'success'
+            ? ['border-emerald-200', 'bg-emerald-50', 'text-emerald-900', 'dark:border-emerald-800', 'dark:bg-emerald-950', 'dark:text-emerald-100']
+            : (tone === 'warning'
+                ? ['border-amber-200', 'bg-amber-50', 'text-amber-900', 'dark:border-amber-800', 'dark:bg-amber-950', 'dark:text-amber-100']
+                : (tone === 'info'
+                    ? ['border-blue-200', 'bg-blue-50', 'text-blue-900', 'dark:border-blue-800', 'dark:bg-blue-950', 'dark:text-blue-100']
+                    : ['border-rose-200', 'bg-rose-50', 'text-rose-900', 'dark:border-rose-800', 'dark:bg-rose-950', 'dark:text-rose-100']))
+    ));
+
+    statusText.textContent = message;
+    return false;
+}
+
 function parseJsonField(value, label) {
     const trimmed = value.trim();
     if (!trimmed) {
@@ -406,21 +439,18 @@ function parseJsonField(value, label) {
     try {
         const parsed = JSON.parse(trimmed);
         if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-            alert(`${label} must be a JSON object.`);
-            return false;
+            return renderPageEditStatus(`${label} must be a JSON object.`, 'error');
         }
         return parsed;
     } catch (error) {
-        alert(`${label} has invalid JSON syntax.`);
-        return false;
+        return renderPageEditStatus(`${label} has invalid JSON syntax.`, 'error');
     }
 }
 
 function parseSectionJson(text, label) {
     const parsed = parseJsonField(text, label);
     if (parsed === null) {
-        alert(`${label} cannot be empty.`);
-        return false;
+        return renderPageEditStatus(`${label} cannot be empty.`, 'error');
     }
 
     return parsed;
@@ -449,13 +479,13 @@ async function saveSection(sectionId, container, options = {}) {
     if (!response.ok) {
         const message = result.errors ? JSON.stringify(result.errors) : (result.error || result.message || `Request failed with status ${response.status}`);
         if (!silent) {
-            alert('Error: ' + message);
+            renderPageEditStatus('Error: ' + message, 'error');
         }
         return false;
     }
 
     if (!silent) {
-        alert('Module updated.');
+        renderPageEditStatus('Module updated.', 'success');
     }
     return true;
 }
@@ -479,7 +509,7 @@ async function deleteSection(sectionId) {
 
     if (!response.ok) {
         const message = result.errors ? JSON.stringify(result.errors) : (result.error || result.message || `Request failed with status ${response.status}`);
-        alert('Error: ' + message);
+        renderPageEditStatus('Error: ' + message, 'error');
         return;
     }
 
@@ -491,7 +521,7 @@ async function addModule() {
     const moduleKey = moduleSelect ? moduleSelect.value : null;
 
     if (!moduleKey) {
-        alert('Please select a module type.');
+        renderPageEditStatus('Please select a module type.', 'warning');
         return;
     }
 
@@ -527,7 +557,7 @@ async function addModule() {
 
     if (!response.ok) {
         const message = result.errors ? JSON.stringify(result.errors) : (result.error || result.message || `Request failed with status ${response.status}`);
-        alert('Error: ' + message);
+        renderPageEditStatus('Error: ' + message, 'error');
         return;
     }
 
@@ -576,7 +606,7 @@ async function reorderSections(sectionId, newPosition) {
 
     if (!response.ok) {
         const message = result.errors ? JSON.stringify(result.errors) : (result.error || result.message || `Request failed with status ${response.status}`);
-        alert('Error: ' + message);
+        renderPageEditStatus('Error: ' + message, 'error');
         return;
     }
 
@@ -607,11 +637,11 @@ async function clearAllModules() {
 
     if (!response.ok) {
         const message = result.errors ? JSON.stringify(result.errors) : (result.error || result.message || `Request failed with status ${response.status}`);
-        alert('Error: ' + message);
+        renderPageEditStatus('Error: ' + message, 'error');
         return;
     }
 
-    alert('All modules cleared.');
+    renderPageEditStatus('All modules cleared. Reloading…', 'success');
     window.location.reload();
 }
 
@@ -630,12 +660,12 @@ async function openPreview() {
 
     if (!response.ok) {
         const message = result.errors ? JSON.stringify(result.errors) : (result.error || result.message || `Request failed with status ${response.status}`);
-        alert('Error: ' + message);
+        renderPageEditStatus('Error: ' + message, 'error');
         return;
     }
 
     if (!result.preview_url) {
-        alert('Error: Preview URL is missing in response.');
+        renderPageEditStatus('Error: Preview URL is missing in response.', 'error');
         return;
     }
 
@@ -647,7 +677,7 @@ async function applyTemplateToSections() {
     const templateKey = templateField ? String(templateField.value || '').trim() : '';
 
     if (!templateKey) {
-        alert('Select a page template first.');
+        renderPageEditStatus('Select a page template first.', 'warning');
         return;
     }
 
@@ -674,11 +704,11 @@ async function applyTemplateToSections() {
 
     if (!response.ok) {
         const message = result.errors ? JSON.stringify(result.errors) : (result.error || result.message || `Request failed with status ${response.status}`);
-        alert('Error: ' + message);
+        renderPageEditStatus('Error: ' + message, 'error');
         return;
     }
 
-    alert('Template modules were applied.');
+    renderPageEditStatus('Template modules were applied. Reloading…', 'success');
     window.location.reload();
 }
 
@@ -745,7 +775,7 @@ async function savePageSettings() {
 
     if (!response.ok) {
         const message = result.errors ? JSON.stringify(result.errors) : (result.error || result.message || `Request failed with status ${response.status}`);
-        alert('Error: ' + message);
+        renderPageEditStatus('Error: ' + message, 'error');
         return false;
     }
 
@@ -763,7 +793,7 @@ async function saveAllSectionsSilently() {
 
         const ok = await saveSection(sectionId, container, { silent: true });
         if (!ok) {
-            alert(`Module save failed (section #${sectionId}). Deploy aborted.`);
+            renderPageEditStatus(`Module save failed (section #${sectionId}). Deploy aborted.`, 'error');
             return false;
         }
     }
@@ -789,12 +819,12 @@ async function deploySiteWithSettings() {
     const result = await readApiResponse(response);
 
     if (!response.ok) {
-        alert('Deployment failed: ' + (result.error || result.message || `HTTP ${response.status}`));
+        renderPageEditStatus('Deployment failed: ' + (result.error || result.message || `HTTP ${response.status}`), 'error');
         return false;
     }
 
     if (result.status !== 'completed') {
-        alert('Deployment failed: ' + (result.error_message || result.message || 'Unknown deployment error'));
+        renderPageEditStatus('Deployment failed: ' + (result.error_message || result.message || 'Unknown deployment error'), 'error');
         return false;
     }
 
@@ -818,8 +848,7 @@ async function handlePageSave(options = {}) {
         }
 
         if (!deployAfterSave) {
-            alert('Page updated successfully.');
-            window.location.href = '{{ route('admin.pages.index', $site->id) }}';
+            renderPageEditStatus('Page updated successfully.', 'success');
             return;
         }
 
@@ -833,10 +862,9 @@ async function handlePageSave(options = {}) {
             return;
         }
 
-        alert(`Page saved and deployed successfully to ${deployment.sftp_host}${deployment.remote_path}`);
-        window.location.href = '{{ route('admin.pages.index', $site->id) }}';
+        renderPageEditStatus(`Page saved and deployed successfully to ${deployment.sftp_host}${deployment.remote_path}`, 'success');
     } catch (error) {
-        alert('Error: ' + error.message);
+        renderPageEditStatus('Error: ' + error.message, 'error');
     } finally {
         pageActionInProgress = false;
         setPageActionBusy(false);
@@ -855,7 +883,7 @@ document.querySelectorAll('.section-item').forEach((container) => {
         try {
             await saveSection(sectionId, container);
         } catch (error) {
-            alert('Error: ' + error.message);
+            renderPageEditStatus('Error: ' + error.message, 'error');
         }
     });
 
@@ -863,7 +891,7 @@ document.querySelectorAll('.section-item').forEach((container) => {
         try {
             await deleteSection(sectionId);
         } catch (error) {
-            alert('Error: ' + error.message);
+            renderPageEditStatus('Error: ' + error.message, 'error');
         }
     });
 });
@@ -1038,14 +1066,15 @@ function initTinyMCE(container) {
                             .then(result => {
                                 status.style.display = 'none';
                                 if (result.error || result.errors) {
-                                    alert('Upload failed: ' + (result.error || JSON.stringify(result.errors)));
+                                    renderPageEditStatus('Upload failed: ' + (result.error || JSON.stringify(result.errors)), 'error');
                                 } else {
                                     loadGallery();
+                                    renderPageEditStatus('Upload completed successfully.', 'success');
                                 }
                             })
                             .catch(err => {
                                 status.style.display = 'none';
-                                alert('Upload failed: ' + err.message);
+                                renderPageEditStatus('Upload failed: ' + err.message, 'error');
                             });
                         };
                     }
@@ -1114,7 +1143,7 @@ document.getElementById('preview-page-btn')?.addEventListener('click', async () 
     try {
         await openPreview();
     } catch (error) {
-        alert('Error: ' + error.message);
+        renderPageEditStatus('Error: ' + error.message, 'error');
     }
 });
 
@@ -1122,7 +1151,7 @@ document.getElementById('apply-template-btn')?.addEventListener('click', async (
     try {
         await applyTemplateToSections();
     } catch (error) {
-        alert('Error: ' + error.message);
+        renderPageEditStatus('Error: ' + error.message, 'error');
     }
 });
 
@@ -1130,7 +1159,7 @@ document.getElementById('add-module-btn')?.addEventListener('click', async () =>
     try {
         await addModule();
     } catch (error) {
-        alert('Error: ' + error.message);
+        renderPageEditStatus('Error: ' + error.message, 'error');
     }
 });
 
@@ -1138,7 +1167,7 @@ document.getElementById('clear-all-btn')?.addEventListener('click', async () => 
     try {
         await clearAllModules();
     } catch (error) {
-        alert('Error: ' + error.message);
+        renderPageEditStatus('Error: ' + error.message, 'error');
     }
 });
 

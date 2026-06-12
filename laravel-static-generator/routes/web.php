@@ -20,6 +20,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth'])->group(function () 
         Route::get('/', [SiteController::class, 'index'])->name('index');
         Route::get('/create', [SiteController::class, 'create'])->name('create');
         Route::get('/{id}/edit', [SiteController::class, 'edit'])->name('edit');
+        Route::get('/{id}/creation-log', [SiteController::class, 'creationLog'])->name('creation-log');
     });
     
     Route::prefix('sites/{siteId}/pages')->name('pages.')->group(function () {

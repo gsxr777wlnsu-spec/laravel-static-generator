@@ -72,6 +72,9 @@
             </tbody>
         </table>
     </div>
+    <div id="sites-index-status" class="hidden rounded-md border px-4 py-3 text-sm shadow-sm">
+        <div id="sites-index-status-text" class="whitespace-pre-wrap"></div>
+    </div>
 </div>
 
 <script>
@@ -92,6 +95,35 @@ async function readApiResponse(response) {
     };
 }
 
+function renderSitesIndexStatus(message, tone = 'error') {
+    const statusBox = document.getElementById('sites-index-status');
+    const statusText = document.getElementById('sites-index-status-text');
+
+    if (!statusBox || !statusText) {
+        return;
+    }
+
+    statusBox.classList.remove(
+        'hidden',
+        'border-emerald-200', 'bg-emerald-50', 'text-emerald-900', 'dark:border-emerald-800', 'dark:bg-emerald-950', 'dark:text-emerald-100',
+        'border-amber-200', 'bg-amber-50', 'text-amber-900', 'dark:border-amber-800', 'dark:bg-amber-950', 'dark:text-amber-100',
+        'border-rose-200', 'bg-rose-50', 'text-rose-900', 'dark:border-rose-800', 'dark:bg-rose-950', 'dark:text-rose-100',
+        'border-blue-200', 'bg-blue-50', 'text-blue-900', 'dark:border-blue-800', 'dark:bg-blue-950', 'dark:text-blue-100'
+    );
+
+    statusBox.classList.add(...(
+        tone === 'success'
+            ? ['border-emerald-200', 'bg-emerald-50', 'text-emerald-900', 'dark:border-emerald-800', 'dark:bg-emerald-950', 'dark:text-emerald-100']
+            : (tone === 'warning'
+                ? ['border-amber-200', 'bg-amber-50', 'text-amber-900', 'dark:border-amber-800', 'dark:bg-amber-950', 'dark:text-amber-100']
+                : (tone === 'info'
+                    ? ['border-blue-200', 'bg-blue-50', 'text-blue-900', 'dark:border-blue-800', 'dark:bg-blue-950', 'dark:text-blue-100']
+                    : ['border-rose-200', 'bg-rose-50', 'text-rose-900', 'dark:border-rose-800', 'dark:bg-rose-950', 'dark:text-rose-100']))
+    ));
+
+    statusText.textContent = message;
+}
+
 async function generateSite(siteId) {
     if (!confirm('Generate HTML for this site?')) return;
     
@@ -108,23 +140,23 @@ async function generateSite(siteId) {
         const data = await readApiResponse(response);
 
         if (!response.ok) {
-            alert('Generation failed: ' + (data.error || data.message || `HTTP ${response.status}`));
+            renderSitesIndexStatus('Generation failed: ' + (data.error || data.message || `HTTP ${response.status}`), 'error');
             return;
         }
 
         if (response.status === 202) {
-            alert(data.message || 'Generation was queued.');
+            renderSitesIndexStatus(data.message || 'Generation was queued.', 'info');
             return;
         }
         
         if (data.success) {
-            alert(`Generated ${data.files_count} files successfully!`);
+            renderSitesIndexStatus(`Generated ${data.files_count} files successfully!`, 'success');
         } else {
-            alert('Generation failed. Check console for errors.');
+            renderSitesIndexStatus('Generation failed. Check console for errors.', 'error');
             console.error(data.errors);
         }
     } catch (error) {
-        alert('Error: ' + error.message);
+        renderSitesIndexStatus('Error: ' + error.message, 'error');
     }
 }
 
@@ -148,22 +180,22 @@ async function deploySite(siteId) {
         const data = await readApiResponse(response);
 
         if (!response.ok) {
-            alert('Deployment failed: ' + (data.error || data.message || `HTTP ${response.status}`));
+            renderSitesIndexStatus('Deployment failed: ' + (data.error || data.message || `HTTP ${response.status}`), 'error');
             return;
         }
 
         if (response.status === 202) {
-            alert(data.message || 'Deployment was queued.');
+            renderSitesIndexStatus(data.message || 'Deployment was queued.', 'info');
             return;
         }
         
         if (data.status === 'completed') {
-            alert('Deployment completed successfully!');
+            renderSitesIndexStatus('Deployment completed successfully!', 'success');
         } else {
-            alert('Deployment failed: ' + (data.error_message || 'Unknown error'));
+            renderSitesIndexStatus('Deployment failed: ' + (data.error_message || 'Unknown error'), 'error');
         }
     } catch (error) {
-        alert('Error: ' + error.message);
+        renderSitesIndexStatus('Error: ' + error.message, 'error');
     }
 }
 
@@ -183,13 +215,26 @@ async function deleteSite(siteId, siteName) {
         const data = await readApiResponse(response);
 
         if (!response.ok) {
-            alert('Delete failed: ' + (data.error || data.message || `HTTP ${response.status}`));
+            renderSitesIndexStatus('Delete failed: ' + (data.error || data.message || `HTTP ${response.status}`), 'error');
             return;
         }
 
-        window.location.reload();
+        if (Array.isArray(data.cleanup_warnings) && data.cleanup_warnings.length > 0) {
+            const lines = data.cleanup_warnings.map((issue) => {
+                const scope = issue?.scope ? `[${issue.scope}] ` : '';
+                const resource = issue?.resource ? `${issue.resource}: ` : '';
+                const path = issue?.path ? `${issue.path} - ` : '';
+                const message = issue?.message || 'Cleanup warning';
+                return `- ${scope}${resource}${path}${message}`;
+            });
+            renderSitesIndexStatus((data.message || 'Site deleted with cleanup warnings') + '\n\n' + lines.join('\n'), 'warning');
+        }
+        if (!Array.isArray(data.cleanup_warnings) || data.cleanup_warnings.length === 0) {
+            renderSitesIndexStatus(data.message || 'Site deleted successfully. Reloading…', 'success');
+        }
+        setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
-        alert('Error: ' + error.message);
+        renderSitesIndexStatus('Error: ' + error.message, 'error');
     }
 }
 
@@ -218,14 +263,14 @@ async function processImportBatch(input, options) {
     }
 
     if (importBatchInProgress) {
-        alert('Another import batch is already running. Please wait for it to finish.');
+        renderSitesIndexStatus('Another import batch is already running. Please wait for it to finish.', 'warning');
         input.value = '';
         return;
     }
 
     const invalidFiles = files.filter((file) => !/\.(md|yaml|yml|txt)$/i.test(file.name));
     if (invalidFiles.length > 0) {
-        alert(`Unsupported file type(s):\n${invalidFiles.map((file) => `- ${file.name}`).join('\n')}`);
+        renderSitesIndexStatus(`Unsupported file type(s):\n${invalidFiles.map((file) => `- ${file.name}`).join('\n')}`, 'error');
         input.value = '';
         return;
     }
@@ -283,15 +328,16 @@ async function processImportBatch(input, options) {
         const failCount = results.length - successCount;
         const summaryLines = results.map((item) => `${item.ok ? '[OK]' : '[FAIL]'} ${item.file}: ${item.message}`);
 
-        alert(
+        renderSitesIndexStatus(
             `${options.actionTitle} batch finished.\n` +
             `Success: ${successCount}\n` +
             `Failed: ${failCount}\n\n` +
-            summaryLines.join('\n')
+            summaryLines.join('\n'),
+            failCount > 0 ? 'warning' : 'success'
         );
 
         if (successCount > 0) {
-            window.location.reload();
+            setTimeout(() => window.location.reload(), 1200);
         }
     } finally {
         importBatchInProgress = false;
@@ -316,19 +362,19 @@ async function importAndDeploy(siteId) {
         const data = await readApiResponse(response);
 
         if (!response.ok) {
-            alert('Import & Deploy failed: ' + (data.error || data.message || `HTTP ${response.status}`));
+            renderSitesIndexStatus('Import & Deploy failed: ' + (data.error || data.message || `HTTP ${response.status}`), 'error');
             return;
         }
 
         if (data.success) {
-            alert(`Import & Deploy completed successfully!\n\n${data.message || ''}`);
+            renderSitesIndexStatus(`Import & Deploy completed successfully!\n\n${data.message || ''}`, 'success');
         } else {
-            alert('Import & Deploy failed: ' + (data.error || 'Unknown error'));
+            renderSitesIndexStatus('Import & Deploy failed: ' + (data.error || 'Unknown error'), 'error');
         }
         
-        window.location.reload();
+        setTimeout(() => window.location.reload(), 1200);
     } catch (error) {
-        alert('Error: ' + error.message);
+        renderSitesIndexStatus('Error: ' + error.message, 'error');
     }
 }
 
@@ -341,7 +387,7 @@ function promptImportAndDeploy() {
     if (siteId && sites[siteId]) {
         importAndDeploy(siteId);
     } else if (siteId) {
-        alert('Site not found with ID: ' + siteId);
+        renderSitesIndexStatus('Site not found with ID: ' + siteId, 'error');
     }
 }
 </script>

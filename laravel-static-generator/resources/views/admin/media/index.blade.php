@@ -97,6 +97,9 @@
             </tbody>
         </table>
     </div>
+    <div id="media-status" class="hidden rounded-md border px-4 py-3 text-sm shadow-sm">
+        <div id="media-status-text"></div>
+    </div>
 </div>
 
 <script>
@@ -115,6 +118,26 @@ async function readApiResponse(response) {
         error: `Server returned non-JSON response (HTTP ${response.status})`,
         raw_body: await response.text(),
     };
+}
+
+function renderMediaStatus(message, tone = 'error') {
+    const statusBox = document.getElementById('media-status');
+    const statusText = document.getElementById('media-status-text');
+
+    if (!statusBox || !statusText) {
+        return;
+    }
+
+    statusBox.classList.remove(
+        'hidden',
+        'border-emerald-200', 'bg-emerald-50', 'text-emerald-900', 'dark:border-emerald-800', 'dark:bg-emerald-950', 'dark:text-emerald-100',
+        'border-rose-200', 'bg-rose-50', 'text-rose-900', 'dark:border-rose-800', 'dark:bg-rose-950', 'dark:text-rose-100'
+    );
+
+    statusBox.classList.add(...(tone === 'success'
+        ? ['border-emerald-200', 'bg-emerald-50', 'text-emerald-900', 'dark:border-emerald-800', 'dark:bg-emerald-950', 'dark:text-emerald-100']
+        : ['border-rose-200', 'bg-rose-50', 'text-rose-900', 'dark:border-rose-800', 'dark:bg-rose-950', 'dark:text-rose-100']));
+    statusText.textContent = message;
 }
 
 document.getElementById('upload-media-form')?.addEventListener('submit', async function (event) {
@@ -139,13 +162,14 @@ document.getElementById('upload-media-form')?.addEventListener('submit', async f
 
         if (!response.ok) {
             const message = result.errors ? JSON.stringify(result.errors) : (result.error || result.message || `Request failed with status ${response.status}`);
-            alert('Error: ' + message);
+            renderMediaStatus('Error: ' + message, 'error');
             return;
         }
 
-        window.location.reload();
+        renderMediaStatus('Media uploaded successfully. Reloading…', 'success');
+        setTimeout(() => window.location.reload(), 800);
     } catch (error) {
-        alert('Error: ' + error.message);
+        renderMediaStatus('Error: ' + error.message, 'error');
     }
 });
 
@@ -170,11 +194,11 @@ async function saveMedia(row) {
 
     if (!response.ok) {
         const message = result.errors ? JSON.stringify(result.errors) : (result.error || result.message || `Request failed with status ${response.status}`);
-        alert('Error: ' + message);
+        renderMediaStatus('Error: ' + message, 'error');
         return;
     }
 
-    alert('Media updated.');
+    renderMediaStatus('Media updated.', 'success');
 }
 
 async function deleteMedia(row) {
@@ -197,11 +221,12 @@ async function deleteMedia(row) {
 
     if (!response.ok) {
         const message = result.errors ? JSON.stringify(result.errors) : (result.error || result.message || `Request failed with status ${response.status}`);
-        alert('Error: ' + message);
+        renderMediaStatus('Error: ' + message, 'error');
         return;
     }
 
-    window.location.reload();
+    renderMediaStatus('Media deleted. Reloading…', 'success');
+    setTimeout(() => window.location.reload(), 800);
 }
 
 document.querySelectorAll('.media-row').forEach((row) => {
@@ -209,7 +234,7 @@ document.querySelectorAll('.media-row').forEach((row) => {
         try {
             await saveMedia(row);
         } catch (error) {
-            alert('Error: ' + error.message);
+            renderMediaStatus('Error: ' + error.message, 'error');
         }
     });
 
@@ -217,7 +242,7 @@ document.querySelectorAll('.media-row').forEach((row) => {
         try {
             await deleteMedia(row);
         } catch (error) {
-            alert('Error: ' + error.message);
+            renderMediaStatus('Error: ' + error.message, 'error');
         }
     });
 });

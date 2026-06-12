@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="{{ $page->locale ?? 'en' }}">
 <head>
-        @php
+@php
             $pageOgData = is_array($page->og_data ?? null) ? $page->og_data : [];
             $headMetaItems = isset($pageOgData['head_meta']) && is_array($pageOgData['head_meta']) ? $pageOgData['head_meta'] : [];
             $headLinkItems = isset($pageOgData['head_links']) && is_array($pageOgData['head_links']) ? $pageOgData['head_links'] : [];
@@ -25,41 +25,44 @@
 
                 return null;
             };
+            $blockedHeadMetaKeys = [
+                'name:geo.region',
+                'name:geo.position',
+                'name:icbm',
+                'name:contact',
+                'name:copyright',
+                'name:designer',
+                'name:generator',
+                'name:author',
+                'name:rating',
+                'name:telegram:channel',
+                'name:telegram:bot',
+                'property:vk:image',
+                'property:vk:app_id',
+                'name:twitter:title',
+                'name:twitter:description',
+                'name:twitter:site',
+                'name:twitter:creator',
+                'name:twitter:image',
+                'property:og:image',
+            ];
 
             $defaultHeadMeta = [
-                ['name' => 'robots', 'content' => 'all'],
-                ['name' => 'telegram:channel', 'content' => '@WP_WooCom'],
-                ['name' => 'telegram:bot', 'content' => '@WP_WooCom_bot'],
-                ['property' => 'vk:image', 'content' => '/assets/images/logo/logo.png'],
-                ['property' => 'vk:app_id', 'content' => ''],
+                ['name' => 'robots', 'content' => 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1'],
                 ['name' => 'og:type', 'property' => 'og:type', 'content' => 'website'],
                 ['property' => 'og:locale', 'content' => ($page->locale ?? 'en') . '_' . strtoupper($page->locale ?? 'en')],
                 ['name' => 'og:title', 'property' => 'og:title', 'content' => (string) ($page->meta_title ?? $page->title ?? '')],
                 ['name' => 'og:description', 'property' => 'og:description', 'content' => (string) ($page->meta_description ?? '')],
-                ['property' => 'article:published_time', 'content' => '2016'],
+                ['property' => 'article:published_time', 'content' => '2020-12-07T18:05:01+00:00'],
+                ['property' => 'article:modified_time', 'content' => '2026-04-20T10:43:59+00:00'],
                 ['property' => 'article:author', 'content' => $domain],
                 ['name' => 'twitter:card', 'content' => 'summary_large_image'],
-                ['name' => 'twitter:title', 'content' => (string) ($page->meta_title ?? $page->title ?? '')],
-                ['name' => 'twitter:description', 'content' => (string) ($page->meta_description ?? '')],
-                ['name' => 'twitter:site', 'content' => $domain],
-                ['name' => 'twitter:creator', 'content' => $domain],
-                ['name' => 'twitter:image', 'content' => (string) ($page->og_image ?? '/assets/images/aviator.jpg')],
-                ['property' => 'og:image', 'content' => (string) ($page->og_image ?? '/assets/images/aviator.jpg')],
-                ['name' => 'geo.region', 'content' => 'EN'],
-                ['name' => 'geo.position', 'content' => '55.71881; 37.555728'],
-                ['name' => 'ICBM', 'content' => '55.71881, 37.555728'],
-                ['name' => 'contact', 'content' => 'support@' . $domain],
-                ['name' => 'copyright', 'content' => $domain],
-                ['name' => 'designer', 'content' => 'gsxr777'],
-                ['name' => 'generator', 'content' => $domain . ' CMS'],
-                ['name' => 'author', 'content' => $domain],
-                ['name' => 'rating', 'content' => 'general'],
             ];
 
             $mergedMetaMap = [];
             foreach ($defaultHeadMeta as $meta) {
                 $key = $metaKey($meta);
-                if ($key === null) {
+                if ($key === null || in_array($key, $blockedHeadMetaKeys, true)) {
                     continue;
                 }
                 $mergedMetaMap[$key] = $meta;
@@ -71,7 +74,7 @@
                 }
 
                 $key = $metaKey($meta);
-                if ($key === null) {
+                if ($key === null || in_array($key, $blockedHeadMetaKeys, true)) {
                     continue;
                 }
 
@@ -106,19 +109,7 @@
 
                 array_splice($mergedHeadMeta, $publishedIndex + 1, 0, [$modifiedMeta]);
             }
-
-            $publisherHref = 'https://' . $domain . '/';
-            foreach ($headLinkItems as $link) {
-                if (!is_array($link) || !isset($link['href'])) {
-                    continue;
-                }
-
-                $rel = strtolower(trim((string) ($link['rel'] ?? '')));
-                if ($rel === 'publisher') {
-                    $publisherHref = (string) $link['href'];
-                }
-            }
-        @endphp
+@endphp
         <meta charset="utf-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -147,13 +138,6 @@ foreach ($mergedHeadMeta as $meta) {
     echo '        <meta ' . implode(' ', $metaAttributes) . '>' . PHP_EOL;
 }
 @endphp
-        <link rel="publisher" href="{{ $publisherHref }}">
-        <link href="/assets/css/style.css" rel="stylesheet">
-        <link rel="icon" type="image/png" href="/assets/images/favicon/favicon-96x96.png" sizes="96x96">
-        <link rel="icon" type="image/svg+xml" href="/assets/images/favicon/favicon.svg">
-        <link rel="shortcut icon" href="/assets/images/favicon/favicon.ico">
-        <link rel="apple-touch-icon" sizes="180x180" href="/assets/images/favicon/apple-touch-icon.png">
-        <link rel="manifest" href="/assets/images/favicon/site.webmanifest">
 @php
 foreach ($headLinkItems as $link) {
     if (!is_array($link) || !isset($link['href'])) {
@@ -176,14 +160,22 @@ foreach ($headLinkItems as $link) {
     if (isset($link['sizes'])) {
         $linkAttributes[] = 'sizes="' . e((string) $link['sizes']) . '"';
     }
+    if (isset($link['hreflang'])) {
+        $linkAttributes[] = 'hreflang="' . e((string) $link['hreflang']) . '"';
+    }
 
     echo '        <link ' . implode(' ', $linkAttributes) . '>' . PHP_EOL;
 }
 @endphp
-
-        @if(isset($pageOgData['head_extra']) && is_string($pageOgData['head_extra']) && trim($pageOgData['head_extra']) !== '')
-            {!! $pageOgData['head_extra'] !!}
-        @else
+        <link href="/assets/css/style.css" rel="stylesheet">
+        <link rel="icon" type="image/png" href="/assets/images/favicon/favicon-96x96.png" sizes="96x96">
+        <link rel="icon" type="image/svg+xml" href="/assets/images/favicon/favicon.svg">
+        <link rel="shortcut icon" href="/assets/images/favicon/favicon.ico">
+        <link rel="apple-touch-icon" sizes="180x180" href="/assets/images/favicon/apple-touch-icon.png">
+        <link rel="manifest" href="/assets/images/favicon/site.webmanifest">
+@if(isset($pageOgData['head_extra']) && is_string($pageOgData['head_extra']) && trim($pageOgData['head_extra']) !== '')
+@php echo preg_replace('/^/m', '        ', trim($pageOgData['head_extra'])) . PHP_EOL; @endphp
+@else
             <script type="application/ld+json">
 {
     "@@context": "https://schema.org",
@@ -234,17 +226,17 @@ foreach ($headLinkItems as $link) {
     }
 }
             </script>
-        @endif
-        @if(isset($pageOgData['head_custom']) && is_string($pageOgData['head_custom']) && trim($pageOgData['head_custom']) !== '')
-            {!! $pageOgData['head_custom'] !!}
-        @endif
+@endif
+@if(isset($pageOgData['head_custom']) && is_string($pageOgData['head_custom']) && trim($pageOgData['head_custom']) !== '')
+@php echo preg_replace('/^/m', '        ', trim($pageOgData['head_custom'])) . PHP_EOL; @endphp
+@endif
 
         @if(isset($languageVersions) && count($languageVersions) > 0)
             @foreach($languageVersions as $version)
             <link rel="alternate" hreflang="{{ $version->locale }}" href="{{ $version->canonical ?? url($version->slug) }}">
             @endforeach
             <link rel="alternate" hreflang="x-default" href="{{ $page->canonical ?? url($page->slug) }}">
-        @endif
+@endif
 </head>
 <body class="body" id="body">
     
@@ -371,11 +363,11 @@ foreach ($headLinkItems as $link) {
         ];
 
         $scripts = $scriptMap[$slugOrTemplate] ?? ['/assets/js/main.js'];
-    @endphp
+@endphp
 
     @foreach($scripts as $script)
         <script defer src="{{ $script }}"></script>
     @endforeach
-    @endif
+@endif
 </body>
 </html>

@@ -78,6 +78,9 @@
             </tbody>
         </table>
     </div>
+    <div id="pages-index-status" class="hidden rounded-md border px-4 py-3 text-sm shadow-sm">
+        <div id="pages-index-status-text"></div>
+    </div>
 </div>
 
 <script>
@@ -96,6 +99,29 @@ async function readApiResponse(response) {
         error: `Server returned non-JSON response (HTTP ${response.status})`,
         raw_body: await response.text(),
     };
+}
+
+function renderPagesIndexStatus(message, tone = 'error') {
+    const statusBox = document.getElementById('pages-index-status');
+    const statusText = document.getElementById('pages-index-status-text');
+
+    if (!statusBox || !statusText) {
+        return;
+    }
+
+    statusBox.classList.remove(
+        'hidden',
+        'border-emerald-200', 'bg-emerald-50', 'text-emerald-900', 'dark:border-emerald-800', 'dark:bg-emerald-950', 'dark:text-emerald-100',
+        'border-amber-200', 'bg-amber-50', 'text-amber-900', 'dark:border-amber-800', 'dark:bg-amber-950', 'dark:text-amber-100',
+        'border-rose-200', 'bg-rose-50', 'text-rose-900', 'dark:border-rose-800', 'dark:bg-rose-950', 'dark:text-rose-100'
+    );
+
+    statusBox.classList.add(...(tone === 'success'
+        ? ['border-emerald-200', 'bg-emerald-50', 'text-emerald-900', 'dark:border-emerald-800', 'dark:bg-emerald-950', 'dark:text-emerald-100']
+        : (tone === 'warning'
+            ? ['border-amber-200', 'bg-amber-50', 'text-amber-900', 'dark:border-amber-800', 'dark:bg-amber-950', 'dark:text-amber-100']
+            : ['border-rose-200', 'bg-rose-50', 'text-rose-900', 'dark:border-rose-800', 'dark:bg-rose-950', 'dark:text-rose-100'])));
+    statusText.textContent = message;
 }
 
 async function deletePage(pageId, pageTitle) {
@@ -117,17 +143,17 @@ async function deletePage(pageId, pageTitle) {
         const data = await readApiResponse(response);
 
         if (!response.ok) {
-            alert('Error: ' + (data.error || data.message || `Request failed with status ${response.status}`));
+            renderPagesIndexStatus('Error: ' + (data.error || data.message || `Request failed with status ${response.status}`), 'error');
             return;
         }
 
         if (data.warning) {
-            alert(data.warning);
+            renderPagesIndexStatus(data.warning, 'warning');
         }
 
         window.location.reload();
     } catch (error) {
-        alert('Error: ' + error.message);
+        renderPagesIndexStatus('Error: ' + error.message, 'error');
     }
 }
 </script>

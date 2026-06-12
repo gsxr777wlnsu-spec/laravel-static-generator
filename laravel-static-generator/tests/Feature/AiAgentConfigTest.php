@@ -62,4 +62,27 @@ class AiAgentConfigTest extends TestCase
         $response->assertStatus(422);
         $response->assertJsonValidationErrors(['provider']);
     }
+
+    public function test_closerouter_provider_can_be_saved(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->putJson('/api/ai-agent/config', [
+            'provider' => 'closerouter',
+            'api_key' => 'closerouter-secret-key',
+            'api_base_url' => 'https://api.closerouter.dev/v1',
+            'model_name' => 'openai/gpt-4o-mini',
+            'is_active' => true,
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('config.provider', 'closerouter');
+        $response->assertJsonPath('config.api_base_url', 'https://api.closerouter.dev/v1');
+
+        $this->assertDatabaseHas('ai_agent_configs', [
+            'user_id' => $user->id,
+            'provider' => 'closerouter',
+            'api_base_url' => 'https://api.closerouter.dev/v1',
+        ]);
+    }
 }

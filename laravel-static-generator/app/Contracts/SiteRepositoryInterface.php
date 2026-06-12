@@ -20,4 +20,9 @@ interface SiteRepositoryInterface
     public function update(Site $site, array $data): Site;
 
     public function delete(Site $site): bool;
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function getLastCleanupIssues(): array;
 }

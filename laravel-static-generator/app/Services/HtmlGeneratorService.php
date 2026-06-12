@@ -446,6 +446,15 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         
         // Copy assets from the site's generated directory to preview directory
         $this->copyAssetsToPreview($page->site_id, $previewToken);
+
+        try {
+            $this->cleanupExpiredPreviews();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Preview cleanup failed', [
+                'token' => $previewToken,
+                'error' => $e->getMessage(),
+            ]);
+        }
         
         return [
             'token' => $previewToken,
@@ -472,6 +481,14 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         }
 
         if (!$generatedDisk->exists($sourceAssetPath)) {
+            $sourceAssetPath = $this->findLatestPreviewAssetsPath($previewToken);
+        }
+
+        if ($sourceAssetPath === null || !$generatedDisk->exists($sourceAssetPath)) {
+            \Illuminate\Support\Facades\Log::warning('Preview assets source was not found', [
+                'site_id' => $siteId,
+                'preview_token' => $previewToken,
+            ]);
             return;
         }
 
@@ -501,6 +518,13 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
                 "url(\$1/api/preview/{$previewToken}/assets/\$2\$1)",
                 $css
             );
+            if ($rewritten !== null) {
+                $rewritten = preg_replace(
+                    '/url\(\s*(["\']?)\/api\/preview\/[^\/)"\']+\/assets\/([^)"\']+)\1\s*\)/',
+                    "url(\$1/api/preview/{$previewToken}/assets/\$2\$1)",
+                    $rewritten
+                );
+            }
 
             if ($rewritten !== null && $rewritten !== $css) {
                 $disk->put($cssFile, $rewritten);
@@ -521,11 +545,59 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
 
         $fallbackPath = 'site1/assets';
         if ($fallbackPath === $targetPath || !Storage::disk('generated')->exists($fallbackPath)) {
+            $fallbackPath = $this->findLatestPreviewAssetsPath();
+        }
+
+        if ($fallbackPath === null || $fallbackPath === $targetPath || !Storage::disk('generated')->exists($fallbackPath)) {
+            \Illuminate\Support\Facades\Log::warning('Generated site assets source was not found', [
+                'site_id' => $siteId,
+            ]);
             return;
         }
 
         $this->copyStorageDirectory('generated', $fallbackPath, 'generated', $targetPath);
         $this->ensureMainScriptAlias('generated', $targetPath);
+    }
+
+    private function findLatestPreviewAssetsPath(?string $excludeToken = null): ?string
+    {
+        $generatedDisk = Storage::disk('generated');
+        $candidates = [];
+
+        foreach ($generatedDisk->directories('preview') as $previewDir) {
+            $token = (string) Str::of($previewDir)->after('preview/');
+            if ($excludeToken !== null && $token === $excludeToken) {
+                continue;
+            }
+
+            $assetsPath = "{$previewDir}/assets";
+            if (!$generatedDisk->exists("{$assetsPath}/css/style.css")) {
+                continue;
+            }
+
+            $modifiedAt = 0;
+            try {
+                $modifiedAt = $generatedDisk->lastModified("{$assetsPath}/css/style.css");
+            } catch (\Throwable) {
+                // Keep the candidate with a neutral timestamp.
+            }
+
+            $candidates[] = [
+                'path' => $assetsPath,
+                'modified_at' => $modifiedAt,
+            ];
+        }
+
+        if ($candidates === []) {
+            return null;
+        }
+
+        usort(
+            $candidates,
+            fn (array $left, array $right): int => $right['modified_at'] <=> $left['modified_at']
+        );
+
+        return (string) $candidates[0]['path'];
     }
 
     private function ensureMainScriptAlias(string $diskName, string $assetsPath): void

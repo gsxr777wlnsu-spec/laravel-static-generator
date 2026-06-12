@@ -5,6 +5,22 @@
 @section('content')
 <form method="POST" action="/api/sites" class="space-y-6">
     @csrf
+    <div class="space-y-3">
+        <div class="flex justify-end">
+            <label style="background-color: #059669;" class="inline-flex items-center rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 cursor-pointer">
+                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                </svg>
+                Import
+                <input type="file" id="create-site-import-file" accept=".md,.txt" class="hidden">
+            </label>
+        </div>
+        <div id="site-import-status" class="hidden rounded-md border px-4 py-3 shadow-sm">
+            <div id="site-import-status-summary" class="text-sm font-medium"></div>
+            <ul id="site-import-status-warnings" class="mt-2 list-disc space-y-1 pl-5 text-sm"></ul>
+        </div>
+    </div>
+
     <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
         <div class="px-4 py-5 sm:p-6">
             <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Site Information</h3>
@@ -136,6 +152,12 @@
 
                     <div class="space-y-10">
                         @foreach($templateFieldCatalog as $fileItem)
+                            @if(($fileItem['file'] ?? '') === 'index-raw_html.md')
+                                @include('admin.sites.partials.create-index-raw-html-fields', [
+                                    'fileItem' => $fileItem,
+                                    'moduleCatalog' => $moduleCatalog ?? [],
+                                ])
+                            @else
                             <details class="rounded-md border border-gray-200 dark:border-gray-700">
                                 <summary class="cursor-pointer px-3 py-2 text-sm font-medium text-gray-800 dark:text-gray-200">
                                     {{ $fileItem['file'] }}
@@ -153,6 +175,10 @@
                                                       placeholder="Edit field value manually">{{ $field['value'] ?? '' }}</textarea>
                                             <textarea rows="2" class="ai-prompt-input block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                                       placeholder="Instruction for AI to rewrite this field"></textarea>
+                                            <label class="mt-2 inline-flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+                                                <input type="checkbox" class="ai-send-current-value-checkbox rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                                                <span>Send current value to AI</span>
+                                            </label>
                                         </div>
                                     @endforeach
 
@@ -176,6 +202,10 @@
                                             @if(($field['show_prompt'] ?? true) === true)
                                                 <textarea rows="2" class="ai-prompt-input block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                                           placeholder="Instruction for AI to rewrite this module field"></textarea>
+                                                <label class="mt-2 inline-flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+                                                    <input type="checkbox" class="ai-send-current-value-checkbox rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                                                    <span>Send current value to AI</span>
+                                                </label>
                                             @elseif(($field['prompt_path'] ?? '') !== ($field['path'] ?? ''))
                                                 <div class="text-xs text-gray-500 dark:text-gray-400">
                                                     Shared AI prompt is attached to the first line of this heading.
@@ -183,8 +213,10 @@
                                             @endif
                                         </div>
                                     @endforeach
+
                                 </div>
                             </details>
+                            @endif
                         @endforeach
                     </div>
                 </div>
@@ -209,6 +241,27 @@
                 <div id="site-create-status-text" class="mt-0.5 text-gray-700 dark:text-blue-300"></div>
             </div>
         </div>
+    </div>
+    <div id="site-create-report" class="hidden rounded-md border px-4 py-4 shadow-sm">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div id="site-create-report-title" class="text-sm font-semibold"></div>
+            <div class="flex flex-wrap items-center gap-2">
+                <button id="site-create-report-copy" type="button" class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 dark:bg-indigo-500 dark:text-white dark:hover:bg-indigo-400">
+                    Copy Report
+                </button>
+                <a id="site-create-report-edit-link" href="#" class="hidden inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
+                    Edit Site
+                </a>
+                <a href="/admin/sites" class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-white dark:ring-gray-600 dark:hover:bg-gray-600">
+                    Back to Sites
+                </a>
+            </div>
+        </div>
+        <div id="site-create-report-meta" class="mt-2 text-xs text-gray-600 dark:text-gray-300"></div>
+        <pre id="site-create-report-body" class="mt-3 overflow-x-auto whitespace-pre-wrap rounded-md bg-white px-4 py-3 text-xs leading-6 text-gray-900 ring-1 ring-inset ring-gray-200 dark:bg-gray-900 dark:text-white dark:ring-gray-700"></pre>
+    </div>
+    <div id="site-create-feedback" class="hidden rounded-md border px-4 py-3 text-sm shadow-sm">
+        <div id="site-create-feedback-text"></div>
     </div>
 </form>
 
@@ -240,6 +293,1204 @@ const siteCreateForm = document.querySelector('form');
 let isSubmitting = false;
 // TODO(PROD): remove temporary create-site client debug flow (debug ID, console logs, extra debug payload/header, timeout diagnostics).
 const SITE_CREATE_TIMEOUT_MS = 180000;
+const pendingBlockOperations = [];
+const queuedBlockOperationKeys = new Set();
+
+function parseImportMultiline(lines, startIndex) {
+    const marker = lines[startIndex]?.trim() || '';
+    if (!marker.startsWith('```')) {
+        return {
+            value: '',
+            nextIndex: startIndex,
+        };
+    }
+
+    const valueLines = [];
+    let index = startIndex + 1;
+    while (index < lines.length && lines[index].trim() !== '```') {
+        valueLines.push(lines[index]);
+        index += 1;
+    }
+
+    return {
+        value: valueLines.join('\n'),
+        nextIndex: index,
+    };
+}
+
+function parseImportVariableDeclaration(rawLine) {
+    const variableMatch = rawLine.match(/^\{([A-Za-z0-9_:-]+)\}\s*=\s*(.*)$/);
+    if (!variableMatch) {
+        return null;
+    }
+
+    return {
+        name: variableMatch[1],
+        value: variableMatch[2].trim(),
+    };
+}
+
+function substituteImportVariables(value, variables) {
+    let output = String(value ?? '');
+
+    Object.entries(variables || {}).forEach(([name, replacement]) => {
+        output = output.replaceAll(`{${name}}`, String(replacement ?? ''));
+    });
+
+    return output;
+}
+
+function escapeImportVariableForJson(value) {
+    return JSON.stringify(String(value ?? '')).slice(1, -1);
+}
+
+function substituteImportVariablesForJsonLd(value, variables) {
+    let output = String(value ?? '');
+
+    Object.entries(variables || {}).forEach(([name, replacement]) => {
+        output = output.replaceAll(`{${name}}`, escapeImportVariableForJson(replacement));
+    });
+
+    return output;
+}
+
+function collectImportVariableTokens(value) {
+    const matches = String(value ?? '').match(/\{([A-Za-z0-9_:-]+)\}/g) || [];
+    return matches.map((token) => token.slice(1, -1));
+}
+
+function parseCreateSiteImportTemplate(rawText) {
+    const lines = String(rawText || '').replaceAll('\r\n', '\n').replaceAll('\r', '\n').split('\n');
+    const blocks = [];
+    const variables = {};
+    const variableDeclarationCounts = {};
+    const variableUsage = {};
+    const warnings = [];
+    let current = null;
+
+    const pushCurrent = () => {
+        if (current) {
+            blocks.push(current);
+        }
+    };
+
+    const registerVariableUsage = (value) => {
+        collectImportVariableTokens(value).forEach((name) => {
+            variableUsage[name] = (variableUsage[name] || 0) + 1;
+        });
+    };
+
+    for (let index = 0; index < lines.length; index += 1) {
+        const rawLine = lines[index];
+        const line = rawLine.trim();
+        const blockMatch = line.match(/^\[(FORM|FIELD|OPERATION)\]$/);
+
+        if (blockMatch) {
+            pushCurrent();
+            current = {
+                type: blockMatch[1],
+                values: {},
+            };
+            continue;
+        }
+
+        if (!current) {
+            if (line === '' || line.startsWith('#')) {
+                continue;
+            }
+
+            const variable = parseImportVariableDeclaration(rawLine);
+            if (variable) {
+                variableDeclarationCounts[variable.name] = (variableDeclarationCounts[variable.name] || 0) + 1;
+                variables[variable.name] = substituteImportVariables(variable.value, variables);
+                registerVariableUsage(variable.value);
+            }
+
+            continue;
+        }
+
+        if (line === '' || line.startsWith('#')) {
+            continue;
+        }
+
+        const multilineMatch = rawLine.match(/^([A-Za-z0-9_]+):\s*$/);
+        if (multilineMatch) {
+            const parsed = parseImportMultiline(lines, index + 1);
+            registerVariableUsage(parsed.value);
+            current.values[multilineMatch[1]] = parsed.value.includes('<script type="application/ld+json">')
+                ? substituteImportVariablesForJsonLd(parsed.value, variables)
+                : substituteImportVariables(parsed.value, variables);
+            index = parsed.nextIndex;
+            continue;
+        }
+
+        const scalarMatch = rawLine.match(/^([A-Za-z0-9_]+)\s*=\s*(.*)$/);
+        if (scalarMatch) {
+            registerVariableUsage(scalarMatch[2].trim());
+            current.values[scalarMatch[1]] = substituteImportVariables(scalarMatch[2].trim(), variables);
+        }
+    }
+
+    pushCurrent();
+
+    Object.entries(variableDeclarationCounts).forEach(([name, count]) => {
+        if (count > 1) {
+            warnings.push(`Variable {${name}} is declared ${count} times. Last value wins.`);
+        }
+    });
+
+    Object.keys(variableUsage).forEach((name) => {
+        if (!Object.prototype.hasOwnProperty.call(variables, name)) {
+            warnings.push(`Variable {${name}} is used but not declared at the top of the file.`);
+        }
+    });
+
+    Object.keys(variables).forEach((name) => {
+        if (!variableUsage[name]) {
+            warnings.push(`Variable {${name}} is declared but not used anywhere in the import file.`);
+        }
+    });
+
+    return {
+        blocks,
+        warnings,
+    };
+}
+
+function parseImportJsonArray(value) {
+    const trimmed = String(value || '').trim();
+    if (trimmed === '') {
+        return [];
+    }
+
+    try {
+        const parsed = JSON.parse(trimmed);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+        return trimmed
+            .split('\n')
+            .map((line) => line.trim())
+            .filter((line) => line !== '');
+    }
+}
+
+function findPromptRow(file, path) {
+    return Array.from(document.querySelectorAll('.ai-prompt-row'))
+        .find((row) => row.dataset.file === file && row.dataset.path === path) || null;
+}
+
+function setImportedFormValue(name, value) {
+    if (name === 'ai_clone_templates') {
+        const checkbox = document.getElementById('ai_clone_templates');
+        if (checkbox) {
+            checkbox.checked = ['1', 'true', 'yes', 'on'].includes(String(value).toLowerCase());
+            return true;
+        }
+
+        return false;
+    }
+
+    if (name === 'ai_source_domain') {
+        const input = document.getElementById('ai_source_domain');
+        if (input) {
+            input.value = value;
+            return true;
+        }
+
+        return false;
+    }
+
+    const field = siteCreateForm?.elements?.[name];
+    if (!field) {
+        return false;
+    }
+
+    field.value = value;
+    return true;
+}
+
+function buildImportedOperation(values) {
+    const operation = {
+        file: values.file || 'index-raw_html.md',
+        section_path: values.section_path || '',
+        action: values.action || '',
+    };
+
+    if (!operation.section_path || !operation.action) {
+        return null;
+    }
+
+    const copyScalar = (from, to = from) => {
+        if (Object.prototype.hasOwnProperty.call(values, from)) {
+            operation[to] = values[from];
+        }
+    };
+
+    [
+        'module',
+        'target_key',
+        'container_key',
+        'anchor_key',
+        'anchor_position',
+        'tag',
+        'class',
+        'item_class',
+        'aria_label',
+        'list_tag',
+        'value',
+        'value_prompt',
+        'text',
+        'text_prompt',
+        'icon_src',
+        'icon_alt',
+        'col1',
+        'col1_prompt',
+        'col2',
+        'col2_prompt',
+        'row_class',
+    ].forEach((key) => copyScalar(key));
+
+    if (operation.action === 'add_list_block') {
+        operation.items = parseImportJsonArray(values.items || '');
+        operation.item_prompts = parseImportJsonArray(values.item_prompts || '');
+    }
+
+    if (operation.action === 'add_table_block') {
+        operation.headers = parseImportJsonArray(values.headers || '');
+        operation.header_prompts = parseImportJsonArray(values.header_prompts || '');
+        operation.rows = parseImportJsonArray(values.rows || '');
+        operation.row_prompts = parseImportJsonArray(values.row_prompts || '');
+    }
+
+    return operation;
+}
+
+function resetPendingBlockOperations() {
+    pendingBlockOperations.splice(0, pendingBlockOperations.length);
+    queuedBlockOperationKeys.clear();
+
+    document.querySelectorAll('.ai-queued-block-editor').forEach((editor) => {
+        const previousElement = editor.previousElementSibling;
+        if (previousElement instanceof HTMLButtonElement) {
+            restoreQueueButton(previousElement);
+        }
+
+        editor.remove();
+    });
+
+    renderBlockOperations();
+}
+
+function applyCreateSiteImportTemplate(rawText) {
+    const parsedImport = parseCreateSiteImportTemplate(rawText);
+    const blocks = parsedImport.blocks || [];
+
+    resetPendingBlockOperations();
+
+    const stats = {
+        form: 0,
+        fields: 0,
+        operations: 0,
+        skipped: 0,
+        warnings: parsedImport.warnings || [],
+    };
+
+    blocks.forEach((block) => {
+        const values = block.values || {};
+
+        if (block.type === 'FORM') {
+            Object.entries(values).forEach(([key, value]) => {
+                stats.form += setImportedFormValue(key, value) ? 1 : 0;
+            });
+            return;
+        }
+
+        if (block.type === 'FIELD') {
+            const row = findPromptRow(values.file || 'index-raw_html.md', values.path || '');
+            if (!row) {
+                stats.skipped += 1;
+                return;
+            }
+
+            const manualInput = row.querySelector('.ai-manual-input');
+            const promptInput = row.querySelector('.ai-prompt-input');
+            const sendCurrentValueCheckbox = row.querySelector('.ai-send-current-value-checkbox');
+            if (manualInput && Object.prototype.hasOwnProperty.call(values, 'value')) {
+                manualInput.value = values.value;
+            }
+            if (promptInput && Object.prototype.hasOwnProperty.call(values, 'prompt')) {
+                promptInput.value = values.prompt;
+            }
+            if (sendCurrentValueCheckbox && Object.prototype.hasOwnProperty.call(values, 'send_current_value')) {
+                sendCurrentValueCheckbox.checked = ['1', 'true', 'yes', 'on'].includes(String(values.send_current_value).toLowerCase());
+            }
+
+            stats.fields += 1;
+            return;
+        }
+
+        if (block.type === 'OPERATION') {
+            if (!['1', 'true', 'yes', 'on'].includes(String(values.enabled || '').toLowerCase())) {
+                return;
+            }
+
+            const operation = buildImportedOperation(values);
+            if (!operation) {
+                stats.skipped += 1;
+                return;
+            }
+
+            const label = values.label || `${operation.section_path} ${operation.action}`;
+            stats.operations += queueBlockOperation(operation, label) ? 1 : 0;
+        }
+    });
+
+    renderBlockOperations();
+
+    return stats;
+}
+
+function renderImportStatus(stats) {
+    const statusBox = document.getElementById('site-import-status');
+    const summary = document.getElementById('site-import-status-summary');
+    const warningsList = document.getElementById('site-import-status-warnings');
+
+    if (!statusBox || !summary || !warningsList) {
+        return;
+    }
+
+    const warnings = Array.isArray(stats?.warnings) ? stats.warnings : [];
+
+    statusBox.classList.remove(
+        'hidden',
+        'border-emerald-200',
+        'bg-emerald-50',
+        'text-emerald-900',
+        'dark:border-emerald-800',
+        'dark:bg-emerald-950',
+        'dark:text-emerald-100',
+        'border-amber-200',
+        'bg-amber-50',
+        'text-amber-900',
+        'dark:border-amber-800',
+        'dark:bg-amber-950',
+        'dark:text-amber-100'
+    );
+
+    if (warnings.length > 0) {
+        statusBox.classList.add(
+            'border-amber-200',
+            'bg-amber-50',
+            'text-amber-900',
+            'dark:border-amber-800',
+            'dark:bg-amber-950',
+            'dark:text-amber-100'
+        );
+    } else {
+        statusBox.classList.add(
+            'border-emerald-200',
+            'bg-emerald-50',
+            'text-emerald-900',
+            'dark:border-emerald-800',
+            'dark:bg-emerald-950',
+            'dark:text-emerald-100'
+        );
+    }
+
+    summary.textContent = `Import loaded. Form fields: ${stats.form}. Page/template fields: ${stats.fields}. Queued structural operations: ${stats.operations}. Skipped blocks: ${stats.skipped}.`;
+    warningsList.innerHTML = warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join('');
+    warningsList.classList.toggle('hidden', warnings.length === 0);
+}
+
+function renderCreateStatusBlock(element, textElement, message, tone = 'error') {
+    if (!element || !textElement) {
+        return;
+    }
+
+    element.classList.remove(
+        'hidden',
+        'border-emerald-200',
+        'bg-emerald-50',
+        'text-emerald-900',
+        'dark:border-emerald-800',
+        'dark:bg-emerald-950',
+        'dark:text-emerald-100',
+        'border-amber-200',
+        'bg-amber-50',
+        'text-amber-900',
+        'dark:border-amber-800',
+        'dark:bg-amber-950',
+        'dark:text-amber-100',
+        'border-rose-200',
+        'bg-rose-50',
+        'text-rose-900',
+        'dark:border-rose-800',
+        'dark:bg-rose-950',
+        'dark:text-rose-100',
+        'border-blue-200',
+        'bg-blue-50',
+        'text-blue-900',
+        'dark:border-blue-800',
+        'dark:bg-blue-950',
+        'dark:text-blue-100'
+    );
+
+    const toneClasses = tone === 'success'
+        ? ['border-emerald-200', 'bg-emerald-50', 'text-emerald-900', 'dark:border-emerald-800', 'dark:bg-emerald-950', 'dark:text-emerald-100']
+        : (tone === 'warning'
+            ? ['border-amber-200', 'bg-amber-50', 'text-amber-900', 'dark:border-amber-800', 'dark:bg-amber-950', 'dark:text-amber-100']
+            : (tone === 'info'
+                ? ['border-blue-200', 'bg-blue-50', 'text-blue-900', 'dark:border-blue-800', 'dark:bg-blue-950', 'dark:text-blue-100']
+                : ['border-rose-200', 'bg-rose-50', 'text-rose-900', 'dark:border-rose-800', 'dark:bg-rose-950', 'dark:text-rose-100']));
+
+    element.classList.add(...toneClasses);
+    textElement.textContent = message;
+}
+
+function renderSiteCreateFeedback(message, tone = 'error') {
+    renderCreateStatusBlock(
+        document.getElementById('site-create-feedback'),
+        document.getElementById('site-create-feedback-text'),
+        message,
+        tone
+    );
+}
+
+function buildSiteCreateReport(result, responseDebugId) {
+    const aiGeneration = result?.ai_generation || {};
+    const updatedPaths = Array.isArray(aiGeneration.updated_paths)
+        ? aiGeneration.updated_paths.filter((path) => typeof path === 'string' && path.trim() !== '')
+        : [];
+    const manualUpdatedPaths = Array.isArray(aiGeneration.manual_updated_paths)
+        ? aiGeneration.manual_updated_paths.filter((path) => typeof path === 'string' && path.trim() !== '')
+        : [];
+    const blockUpdatedPaths = Array.isArray(aiGeneration.block_updated_paths)
+        ? aiGeneration.block_updated_paths.filter((path) => typeof path === 'string' && path.trim() !== '')
+        : [];
+
+    const lines = [
+        'Site created successfully.',
+        '',
+        `Site ID: ${result?.id ?? 'n/a'}`,
+        `Name: ${result?.name ?? ''}`,
+        `Domain: ${result?.domain ?? ''}`,
+        `Template set: ${result?.template_set ?? ''}`,
+        `Output path: ${result?.output_path ?? ''}`,
+        `Status: ${result?.status ?? ''}`,
+        `Locale: ${result?.locale ?? ''}`,
+        `AI generation enabled: ${aiGeneration.enabled === true ? 'yes' : 'no'}`,
+        `AI updated fields: ${aiGeneration.updated_fields ?? 0}`,
+        `Manual updated fields: ${aiGeneration.manual_updated_fields ?? 0}`,
+        `Block updated fields: ${aiGeneration.block_updated_fields ?? 0}`,
+        `Debug ID: ${responseDebugId}`,
+    ];
+
+    if (blockUpdatedPaths.length > 0) {
+        lines.push('', 'Block operations:', ...blockUpdatedPaths.map((path) => `- ${path}`));
+    }
+
+    if (manualUpdatedPaths.length > 0) {
+        lines.push('', 'Manual field updates:', ...manualUpdatedPaths.map((path) => `- ${path}`));
+    }
+
+    if (updatedPaths.length > 0) {
+        lines.push('', 'AI updated fields:', ...updatedPaths.map((path) => `- ${path}`));
+    } else if (aiGeneration.enabled === true && manualUpdatedPaths.length === 0) {
+        lines.push('', 'AI completed without field rewrites.');
+    }
+
+    if (result?.create_report?.stored_path) {
+        lines.push('', `Saved report: ${result.create_report.stored_path}`);
+    }
+
+    return lines.join('\n');
+}
+
+function renderSiteCreateReport(result, responseDebugId) {
+    const reportBox = document.getElementById('site-create-report');
+    const reportTitle = document.getElementById('site-create-report-title');
+    const reportMeta = document.getElementById('site-create-report-meta');
+    const reportBody = document.getElementById('site-create-report-body');
+    const reportEditLink = document.getElementById('site-create-report-edit-link');
+
+    if (!reportBox || !reportTitle || !reportMeta || !reportBody || !reportEditLink) {
+        return;
+    }
+
+    reportBox.classList.remove(
+        'hidden',
+        'border-emerald-200',
+        'bg-emerald-50',
+        'text-emerald-900',
+        'dark:border-emerald-800',
+        'dark:bg-emerald-950',
+        'dark:text-emerald-100'
+    );
+    reportBox.classList.add(
+        'border-emerald-200',
+        'bg-emerald-50',
+        'text-emerald-900',
+        'dark:border-emerald-800',
+        'dark:bg-emerald-950',
+        'dark:text-emerald-100'
+    );
+
+    reportTitle.textContent = 'Site Creation Report';
+    reportMeta.textContent = `Debug ID: ${responseDebugId}`;
+    reportBody.textContent = String(result?.create_report?.text || buildSiteCreateReport(result, responseDebugId));
+
+    if (result?.id) {
+        reportEditLink.href = `/admin/sites/${result.id}/edit`;
+        reportEditLink.classList.remove('hidden');
+    } else {
+        reportEditLink.classList.add('hidden');
+    }
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+}
+
+function renderBlockOperations() {
+    const log = document.getElementById('ai-block-ops-log');
+    if (!log) {
+        return;
+    }
+
+    if (pendingBlockOperations.length === 0) {
+        log.innerHTML = '<div>No operations queued.</div>';
+        return;
+    }
+
+    log.innerHTML = pendingBlockOperations
+        .map((item, index) => {
+            const label = escapeHtml(item._label || item.action || 'operation');
+            return `<div class="flex items-center justify-between gap-2 rounded bg-gray-100 px-2 py-1 dark:bg-gray-700">
+                <span class="min-w-0 truncate">${label}</span>
+                <button type="button" class="ai-block-op-remove-queued rounded bg-gray-200 px-2 py-0.5 text-[11px] font-semibold text-gray-700 hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500" data-index="${index}">Remove</button>
+            </div>`;
+        })
+        .join('');
+}
+
+function queueBlockOperation(operation, label) {
+    if (!operation.queue_id && (operation.action === 'add_text' || operation.action === 'add_list_block' || operation.action === 'add_table_block')) {
+        operation.queue_id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    }
+
+    const key = JSON.stringify(normalizeBlockOperation(operation));
+    if (queuedBlockOperationKeys.has(key)) {
+        return false;
+    }
+
+    queuedBlockOperationKeys.add(key);
+    pendingBlockOperations.push({
+        ...operation,
+        _label: label,
+        _key: key,
+    });
+    renderBlockOperations();
+    return true;
+}
+
+function normalizeBlockOperation(value) {
+    if (Array.isArray(value)) {
+        return value.map((item) => normalizeBlockOperation(item));
+    }
+
+    if (value && typeof value === 'object') {
+        return Object.keys(value)
+            .filter((key) => key !== '_label' && key !== '_key')
+            .sort()
+            .reduce((acc, key) => {
+                acc[key] = normalizeBlockOperation(value[key]);
+                return acc;
+            }, {});
+    }
+
+    return value;
+}
+
+function queueAndLockButton(button, operation, label) {
+    if (!queueBlockOperation(operation, label)) {
+        return;
+    }
+
+    if (!button) {
+        return;
+    }
+
+    const lastOperation = pendingBlockOperations[pendingBlockOperations.length - 1];
+    const isNewBlockQueueButton = button.dataset.action === 'add_text' || button.dataset.action === 'add_standard_block';
+    if (!button.dataset.defaultText) {
+        button.dataset.defaultText = button.textContent.trim();
+    }
+
+    button.disabled = true;
+    button.classList.add('opacity-60', 'cursor-not-allowed');
+    if (isNewBlockQueueButton) {
+        button.textContent = 'Block Added to Queue';
+        renderQueuedBlockEditor(button, lastOperation);
+        return;
+    }
+
+    window.setTimeout(() => {
+        button.disabled = false;
+        button.classList.remove('opacity-60', 'cursor-not-allowed');
+    }, 700);
+}
+
+function findPendingBlockOperation(key) {
+    return pendingBlockOperations.find((operation) => operation._key === key) || null;
+}
+
+function removePendingBlockOperation(key) {
+    const index = pendingBlockOperations.findIndex((operation) => operation._key === key);
+    if (index < 0) {
+        return;
+    }
+
+    pendingBlockOperations.splice(index, 1);
+    queuedBlockOperationKeys.delete(key);
+    renderBlockOperations();
+}
+
+function restoreQueueButton(button) {
+    if (!button) {
+        return;
+    }
+
+    button.disabled = false;
+    button.classList.remove('opacity-60', 'cursor-not-allowed');
+    button.textContent = button.dataset.defaultText || button.textContent;
+}
+
+function renderQueuedTextField(label, value, prompt, valueClass, promptClass) {
+    return `<div class="rounded-md border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
+        <div class="mb-2 text-xs font-medium text-gray-700 dark:text-gray-300">${escapeHtml(label)} (${String(value || '').length} chars)</div>
+        <textarea rows="2" class="${valueClass} ai-queued-value mb-2 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white" placeholder="Edit field value manually">${escapeHtml(value || '')}</textarea>
+        <textarea rows="2" class="${promptClass} ai-queued-prompt block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white" placeholder="Instruction for AI to rewrite this field">${escapeHtml(prompt || '')}</textarea>
+    </div>`;
+}
+
+function renderQueuedOperationFields(operation) {
+    if (operation.action === 'add_text') {
+        return renderQueuedTextField(
+            `New ${String(operation.tag || 'text').toUpperCase()} block`,
+            operation.value || '',
+            operation.value_prompt || '',
+            'ai-queued-text-value',
+            'ai-queued-text-prompt'
+        );
+    }
+
+    if (operation.action === 'add_list_block') {
+        const items = Array.isArray(operation.items) ? operation.items : [];
+        const prompts = Array.isArray(operation.item_prompts) ? operation.item_prompts : [];
+        return items.map((value, index) => renderQueuedTextField(
+            `New ${String(operation.list_tag || 'UL').toUpperCase()} item ${index + 1}`,
+            value,
+            prompts[index] || '',
+            'ai-queued-list-item-value',
+            'ai-queued-list-item-prompt'
+        )).join('');
+    }
+
+    if (operation.action === 'add_table_block') {
+        const headers = Array.isArray(operation.headers) ? operation.headers : [];
+        const headerPrompts = Array.isArray(operation.header_prompts) ? operation.header_prompts : [];
+        const rows = Array.isArray(operation.rows) ? operation.rows : [];
+        const rowPrompts = Array.isArray(operation.row_prompts) ? operation.row_prompts : [];
+        const headerFields = headers.map((value, index) => renderQueuedTextField(
+            `New table header ${index + 1}`,
+            value,
+            headerPrompts[index] || '',
+            'ai-queued-table-header-value',
+            'ai-queued-table-header-prompt'
+        )).join('');
+        const rowFields = rows.map((row, rowIndex) => {
+            if (!Array.isArray(row)) {
+                return '';
+            }
+
+            return row.map((value, cellIndex) => renderQueuedTextField(
+                `New table row ${rowIndex + 1} cell ${cellIndex + 1}`,
+                value,
+                rowPrompts[rowIndex]?.[cellIndex] || '',
+                'ai-queued-table-cell-value',
+                'ai-queued-table-cell-prompt'
+            )).join('');
+        }).join('');
+
+        return headerFields + rowFields;
+    }
+
+    return '';
+}
+
+function syncQueuedOperationFromEditor(editor) {
+    const key = editor.dataset.operationKey || '';
+    const operation = findPendingBlockOperation(key);
+    if (!operation) {
+        return;
+    }
+
+    if (operation.action === 'add_text') {
+        operation.value = editor.querySelector('.ai-queued-text-value')?.value || '';
+        operation.value_prompt = editor.querySelector('.ai-queued-text-prompt')?.value?.trim() || '';
+        return;
+    }
+
+    if (operation.action === 'add_list_block') {
+        operation.items = Array.from(editor.querySelectorAll('.ai-queued-list-item-value')).map((input) => input.value || '');
+        operation.item_prompts = Array.from(editor.querySelectorAll('.ai-queued-list-item-prompt')).map((input) => input.value?.trim() || '');
+        return;
+    }
+
+    if (operation.action === 'add_table_block') {
+        operation.headers = Array.from(editor.querySelectorAll('.ai-queued-table-header-value')).map((input) => input.value || '');
+        operation.header_prompts = Array.from(editor.querySelectorAll('.ai-queued-table-header-prompt')).map((input) => input.value?.trim() || '');
+        const headerCount = operation.headers.length;
+        const cellValues = Array.from(editor.querySelectorAll('.ai-queued-table-cell-value')).map((input) => input.value || '');
+        const cellPrompts = Array.from(editor.querySelectorAll('.ai-queued-table-cell-prompt')).map((input) => input.value?.trim() || '');
+        operation.rows = [];
+        operation.row_prompts = [];
+        for (let index = 0; index < cellValues.length; index += headerCount) {
+            operation.rows.push(cellValues.slice(index, index + headerCount));
+            operation.row_prompts.push(cellPrompts.slice(index, index + headerCount));
+        }
+    }
+}
+
+function renderQueuedBlockEditor(button, operation) {
+    if (!button || !operation?._key) {
+        return;
+    }
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'ai-queued-block-editor mt-4 rounded-md border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-800 dark:bg-indigo-950/40';
+    wrapper.dataset.operationKey = operation._key;
+    wrapper.dataset.buttonAction = button.dataset.action || '';
+    wrapper.innerHTML = `<div class="mb-3 flex flex-wrap items-center gap-2">
+        <span class="text-xs font-semibold uppercase text-indigo-800 dark:text-indigo-200">Block Added to Queue</span>
+        <button type="button" class="ai-queued-add-another inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500">+</button>
+        <button type="button" class="ai-queued-remove inline-flex items-center rounded-md bg-rose-600 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-500">-</button>
+    </div>
+    <div class="space-y-3">${renderQueuedOperationFields(operation)}</div>`;
+
+    let insertAfter = button;
+    while (insertAfter.nextElementSibling?.classList.contains('ai-queued-block-editor')) {
+        insertAfter = insertAfter.nextElementSibling;
+    }
+    insertAfter.insertAdjacentElement('afterend', wrapper);
+}
+
+document.addEventListener('change', function (event) {
+    const select = event.target.closest('.ai-standard-block-type');
+    if (!select) {
+        return;
+    }
+
+    const scope = select.closest('.ai-structural-control');
+    if (!scope) {
+        return;
+    }
+
+    const type = select.value || 'ul';
+    scope.querySelectorAll('.ai-standard-block-panel').forEach((panel) => {
+        panel.classList.toggle('hidden', panel.dataset.standardPanel !== type);
+    });
+});
+
+document.addEventListener('input', function (event) {
+    const editor = event.target.closest('.ai-queued-block-editor');
+    if (!editor) {
+        return;
+    }
+
+    syncQueuedOperationFromEditor(editor);
+});
+
+document.addEventListener('click', function (event) {
+    const queuedRemoveButton = event.target.closest('.ai-queued-remove');
+    if (queuedRemoveButton) {
+        const editor = queuedRemoveButton.closest('.ai-queued-block-editor');
+        const key = editor?.dataset.operationKey || '';
+        if (key) {
+            removePendingBlockOperation(key);
+        }
+
+        const scope = editor?.closest('.ai-structural-control');
+        const buttonAction = editor?.dataset.buttonAction || '';
+        const button = buttonAction !== '' ? scope?.querySelector(`.ai-block-op-btn[disabled][data-action="${buttonAction}"]`) : null;
+        restoreQueueButton(button);
+        editor?.remove();
+        return;
+    }
+
+    const queuedAddAnotherButton = event.target.closest('.ai-queued-add-another');
+    if (queuedAddAnotherButton) {
+        const editor = queuedAddAnotherButton.closest('.ai-queued-block-editor');
+        const scope = editor?.closest('.ai-structural-control');
+        const buttonAction = editor?.dataset.buttonAction || '';
+        const button = buttonAction !== '' ? scope?.querySelector(`.ai-block-op-btn[disabled][data-action="${buttonAction}"]`) : null;
+        restoreQueueButton(button);
+        return;
+    }
+
+    const removeQueuedButton = event.target.closest('.ai-block-op-remove-queued');
+    if (removeQueuedButton) {
+        const index = parseInt(removeQueuedButton.dataset.index || '-1', 10);
+        if (!Number.isNaN(index) && index >= 0 && index < pendingBlockOperations.length) {
+            const removed = pendingBlockOperations.splice(index, 1);
+            const removedKey = removed[0]?._key;
+            if (removedKey) {
+                queuedBlockOperationKeys.delete(removedKey);
+            }
+            renderBlockOperations();
+        }
+        return;
+    }
+
+    const toggleAddButton = event.target.closest('.ai-inline-toggle-add');
+    if (toggleAddButton) {
+        const scope = toggleAddButton.closest('.ai-structural-control');
+        const panel = scope?.querySelector('.ai-inline-add-panel');
+        if (panel) {
+            panel.classList.toggle('hidden');
+        }
+        return;
+    }
+
+    const inlineRemoveButton = event.target.closest('.ai-inline-remove-btn');
+    if (inlineRemoveButton) {
+        const scope = inlineRemoveButton.closest('.ai-structural-control');
+        const section = inlineRemoveButton.closest('[data-section-path]');
+        const file = scope?.dataset.file || section?.dataset.file || '';
+        const sectionPath = scope?.dataset.sectionPath || section?.dataset.sectionPath || '';
+        const action = inlineRemoveButton.dataset.action || '';
+        const confirmLabel = inlineRemoveButton.dataset.confirmLabel || 'selected item';
+
+        if (!file || !sectionPath || !action) {
+            return;
+        }
+
+        if (!window.confirm(`Remove ${confirmLabel}?`)) {
+            return;
+        }
+
+        const operation = {
+            file,
+            section_path: sectionPath,
+            action,
+        };
+
+        if (action === 'remove_block') {
+            operation.target_key = inlineRemoveButton.dataset.targetKey || scope?.dataset.blockKey || '';
+            if (!operation.target_key) {
+                return;
+            }
+        }
+
+        if (action === 'remove_last_list_item' || action === 'remove_last_table_row') {
+            operation.container_key = inlineRemoveButton.dataset.containerKey || scope?.dataset.blockKey || '';
+            if (!operation.container_key) {
+                return;
+            }
+        }
+
+        queueAndLockButton(inlineRemoveButton, operation, `${sectionPath} ${action}: ${confirmLabel}`);
+        return;
+    }
+
+    const button = event.target.closest('.ai-block-op-btn');
+    if (!button) {
+        return;
+    }
+
+    const scope = button.closest('.ai-structural-control') || button.closest('.ai-block-section');
+    const section = button.closest('[data-section-path]');
+    if (!section) {
+        return;
+    }
+
+    const file = scope?.dataset.file || section.dataset.file || '';
+    const sectionPath = scope?.dataset.sectionPath || section.dataset.sectionPath || '';
+    const action = button.dataset.action || '';
+    const anchorKey = button.dataset.anchorKey || scope?.dataset.blockKey || section.querySelector('.ai-block-insert-anchor')?.value?.trim() || '';
+    const anchorPosition = button.dataset.anchorPosition || section.querySelector('.ai-block-insert-position')?.value?.trim() || 'after';
+    if (!file || !sectionPath || !action) {
+        return;
+    }
+
+    if (action === 'add_section') {
+        const module = scope?.querySelector('.ai-section-module-select')?.value?.trim() || '';
+        if (!module) {
+            return;
+        }
+
+        queueAndLockButton(button, {
+            file,
+            section_path: sectionPath,
+            action,
+            module,
+        }, `${sectionPath} add section ${module}`);
+        return;
+    }
+
+    if (action === 'remove_block') {
+        const select = scope?.querySelector('.ai-block-remove-select');
+        const targetKey = select?.value?.trim() || '';
+        if (!targetKey) {
+            return;
+        }
+
+        const selectedText = select?.selectedOptions?.[0]?.textContent?.trim() || targetKey;
+        queueAndLockButton(button, {
+            file,
+            section_path: sectionPath,
+            action,
+            target_key: targetKey,
+        }, `${sectionPath} remove: ${selectedText}`);
+        return;
+    }
+
+    if (action === 'add_text') {
+        const tag = scope?.querySelector('.ai-block-text-tag')?.value?.trim() || '';
+        const value = scope?.querySelector('.ai-block-text-value')?.value?.trim() || '';
+        const valuePrompt = scope?.querySelector('.ai-block-text-prompt')?.value?.trim() || '';
+        const className = scope?.querySelector('.ai-block-text-class')?.value?.trim() || '';
+        if (!tag || !value) {
+            return;
+        }
+
+        queueAndLockButton(button, {
+            file,
+            section_path: sectionPath,
+            action,
+            tag,
+            value,
+            value_prompt: valuePrompt,
+            class: className,
+            anchor_key: anchorKey,
+            anchor_position: anchorPosition,
+        }, `${sectionPath} add <${tag}>`);
+        return;
+    }
+
+    if (action === 'add_list_block') {
+        const listTag = scope?.querySelector('.ai-block-list-tag')?.value?.trim() || 'ul';
+        const className = scope?.querySelector('.ai-block-list-class')?.value?.trim() || '';
+        const rawItems = scope?.querySelector('.ai-block-list-items')?.value || '';
+        const items = rawItems
+            .split('\n')
+            .map((item) => item.trim())
+            .filter((item) => item !== '');
+
+        queueAndLockButton(button, {
+            file,
+            section_path: sectionPath,
+            action,
+            list_tag: listTag,
+            class: className,
+            items,
+            anchor_key: anchorKey,
+            anchor_position: anchorPosition,
+        }, `${sectionPath} add ${listTag} list`);
+        return;
+    }
+
+    if (action === 'add_standard_block') {
+        const blockType = scope?.querySelector('.ai-standard-block-type')?.value?.trim() || 'ul';
+        const panel = scope?.querySelector(`.ai-standard-block-panel-${blockType}`);
+        if (!panel) {
+            return;
+        }
+
+        if (blockType === 'ul' || blockType === 'ol') {
+            const className = panel.querySelector('.ai-standard-list-class')?.value?.trim() || '';
+            const ariaLabel = panel.querySelector('.ai-standard-list-aria')?.value?.trim() || '';
+            const itemClass = panel.querySelector('.ai-standard-list-item-class')?.value?.trim() || '';
+            const listEntries = Array.from(panel.querySelectorAll('.ai-standard-list-item'))
+                .map((input) => ({
+                    value: input.value?.trim() || '',
+                    prompt: input.closest('div')?.querySelector('.ai-standard-list-item-prompt')?.value?.trim() || '',
+                }))
+                .filter((entry) => entry.value !== '');
+            const items = listEntries.map((entry) => entry.value);
+            const itemPrompts = listEntries.map((entry) => entry.prompt);
+            if (items.length === 0) {
+                return;
+            }
+
+            queueAndLockButton(button, {
+                file,
+                section_path: sectionPath,
+                action: 'add_list_block',
+                list_tag: blockType,
+                class: className,
+                item_class: itemClass,
+                aria_label: ariaLabel,
+                items,
+                item_prompts: itemPrompts,
+                anchor_key: anchorKey,
+                anchor_position: anchorPosition,
+            }, `${sectionPath} add ${blockType.toUpperCase()} standard list`);
+            return;
+        }
+
+        if (blockType === 'table') {
+            const headerEntries = Array.from(panel.querySelectorAll('.ai-standard-table-header'))
+                .map((input) => ({
+                    value: input.value?.trim() || '',
+                    prompt: input.closest('div')?.querySelector('.ai-standard-table-header-prompt')?.value?.trim() || '',
+                }))
+                .filter((entry) => entry.value !== '');
+            const headers = headerEntries.map((entry) => entry.value);
+            const headerPrompts = headerEntries.map((entry) => entry.prompt);
+            const rowEntries = Array.from(panel.querySelectorAll('.ai-standard-table-row'))
+                .map((row) => ({
+                    cells: Array.from(row.querySelectorAll('.ai-standard-table-cell')).map((input) => input.value?.trim() || ''),
+                    prompts: Array.from(row.querySelectorAll('.ai-standard-table-cell-prompt')).map((input) => input.value?.trim() || ''),
+                }))
+                .filter((row) => row.cells.some((value) => value !== ''));
+            const rows = rowEntries.map((row) => row.cells);
+            const rowPrompts = rowEntries.map((row) => row.prompts);
+            if (headers.length === 0 || rows.length === 0) {
+                return;
+            }
+
+            queueAndLockButton(button, {
+                file,
+                section_path: sectionPath,
+                action: 'add_table_block',
+                class: panel.querySelector('.ai-standard-table-class')?.value?.trim() || '',
+                aria_label: panel.querySelector('.ai-standard-table-aria')?.value?.trim() || '',
+                headers,
+                header_prompts: headerPrompts,
+                rows,
+                row_prompts: rowPrompts,
+                anchor_key: anchorKey,
+                anchor_position: anchorPosition,
+            }, `${sectionPath} add standard table`);
+        }
+
+        return;
+    }
+
+    if (action === 'add_list_item') {
+        const containerKey = button.dataset.containerKey || scope?.dataset.blockKey || scope?.querySelector('.ai-block-list-container')?.value?.trim() || '';
+        const value = scope?.querySelector('.ai-block-list-item-text')?.value?.trim() || '';
+        const valuePrompt = scope?.querySelector('.ai-block-list-item-prompt')?.value?.trim() || '';
+        const className = scope?.querySelector('.ai-block-list-item-class')?.value?.trim() || '';
+        if (!containerKey || !value) {
+            return;
+        }
+
+        queueAndLockButton(button, {
+            file,
+            section_path: sectionPath,
+            action,
+            container_key: containerKey,
+            value,
+            value_prompt: valuePrompt,
+            class: className,
+        }, `${sectionPath} add li`);
+        return;
+    }
+
+    if (action === 'add_card_feature') {
+        const containerKey = button.dataset.containerKey || scope?.dataset.blockKey || scope?.querySelector('.ai-block-feature-container')?.value?.trim() || '';
+        const text = scope?.querySelector('.ai-block-feature-text')?.value?.trim() || '';
+        const textPrompt = scope?.querySelector('.ai-block-feature-prompt')?.value?.trim() || '';
+        const iconSrc = scope?.querySelector('.ai-block-feature-icon-src')?.value?.trim() || '/assets/svg/';
+        const iconAlt = scope?.querySelector('.ai-block-feature-icon-alt')?.value?.trim() || '';
+        if (!containerKey || !text) {
+            return;
+        }
+
+        queueAndLockButton(button, {
+            file,
+            section_path: sectionPath,
+            action,
+            container_key: containerKey,
+            text,
+            text_prompt: textPrompt,
+            icon_src: iconSrc,
+            icon_alt: iconAlt,
+        }, `${sectionPath} add card feature`);
+        return;
+    }
+
+    if (action === 'add_table_row') {
+        const containerKey = button.dataset.containerKey || scope?.dataset.blockKey || scope?.querySelector('.ai-block-table-container')?.value?.trim() || '';
+        const col1 = scope?.querySelector('.ai-block-table-col1')?.value?.trim() || '';
+        const col2 = scope?.querySelector('.ai-block-table-col2')?.value?.trim() || '';
+        const col1Prompt = scope?.querySelector('.ai-block-table-col1-prompt')?.value?.trim() || '';
+        const col2Prompt = scope?.querySelector('.ai-block-table-col2-prompt')?.value?.trim() || '';
+        const rowClass = scope?.querySelector('.ai-block-table-row-class')?.value?.trim() || '';
+        if (!containerKey || (!col1 && !col2)) {
+            return;
+        }
+
+        queueAndLockButton(button, {
+            file,
+            section_path: sectionPath,
+            action,
+            container_key: containerKey,
+            col1,
+            col2,
+            col1_prompt: col1Prompt,
+            col2_prompt: col2Prompt,
+            row_class: rowClass,
+            anchor_key: anchorKey,
+            anchor_position: anchorPosition,
+        }, `${sectionPath} add table row`);
+    }
+});
+
+renderBlockOperations();
+
+document.getElementById('create-site-import-file')?.addEventListener('change', async function () {
+    const file = this.files?.[0] || null;
+    if (!file) {
+        return;
+    }
+
+    try {
+        const rawText = await file.text();
+        const stats = applyCreateSiteImportTemplate(rawText);
+        renderImportStatus(stats);
+    } catch (error) {
+        renderSiteCreateFeedback('Import failed: ' + (error?.message || String(error)), 'error');
+    } finally {
+        this.value = '';
+    }
+});
+
+document.getElementById('site-create-report-copy')?.addEventListener('click', async function () {
+    const reportBody = document.getElementById('site-create-report-body');
+    const text = reportBody?.textContent || '';
+    if (text === '') {
+        return;
+    }
+
+    try {
+        await navigator.clipboard.writeText(text);
+        this.textContent = 'Copied';
+        renderSiteCreateFeedback('Report copied to clipboard.', 'success');
+        setTimeout(() => {
+            this.textContent = 'Copy Report';
+        }, 1500);
+    } catch (error) {
+        renderSiteCreateFeedback('Copy failed: ' + (error?.message || String(error)), 'error');
+    }
+});
 
 siteCreateForm.addEventListener('submit', async function(e) {
     e.preventDefault();
@@ -291,6 +1542,7 @@ siteCreateForm.addEventListener('submit', async function(e) {
 
                 const promptPath = row.dataset.promptPath || row.dataset.path;
                 const prompt = promptInput.value?.trim() || '';
+                const sendCurrentValueCheckbox = row.querySelector('.ai-send-current-value-checkbox');
                 if (!prompt) {
                     return acc;
                 }
@@ -308,6 +1560,7 @@ siteCreateForm.addEventListener('submit', async function(e) {
                     file: row.dataset.file,
                     path: promptPath,
                     prompt,
+                    send_current_value: sendCurrentValueCheckbox ? sendCurrentValueCheckbox.checked : true,
                 });
 
                 return acc;
@@ -339,6 +1592,8 @@ siteCreateForm.addEventListener('submit', async function(e) {
             })
             .filter(Boolean);
 
+        data.ai_block_operations = pendingBlockOperations.map(({ _label, _key, ...operation }) => operation);
+
         console.info('[site-create] request:start', {
             debugId: debugRequestId,
             domain: data.domain || null,
@@ -346,6 +1601,7 @@ siteCreateForm.addEventListener('submit', async function(e) {
             aiCloneTemplates: data.ai_clone_templates === true,
             aiPromptCount: Array.isArray(data.ai_field_prompts) ? data.ai_field_prompts.length : 0,
             aiEditCount: Array.isArray(data.ai_field_edits) ? data.ai_field_edits.length : 0,
+            aiBlockOperationCount: Array.isArray(data.ai_block_operations) ? data.ai_block_operations.length : 0,
         });
 
         const response = await fetch('/api/sites', {
@@ -374,26 +1630,10 @@ siteCreateForm.addEventListener('submit', async function(e) {
         
         if (response.ok) {
             shouldResetSubmitState = false;
-            const updatedPaths = Array.isArray(result?.ai_generation?.updated_paths)
-                ? result.ai_generation.updated_paths.filter((path) => typeof path === 'string' && path.trim() !== '')
-                : [];
-            const manualUpdatedPaths = Array.isArray(result?.ai_generation?.manual_updated_paths)
-                ? result.ai_generation.manual_updated_paths.filter((path) => typeof path === 'string' && path.trim() !== '')
-                : [];
-
-            let successMessage = 'Site created successfully!';
-            if (manualUpdatedPaths.length > 0) {
-                successMessage += '\n\nManual field updates:\n- ' + manualUpdatedPaths.join('\n- ');
+            renderSiteCreateReport(result, responseDebugId);
+            if (statusBox && statusText) {
+                statusText.textContent = `Site creation completed (debug ID: ${responseDebugId}). Review the detailed report below.`;
             }
-            if (updatedPaths.length > 0) {
-                successMessage += '\n\nAI updated fields:\n- ' + updatedPaths.join('\n- ');
-            } else if (result?.ai_generation?.enabled === true && manualUpdatedPaths.length === 0) {
-                successMessage += '\n\nAI completed without field rewrites.';
-            }
-            successMessage += `\n\nDebug ID: ${responseDebugId}`;
-
-            alert(successMessage);
-            window.location.href = '/admin/sites';
         } else {
             let errorMessage = `Request failed with status ${response.status}`;
 
@@ -407,7 +1647,7 @@ siteCreateForm.addEventListener('submit', async function(e) {
                 errorMessage = result.message;
             }
 
-            alert('Error: ' + errorMessage + `\n\nDebug ID: ${responseDebugId}`);
+            renderSiteCreateFeedback('Error: ' + errorMessage + ` Debug ID: ${responseDebugId}`, 'error');
         }
     } catch (error) {
         if (error?.name === 'AbortError') {
@@ -415,7 +1655,7 @@ siteCreateForm.addEventListener('submit', async function(e) {
                 debugId: debugRequestId,
                 durationMs: Date.now() - startedAt,
             });
-            alert('Error: Site creation request timed out after 180 seconds. The request may still be processing on the server. Please refresh /admin/sites and check whether the site was created.' + `\n\nDebug ID: ${debugRequestId}`);
+            renderSiteCreateFeedback('Error: Site creation request timed out after 180 seconds. The request may still be processing on the server. Please refresh /admin/sites and check whether the site was created. Debug ID: ' + debugRequestId, 'error');
         } else {
             console.error('[site-create] request:error', {
                 debugId: debugRequestId,
@@ -423,7 +1663,7 @@ siteCreateForm.addEventListener('submit', async function(e) {
                 requestDataReady: data !== null,
                 message: error?.message || String(error),
             });
-            alert('Error: ' + error.message + `\n\nDebug ID: ${debugRequestId}`);
+            renderSiteCreateFeedback('Error: ' + error.message + ` Debug ID: ${debugRequestId}`, 'error');
         }
     } finally {
         clearTimeout(timeoutId);

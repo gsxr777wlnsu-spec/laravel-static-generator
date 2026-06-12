@@ -119,6 +119,9 @@
                 Create Page
             </button>
         </div>
+        <div id="page-create-status" class="hidden rounded-md border px-4 py-3 text-sm shadow-sm">
+            <div id="page-create-status-text"></div>
+        </div>
     </form>
 </div>
 
@@ -143,6 +146,30 @@ async function readApiResponse(response) {
     };
 }
 
+function renderPageCreateStatus(message, tone = 'error') {
+    const statusBox = document.getElementById('page-create-status');
+    const statusText = document.getElementById('page-create-status-text');
+
+    if (!statusBox || !statusText) {
+        return false;
+    }
+
+    statusBox.classList.remove(
+        'hidden',
+        'border-emerald-200', 'bg-emerald-50', 'text-emerald-900', 'dark:border-emerald-800', 'dark:bg-emerald-950', 'dark:text-emerald-100',
+        'border-amber-200', 'bg-amber-50', 'text-amber-900', 'dark:border-amber-800', 'dark:bg-amber-950', 'dark:text-amber-100',
+        'border-rose-200', 'bg-rose-50', 'text-rose-900', 'dark:border-rose-800', 'dark:bg-rose-950', 'dark:text-rose-100'
+    );
+
+    statusBox.classList.add(...(tone === 'success'
+        ? ['border-emerald-200', 'bg-emerald-50', 'text-emerald-900', 'dark:border-emerald-800', 'dark:bg-emerald-950', 'dark:text-emerald-100']
+        : (tone === 'warning'
+            ? ['border-amber-200', 'bg-amber-50', 'text-amber-900', 'dark:border-amber-800', 'dark:bg-amber-950', 'dark:text-amber-100']
+            : ['border-rose-200', 'bg-rose-50', 'text-rose-900', 'dark:border-rose-800', 'dark:bg-rose-950', 'dark:text-rose-100'])));
+    statusText.textContent = message;
+    return false;
+}
+
 function parseJsonField(value, label) {
     const trimmed = value.trim();
     if (!trimmed) {
@@ -152,13 +179,11 @@ function parseJsonField(value, label) {
     try {
         const parsed = JSON.parse(trimmed);
         if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-            alert(`${label} must be a JSON object.`);
-            return false;
+            return renderPageCreateStatus(`${label} must be a JSON object.`, 'error');
         }
         return parsed;
     } catch (error) {
-        alert(`${label} has invalid JSON syntax.`);
-        return false;
+        return renderPageCreateStatus(`${label} has invalid JSON syntax.`, 'error');
     }
 }
 
@@ -297,19 +322,21 @@ document.getElementById('page-form').addEventListener('submit', async function (
 
         if (!response.ok) {
             const message = result.errors ? JSON.stringify(result.errors) : (result.error || result.message || `Request failed with status ${response.status}`);
-            alert('Error: ' + message);
+            renderPageCreateStatus('Error: ' + message, 'error');
             return;
         }
 
         if (Array.isArray(result.warnings) && result.warnings.length > 0) {
-            alert('Page created with warnings:\n' + result.warnings.join('\n'));
+            renderPageCreateStatus('Page created with warnings: ' + result.warnings.join(' | '), 'warning');
         } else {
-            alert('Page created successfully.');
+            renderPageCreateStatus('Page created successfully.', 'success');
         }
 
-        window.location.href = '{{ route('admin.pages.index', $site->id) }}';
+        setTimeout(() => {
+            window.location.href = '{{ route('admin.pages.index', $site->id) }}';
+        }, 1000);
     } catch (error) {
-        alert('Error: ' + error.message);
+        renderPageCreateStatus('Error: ' + error.message, 'error');
     }
 });
 </script>

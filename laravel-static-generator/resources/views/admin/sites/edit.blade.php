@@ -99,12 +99,18 @@
     </div>
 
     <div class="flex justify-end space-x-3">
+        <a href="{{ $creationLogUrl }}" class="inline-flex items-center rounded-md bg-gray-900 dark:bg-gray-100 px-3 py-2 text-sm font-semibold text-white dark:text-gray-900 shadow-sm hover:bg-gray-700 dark:hover:bg-white">
+            View Creation Log
+        </a>
         <a href="/admin/sites" class="inline-flex items-center rounded-md bg-white dark:bg-gray-700 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-300 dark:ring-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600">
             Cancel
         </a>
         <button type="submit" class="inline-flex cursor-pointer items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus:outline-none focus-visible:outline-none">
             Save Changes
         </button>
+    </div>
+    <div id="site-edit-status" class="hidden rounded-md border px-4 py-3 text-sm shadow-sm">
+        <div id="site-edit-status-text"></div>
     </div>
 </form>
 
@@ -122,6 +128,38 @@ async function readApiResponse(response) {
         error: `Server returned non-JSON response (HTTP ${response.status})`,
         raw_body: rawBody,
     };
+}
+
+function renderSiteEditStatus(message, tone = 'error') {
+    const statusBox = document.getElementById('site-edit-status');
+    const statusText = document.getElementById('site-edit-status-text');
+
+    if (!statusBox || !statusText) {
+        return;
+    }
+
+    statusBox.classList.remove(
+        'hidden',
+        'border-emerald-200',
+        'bg-emerald-50',
+        'text-emerald-900',
+        'dark:border-emerald-800',
+        'dark:bg-emerald-950',
+        'dark:text-emerald-100',
+        'border-rose-200',
+        'bg-rose-50',
+        'text-rose-900',
+        'dark:border-rose-800',
+        'dark:bg-rose-950',
+        'dark:text-rose-100'
+    );
+
+    const toneClasses = tone === 'success'
+        ? ['border-emerald-200', 'bg-emerald-50', 'text-emerald-900', 'dark:border-emerald-800', 'dark:bg-emerald-950', 'dark:text-emerald-100']
+        : ['border-rose-200', 'bg-rose-50', 'text-rose-900', 'dark:border-rose-800', 'dark:bg-rose-950', 'dark:text-rose-100'];
+
+    statusBox.classList.add(...toneClasses);
+    statusText.textContent = message;
 }
 
 document.getElementById('site-edit-form').addEventListener('submit', async function (e) {
@@ -158,14 +196,13 @@ document.getElementById('site-edit-form').addEventListener('submit', async funct
                 ? JSON.stringify(result.errors)
                 : (result?.error || result?.message || `Request failed with status ${response.status}`);
 
-            alert('Error: ' + errorMessage);
+            renderSiteEditStatus('Error: ' + errorMessage, 'error');
             return;
         }
 
-        alert('Site updated successfully!');
-        window.location.href = '/admin/sites';
+        renderSiteEditStatus('Site updated successfully!', 'success');
     } catch (error) {
-        alert('Error: ' + error.message);
+        renderSiteEditStatus('Error: ' + error.message, 'error');
     }
 });
 </script>

@@ -18,6 +18,11 @@ use Symfony\Component\Yaml\Yaml;
 
 class SiteRepository implements SiteRepositoryInterface
 {
+    /**
+     * @var array<int, array<string, mixed>>
+     */
+    private array $lastCleanupIssues = [];
+
     public function create(array $data): Site
     {
         $site = Site::create($data);
@@ -33,6 +38,8 @@ class SiteRepository implements SiteRepositoryInterface
 
     public function delete(Site $site): bool
     {
+        $this->lastCleanupIssues = [];
+
         $siteId = (int) $site->id;
         $outputPath = (string) ($site->output_path ?? '');
 
@@ -55,9 +62,15 @@ class SiteRepository implements SiteRepositoryInterface
 
         if ($deleted) {
             $this->cleanupSiteFilesystemArtifacts($siteId, $outputPath, (string) $site->domain);
+            $this->detectDatabaseResiduesAfterDelete($siteId, $pageIds, $sectionIds, $mediaIds, $deploymentIds);
         }
 
         return $deleted;
+    }
+
+    public function getLastCleanupIssues(): array
+    {
+        return $this->lastCleanupIssues;
     }
 
     public function findById(int $id): ?Site
@@ -153,6 +166,7 @@ class SiteRepository implements SiteRepositoryInterface
                     'site_id' => $siteId,
                     'path' => $templatePath,
                 ]);
+                $this->recordCleanupIssue('filesystem', 'site-template', $templatePath, 'Failed to delete template directory');
             }
         } catch (\Throwable $e) {
             \Log::warning('Failed to delete site template directory', [
@@ -160,6 +174,11 @@ class SiteRepository implements SiteRepositoryInterface
                 'path' => $templatePath,
                 'error' => $e->getMessage(),
             ]);
+            $this->recordCleanupIssue('filesystem', 'site-template', $templatePath, $e->getMessage());
+        }
+
+        if (is_dir($templatePath)) {
+            $this->recordCleanupIssue('filesystem', 'site-template', $templatePath, 'Template directory still exists after cleanup');
         }
     }
 
@@ -176,6 +195,12 @@ class SiteRepository implements SiteRepositoryInterface
                     'disk' => $disk,
                     'path' => $normalized,
                 ]);
+                $this->recordCleanupIssue(
+                    'filesystem',
+                    'disk-directory',
+                    "{$disk}:{$normalized}",
+                    'Storage deleteDirectory returned false'
+                );
             }
         } catch (\Throwable $e) {
             \Log::warning('Failed to delete site artifact directory', [
@@ -183,6 +208,31 @@ class SiteRepository implements SiteRepositoryInterface
                 'path' => $normalized,
                 'error' => $e->getMessage(),
             ]);
+            $this->recordCleanupIssue(
+                'filesystem',
+                'disk-directory',
+                "{$disk}:{$normalized}",
+                $e->getMessage()
+            );
+            return;
+        }
+
+        try {
+            if (Storage::disk($disk)->exists($normalized)) {
+                $this->recordCleanupIssue(
+                    'filesystem',
+                    'disk-directory',
+                    "{$disk}:{$normalized}",
+                    'Directory still exists after cleanup'
+                );
+            }
+        } catch (\Throwable $e) {
+            $this->recordCleanupIssue(
+                'filesystem',
+                'disk-directory',
+                "{$disk}:{$normalized}",
+                "Exists check failed: {$e->getMessage()}"
+            );
         }
     }
 
@@ -243,6 +293,7 @@ class SiteRepository implements SiteRepositoryInterface
                     'domain' => $domain,
                     'path' => $normalizedTarget,
                 ]);
+                $this->recordCleanupIssue('filesystem', 'ai-template', $normalizedTarget, 'Failed to delete AI template directory');
             }
         } catch (\Throwable $e) {
             \Log::warning('Failed to delete AI template directory', [
@@ -250,6 +301,11 @@ class SiteRepository implements SiteRepositoryInterface
                 'path' => $normalizedTarget,
                 'error' => $e->getMessage(),
             ]);
+            $this->recordCleanupIssue('filesystem', 'ai-template', $normalizedTarget, $e->getMessage());
+        }
+
+        if (is_dir($normalizedTarget)) {
+            $this->recordCleanupIssue('filesystem', 'ai-template', $normalizedTarget, 'AI template directory still exists after cleanup');
         }
     }
 
@@ -278,6 +334,89 @@ class SiteRepository implements SiteRepositoryInterface
         }
 
         return false;
+    }
+
+    /**
+     * @param  array<int, int>  $pageIds
+     * @param  array<int, int>  $sectionIds
+     * @param  array<int, int>  $mediaIds
+     * @param  array<int, int>  $deploymentIds
+     */
+    private function detectDatabaseResiduesAfterDelete(
+        int $siteId,
+        array $pageIds,
+        array $sectionIds,
+        array $mediaIds,
+        array $deploymentIds
+    ): void {
+        if (Site::whereKey($siteId)->exists()) {
+            $this->recordCleanupIssue('database', 'sites', "site_id={$siteId}", 'Site row still exists after delete');
+        }
+
+        if (Page::where('site_id', $siteId)->exists()) {
+            $this->recordCleanupIssue('database', 'pages', "site_id={$siteId}", 'Page rows still exist after site delete');
+        }
+
+        if (Media::where('site_id', $siteId)->exists()) {
+            $this->recordCleanupIssue('database', 'media', "site_id={$siteId}", 'Media rows still exist after site delete');
+        }
+
+        if (Deployment::where('site_id', $siteId)->exists()) {
+            $this->recordCleanupIssue('database', 'deployments', "site_id={$siteId}", 'Deployment rows still exist after site delete');
+        }
+
+        if ($pageIds !== [] && Section::whereIn('page_id', $pageIds)->exists()) {
+            $this->recordCleanupIssue('database', 'sections', "page_ids=" . implode(',', $pageIds), 'Section rows still exist after site delete');
+        }
+
+        if ($pageIds !== []) {
+            $remainingPageAuditLogs = AuditLog::where('auditable_type', Page::class)->whereIn('auditable_id', $pageIds)->count();
+            if ($remainingPageAuditLogs > 0) {
+                $this->recordCleanupIssue('database', 'audit_logs', 'page_audit_logs', "Remaining page audit logs: {$remainingPageAuditLogs}");
+            }
+        }
+
+        if ($sectionIds !== []) {
+            $remainingSectionAuditLogs = AuditLog::where('auditable_type', Section::class)->whereIn('auditable_id', $sectionIds)->count();
+            if ($remainingSectionAuditLogs > 0) {
+                $this->recordCleanupIssue('database', 'audit_logs', 'section_audit_logs', "Remaining section audit logs: {$remainingSectionAuditLogs}");
+            }
+        }
+
+        if ($mediaIds !== []) {
+            $remainingMediaAuditLogs = AuditLog::where('auditable_type', Media::class)->whereIn('auditable_id', $mediaIds)->count();
+            if ($remainingMediaAuditLogs > 0) {
+                $this->recordCleanupIssue('database', 'audit_logs', 'media_audit_logs', "Remaining media audit logs: {$remainingMediaAuditLogs}");
+            }
+        }
+
+        if ($deploymentIds !== []) {
+            $remainingDeploymentAuditLogs = AuditLog::where('auditable_type', Deployment::class)->whereIn('auditable_id', $deploymentIds)->count();
+            if ($remainingDeploymentAuditLogs > 0) {
+                $this->recordCleanupIssue('database', 'audit_logs', 'deployment_audit_logs', "Remaining deployment audit logs: {$remainingDeploymentAuditLogs}");
+            }
+        }
+
+        $remainingSiteAuditLogs = AuditLog::where('auditable_type', Site::class)->where('auditable_id', $siteId)->count();
+        if ($remainingSiteAuditLogs > 0) {
+            $this->recordCleanupIssue('database', 'audit_logs', "site_id={$siteId}", "Remaining site audit logs: {$remainingSiteAuditLogs}");
+        }
+    }
+
+    private function recordCleanupIssue(string $scope, string $resource, string $path, string $message): void
+    {
+        $issue = [
+            'scope' => $scope,
+            'resource' => $resource,
+            'path' => $path,
+            'message' => $message,
+        ];
+
+        if (in_array($issue, $this->lastCleanupIssues, true)) {
+            return;
+        }
+
+        $this->lastCleanupIssues[] = $issue;
     }
 
     public function cloneFromStaging(string $stagingPath, array $siteData): ?Site

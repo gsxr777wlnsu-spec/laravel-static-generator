@@ -78,10 +78,54 @@ class SiteController extends Controller
             'ai_field_prompts.*.file' => 'required_with:ai_field_prompts|string|max:255',
             'ai_field_prompts.*.path' => 'required_with:ai_field_prompts|string|max:1000',
             'ai_field_prompts.*.prompt' => 'required_with:ai_field_prompts|string|max:10000',
+            'ai_field_prompts.*.send_current_value' => 'nullable|boolean',
             'ai_field_edits' => 'nullable|array',
             'ai_field_edits.*.file' => 'required_with:ai_field_edits|string|max:255',
             'ai_field_edits.*.path' => 'required_with:ai_field_edits|string|max:1000',
             'ai_field_edits.*.value' => 'present|string|max:100000',
+            'ai_block_operations' => 'nullable|array',
+            'ai_block_operations.*.file' => 'required_with:ai_block_operations|string|max:255',
+            'ai_block_operations.*.section_path' => 'required_with:ai_block_operations|string|max:1000',
+            'ai_block_operations.*.action' => 'required_with:ai_block_operations|string|max:100',
+            'ai_block_operations.*.queue_id' => 'nullable|string|max:64',
+            'ai_block_operations.*.target_key' => 'nullable|string|max:64',
+            'ai_block_operations.*.tag' => 'nullable|string|max:10',
+            'ai_block_operations.*.value' => 'nullable|string|max:100000',
+            'ai_block_operations.*.value_prompt' => 'nullable|string|max:10000',
+            'ai_block_operations.*.class' => 'nullable|string|max:255',
+            'ai_block_operations.*.list_tag' => 'nullable|string|max:10',
+            'ai_block_operations.*.items' => 'nullable|array',
+            'ai_block_operations.*.items.*' => 'nullable|string|max:10000',
+            'ai_block_operations.*.item_prompts' => 'nullable|array',
+            'ai_block_operations.*.item_prompts.*' => 'nullable|string|max:10000',
+            'ai_block_operations.*.item_class' => 'nullable|string|max:255',
+            'ai_block_operations.*.aria_label' => 'nullable|string|max:255',
+            'ai_block_operations.*.headers' => 'nullable|array',
+            'ai_block_operations.*.headers.*' => 'nullable|string|max:10000',
+            'ai_block_operations.*.header_prompts' => 'nullable|array',
+            'ai_block_operations.*.header_prompts.*' => 'nullable|string|max:10000',
+            'ai_block_operations.*.rows' => 'nullable|array',
+            'ai_block_operations.*.rows.*' => 'nullable|array',
+            'ai_block_operations.*.rows.*.*' => 'nullable|string|max:10000',
+            'ai_block_operations.*.row_prompts' => 'nullable|array',
+            'ai_block_operations.*.row_prompts.*' => 'nullable|array',
+            'ai_block_operations.*.row_prompts.*.*' => 'nullable|string|max:10000',
+            'ai_block_operations.*.container_key' => 'nullable|string|max:64',
+            'ai_block_operations.*.text' => 'nullable|string|max:100000',
+            'ai_block_operations.*.text_prompt' => 'nullable|string|max:10000',
+            'ai_block_operations.*.icon_src' => 'nullable|string|max:1000',
+            'ai_block_operations.*.icon_alt' => 'nullable|string|max:1000',
+            'ai_block_operations.*.icon_class' => 'nullable|string|max:255',
+            'ai_block_operations.*.text_class' => 'nullable|string|max:255',
+            'ai_block_operations.*.col1' => 'nullable|string|max:100000',
+            'ai_block_operations.*.col2' => 'nullable|string|max:100000',
+            'ai_block_operations.*.row_class' => 'nullable|string|max:255',
+            'ai_block_operations.*.cell_class' => 'nullable|string|max:255',
+            'ai_block_operations.*.col1_prompt' => 'nullable|string|max:10000',
+            'ai_block_operations.*.col2_prompt' => 'nullable|string|max:10000',
+            'ai_block_operations.*.anchor_key' => 'nullable|string|max:64',
+            'ai_block_operations.*.anchor_position' => 'nullable|in:before,after',
+            'ai_block_operations.*.module' => 'nullable|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -112,6 +156,7 @@ class SiteController extends Controller
         $aiSourceDomain = trim((string) ($data['ai_source_domain'] ?? 'test.com'));
         $aiFieldPrompts = $data['ai_field_prompts'] ?? [];
         $aiFieldEdits = $data['ai_field_edits'] ?? [];
+        $aiBlockOperations = $data['ai_block_operations'] ?? [];
 
         Log::info('site.create.validated', [
             'name' => $data['name'] ?? null,
@@ -122,6 +167,7 @@ class SiteController extends Controller
             'ai_source_domain' => $aiSourceDomain,
             'ai_prompt_count' => is_array($aiFieldPrompts) ? count($aiFieldPrompts) : 0,
             'ai_edit_count' => is_array($aiFieldEdits) ? count($aiFieldEdits) : 0,
+            'ai_block_operation_count' => is_array($aiBlockOperations) ? count($aiBlockOperations) : 0,
             'ai_prompt_summary' => $this->summarizeFieldEntries(
                 is_array($aiFieldPrompts) ? $aiFieldPrompts : [],
                 'prompt'
@@ -130,9 +176,18 @@ class SiteController extends Controller
                 is_array($aiFieldEdits) ? $aiFieldEdits : [],
                 'value'
             ),
+            'ai_block_operation_summary' => $this->summarizeBlockOperations(
+                is_array($aiBlockOperations) ? $aiBlockOperations : []
+            ),
         ]);
 
-        unset($data['ai_clone_templates'], $data['ai_source_domain'], $data['ai_field_prompts'], $data['ai_field_edits']);
+        unset(
+            $data['ai_clone_templates'],
+            $data['ai_source_domain'],
+            $data['ai_field_prompts'],
+            $data['ai_field_edits'],
+            $data['ai_block_operations']
+        );
 
         $site = $this->sites->create($data);
         Log::info('site.create.site_row_created', [
@@ -148,6 +203,12 @@ class SiteController extends Controller
             'manual_updated_fields' => 0,
             'manual_updated_files' => 0,
             'manual_updated_paths' => [],
+            'block_updated_fields' => 0,
+            'block_updated_files' => 0,
+            'block_updated_paths' => [],
+            'received_block_operations' => $this->summarizeBlockOperations(
+                is_array($aiBlockOperations) ? $aiBlockOperations : []
+            ),
         ];
 
         $aiPipelineStartedAt = microtime(true);
@@ -164,7 +225,11 @@ class SiteController extends Controller
                     sourceDomain: $aiSourceDomain !== '' ? $aiSourceDomain : 'test.com',
                     prompts: is_array($aiFieldPrompts) ? $aiFieldPrompts : [],
                     fieldEdits: is_array($aiFieldEdits) ? $aiFieldEdits : [],
+                    blockOperations: is_array($aiBlockOperations) ? $aiBlockOperations : [],
                     debugId: $debugId
+                );
+                $aiGeneration['received_block_operations'] = $this->summarizeBlockOperations(
+                    is_array($aiBlockOperations) ? $aiBlockOperations : []
                 );
 
                 Log::info('site.create.ai_pipeline.completed', [
@@ -238,6 +303,7 @@ class SiteController extends Controller
         $payload = $site->toArray();
         $payload['ai_generation'] = $aiGeneration;
         $payload['debug_id'] = $debugId;
+        $payload['create_report'] = $this->storeSiteCreateReport($site, $aiGeneration, $debugId);
 
         Log::info('site.create.completed', [
             'site_id' => $site->id,
@@ -324,6 +390,14 @@ class SiteController extends Controller
                 'error' => 'Delete failed',
                 'message' => 'Site could not be deleted from local database/storage.',
             ], 500);
+        }
+
+        $cleanupIssues = $this->sites->getLastCleanupIssues();
+        if ($cleanupIssues !== []) {
+            return response()->json([
+                'message' => 'Site deleted successfully, but some local artifacts could not be cleaned up.',
+                'cleanup_warnings' => $cleanupIssues,
+            ]);
         }
 
         return response()->json(['message' => 'Site deleted successfully']);
@@ -554,6 +628,7 @@ class SiteController extends Controller
         string $sourceDomain,
         array $prompts,
         array $fieldEdits,
+        array $blockOperations,
         ?string $debugId = null
     ): array {
         if ($userId <= 0) {
@@ -577,6 +652,49 @@ class SiteController extends Controller
             'source_domain' => $sourceDomain,
             'target_domain' => $site->domain,
         ]);
+
+        $config = $this->aiConfigs->findForUser($userId);
+        Log::info('site.create.ai.config.loaded', [
+            'site_id' => $site->id,
+            'provider' => $config?->provider,
+            'model_name' => $config?->model_name,
+            'is_active' => (bool) ($config?->is_active ?? false),
+            'has_api_key' => trim((string) ($config?->api_key ?? '')) !== '',
+        ]);
+
+        $stepStartedAt = microtime(true);
+        Log::info('site.create.ai.block_ops.start', [
+            'site_id' => $site->id,
+            'rows' => count($blockOperations),
+        ]);
+        $blockResult = $this->aiAgentService->applyBlockOperationsToDomain($site->domain, $blockOperations, $config);
+        $blockUpdatedPaths = [];
+        foreach (($blockResult['details'] ?? []) as $detail) {
+            if (!is_array($detail)) {
+                continue;
+            }
+
+            foreach (($detail['updated_paths'] ?? []) as $path) {
+                if (is_string($path) && $path !== '') {
+                    $blockUpdatedPaths[] = $path;
+                }
+            }
+        }
+        $blockUpdatedPaths = array_values(array_unique($blockUpdatedPaths));
+        Log::info('site.create.ai.block_ops.completed', [
+            'site_id' => $site->id,
+            'duration_ms' => $this->elapsedMilliseconds($stepStartedAt),
+            'updated_fields' => $blockResult['updated_fields'] ?? 0,
+            'updated_files' => $blockResult['updated_files'] ?? 0,
+        ]);
+
+        if (($blockResult['updated_fields'] ?? 0) > 0) {
+            $this->audit->log('ai.templates.blocks_updated', Site::class, $site->id, null, [
+                'updated_fields' => $blockResult['updated_fields'],
+                'updated_files' => $blockResult['updated_files'],
+                'updated_paths' => $blockUpdatedPaths,
+            ]);
+        }
 
         $stepStartedAt = microtime(true);
         Log::info('site.create.ai.manual_edits.start', [
@@ -637,6 +755,9 @@ class SiteController extends Controller
                 'manual_updated_fields' => (int) ($manualResult['updated_fields'] ?? 0),
                 'manual_updated_files' => (int) ($manualResult['updated_files'] ?? 0),
                 'manual_updated_paths' => $manualUpdatedPaths,
+                'block_updated_fields' => (int) ($blockResult['updated_fields'] ?? 0),
+                'block_updated_files' => (int) ($blockResult['updated_files'] ?? 0),
+                'block_updated_paths' => $blockUpdatedPaths,
             ];
         }
 
@@ -645,15 +766,6 @@ class SiteController extends Controller
             'site_id' => $site->id,
             'rows' => count($prompts),
             'summary' => $this->summarizeFieldEntries($prompts, 'prompt'),
-        ]);
-
-        $config = $this->aiConfigs->findForUser($userId);
-        Log::info('site.create.ai.config.loaded', [
-            'site_id' => $site->id,
-            'provider' => $config?->provider,
-            'model_name' => $config?->model_name,
-            'is_active' => (bool) ($config?->is_active ?? false),
-            'has_api_key' => trim((string) ($config?->api_key ?? '')) !== '',
         ]);
 
         $result = $this->aiAgentService->applyPromptsToDomain(
@@ -712,6 +824,9 @@ class SiteController extends Controller
             'manual_updated_fields' => (int) ($manualResult['updated_fields'] ?? 0),
             'manual_updated_files' => (int) ($manualResult['updated_files'] ?? 0),
             'manual_updated_paths' => $manualUpdatedPaths,
+            'block_updated_fields' => (int) ($blockResult['updated_fields'] ?? 0),
+            'block_updated_files' => (int) ($blockResult['updated_files'] ?? 0),
+            'block_updated_paths' => $blockUpdatedPaths,
         ];
     }
 
@@ -755,6 +870,143 @@ class SiteController extends Controller
             'files_count' => count($files),
             'pages_count' => $pagesCount,
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $aiGeneration
+     * @return array{text:string,stored_path:string,view_url:string}
+     */
+    private function storeSiteCreateReport(Site $site, array $aiGeneration, string $debugId): array
+    {
+        $reportText = $this->buildSiteCreateReportText($site, $aiGeneration, $debugId);
+        $reportDirectory = $this->siteCreateReportDirectory($site);
+
+        File::ensureDirectoryExists($reportDirectory);
+
+        $reportPath = $reportDirectory . '/site-create-report.txt';
+        File::put($reportPath, $reportText);
+
+        return [
+            'text' => $reportText,
+            'stored_path' => $reportPath,
+            'view_url' => route('admin.sites.creation-log', ['id' => $site->id]),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $aiGeneration
+     */
+    private function buildSiteCreateReportText(Site $site, array $aiGeneration, string $debugId): string
+    {
+        $updatedPaths = array_values(array_filter((array) ($aiGeneration['updated_paths'] ?? []), fn ($path) => is_string($path) && $path !== ''));
+        $manualUpdatedPaths = array_values(array_filter((array) ($aiGeneration['manual_updated_paths'] ?? []), fn ($path) => is_string($path) && $path !== ''));
+        $blockUpdatedPaths = array_values(array_filter((array) ($aiGeneration['block_updated_paths'] ?? []), fn ($path) => is_string($path) && $path !== ''));
+        $receivedBlockOperations = array_values(array_filter((array) ($aiGeneration['received_block_operations'] ?? []), fn ($line) => is_string($line) && $line !== ''));
+
+        $lines = [
+            'Site created successfully.',
+            '',
+            'Site ID: ' . $site->id,
+            'Name: ' . $site->name,
+            'Domain: ' . $site->domain,
+            'Template set: ' . $site->template_set,
+            'Output path: ' . $site->output_path,
+            'Status: ' . $site->status,
+            'Locale: ' . $site->locale,
+            'AI generation enabled: ' . (($aiGeneration['enabled'] ?? false) ? 'yes' : 'no'),
+            'AI updated fields: ' . (int) ($aiGeneration['updated_fields'] ?? 0),
+            'Manual updated fields: ' . (int) ($aiGeneration['manual_updated_fields'] ?? 0),
+            'Block updated fields: ' . (int) ($aiGeneration['block_updated_fields'] ?? 0),
+            'Debug ID: ' . $debugId,
+        ];
+
+        if ($blockUpdatedPaths !== []) {
+            $lines[] = '';
+            $lines[] = 'Block operations:';
+            foreach ($blockUpdatedPaths as $path) {
+                $lines[] = '- ' . $path;
+            }
+        }
+
+        if ($receivedBlockOperations !== []) {
+            $lines[] = '';
+            $lines[] = 'Received block operations:';
+            foreach ($receivedBlockOperations as $line) {
+                $lines[] = '- ' . $line;
+            }
+        }
+
+        if ($manualUpdatedPaths !== []) {
+            $lines[] = '';
+            $lines[] = 'Manual field updates:';
+            foreach ($manualUpdatedPaths as $path) {
+                $lines[] = '- ' . $path;
+            }
+        }
+
+        if ($updatedPaths !== []) {
+            $lines[] = '';
+            $lines[] = 'AI updated fields:';
+            foreach ($updatedPaths as $path) {
+                $lines[] = '- ' . $path;
+            }
+        } elseif (($aiGeneration['enabled'] ?? false) === true && $manualUpdatedPaths === []) {
+            $lines[] = '';
+            $lines[] = 'AI completed without field rewrites.';
+        }
+
+        return implode("\n", $lines) . "\n";
+    }
+
+    private function siteCreateReportDirectory(Site $site): string
+    {
+        $templatesRoot = (string) config(
+            'services.ai_agent.templates_root',
+            storage_path('import-deploy/md/test/raw_html')
+        );
+
+        return rtrim($templatesRoot, '/') . '/' . $site->domain;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $operations
+     * @return array<int, string>
+     */
+    private function summarizeBlockOperations(array $operations): array
+    {
+        $lines = [];
+
+        foreach (array_values($operations) as $index => $operation) {
+            if (!is_array($operation)) {
+                continue;
+            }
+
+            $action = trim((string) ($operation['action'] ?? ''));
+            $sectionPath = trim((string) ($operation['section_path'] ?? ''));
+            $anchorKey = trim((string) ($operation['anchor_key'] ?? ''));
+            $valuePreview = '';
+
+            if (isset($operation['value']) && is_string($operation['value']) && trim($operation['value']) !== '') {
+                $valuePreview = Str::limit(trim(preg_replace('/\s+/u', ' ', $operation['value']) ?? ''), 50, '...');
+            } elseif (($operation['action'] ?? null) === 'add_table_block') {
+                $headers = is_array($operation['headers'] ?? null) ? count($operation['headers']) : 0;
+                $rows = is_array($operation['rows'] ?? null) ? count($operation['rows']) : 0;
+                $valuePreview = "headers={$headers}, rows={$rows}";
+            }
+
+            $summary = '#' . ($index + 1)
+                . ' ' . ($action !== '' ? $action : 'unknown')
+                . ($sectionPath !== '' ? " @ {$sectionPath}" : '')
+                . ($anchorKey !== '' ? " anchor={$anchorKey}" : '');
+
+            if ($valuePreview !== '') {
+                $summary .= " value={$valuePreview}";
+            }
+
+            $lines[] = $summary;
+        }
+
+        return $lines;
     }
 
     private function resolveSiteCreateDebugId(Request $request): string

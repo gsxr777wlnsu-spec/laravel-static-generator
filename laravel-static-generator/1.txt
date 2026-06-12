@@ -1,0 +1,1971 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+                <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Aviator Game</title>
+        <meta name="description" content="Play Aviator Game - a thrilling legal online game with a maximum win of 1000x your bet. Created by Spribe">
+        <meta name="keywords" content="game, play, bet, aviator">
+        <link rel="canonical" href="https://test15.com/">
+        <meta name="robots" content="all">
+        <meta name="telegram:channel" content="@WP_WooCom">
+        <meta name="telegram:bot" content="@WP_WooCom_bot">
+        <meta property="vk:image" content="/assets/images/logo/logo.png">
+        <meta property="vk:app_id" content="">
+        <meta name="og:type" property="og:type" content="website">
+        <meta property="og:locale" content="en_EN">
+        <meta name="og:title" property="og:title" content="Aviator Game">
+        <meta name="og:description" property="og:description" content="Play Aviator Game">
+        <meta property="article:published_time" content="2020-12-07T18:05:01+00:00">
+        <meta property="article:modified_time" content="2026-04-20T10:43:59+00:00">
+        <meta property="article:author" content="Aviator">
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:title" content="Aviator Game">
+        <meta name="twitter:description" content="Play Aviator Game">
+        <meta name="twitter:site" content="test15.com">
+        <meta name="twitter:creator" content="test15.com">
+        <meta name="twitter:image" content="/assets/images/aviator.jpg">
+        <meta property="og:image" content="/assets/images/aviator.jpg">
+        <meta name="geo.region" content="EN">
+        <meta name="geo.position" content="55.71881; 37.555728">
+        <meta name="ICBM" content="55.71881, 37.555728">
+        <meta name="contact" content="support@test15.com">
+        <meta name="copyright" content="test15.com">
+        <meta name="designer" content="gsxr777">
+        <meta name="generator" content="test15.com CMS">
+        <meta name="author" content="test15.com">
+        <meta name="rating" content="general">
+        <link rel="publisher" href="https://test15.com/">
+        <link href="assets/css/style.css" rel="stylesheet">
+        <link rel="icon" type="image/png" href="assets/images/favicon/favicon-96x96.png" sizes="96x96">
+        <link rel="icon" type="image/svg+xml" href="assets/images/favicon/favicon.svg">
+        <link rel="shortcut icon" href="assets/images/favicon/favicon.ico">
+        <link rel="apple-touch-icon" sizes="180x180" href="assets/images/favicon/apple-touch-icon.png">
+        <link rel="manifest" href="assets/images/favicon/site.webmanifest">
+
+                    <script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "@id": "https://test15.com/#webpage",
+    "url": "https://test15.com/"
+}
+</script>
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "VideoGame",
+    "additionalType": "https://schema.org/WebApplication",
+    "@id": "https://test15.com/#aviator-game",
+    "name": "Aviator",
+    "description": "Play Aviator Game — a thrilling legal online game with a maximum win of 1000x your bet. Created by Spribe, this crash game has a high chance for players to win, with 97% RTP.",
+    "url": "https://test15.com/",
+    "image": "https://test15.com/assets/images/aviator.jpg",
+    "author": {
+        "@type": "Organization",
+        "name": "Spribe"
+    },
+    "gamePlatform": ["Web Browser", "Mobile", "Desktop"],
+    "genre": "Crash Game",
+    "applicationCategory": "GameApplication",
+    "operatingSystem": "Web Browser",
+    "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.7",
+        "bestRating": "5",
+        "worstRating": "1",
+        "ratingCount": "44"
+    },
+    "review": {
+        "@type": "Review",
+        "author": {
+            "@type": "Person",
+            "name": "Kishor Singha",
+            "image": "https://test15.com/assets/images/kishor-singha.webp",
+            "description": "Kishor Singha is a renowned name in the world of online gambling, particularly renowned for his expertise in the Aviator crash game. Born in the vibrant city of Delhi, India, Kishor's passion for gaming."
+        },
+        "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": "4.7",
+            "bestRating": "5",
+            "worstRating": "1"
+        },
+        "reviewBody": "In this article, we will explore the key features of the Aviator casino game, discuss its gameplay mechanics, user interface, and overall experience."
+    },
+    "offers": {
+        "@type": "Offer",
+        "availability": "https://schema.org/InStock",
+        "price": "0",
+        "priceCurrency": "USD"
+    }
+}
+</script>
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "@id": "https://test15.com/#organization",
+    "name": "Aviator Game",
+    "url": "https://test15.com/",
+    "logo": {
+        "@type": "ImageObject",
+        "url": "https://test15.com/assets/images/favicon/apple-touch-icon.png",
+        "width": 180,
+        "height": 180
+    }
+}
+</script>
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+        {
+            "@type": "Question",
+            "name": "What is the Aviator game?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Aviator is an arcade aviation game where the player must control a flying airplane. The goal of the game is to fly as many kilometers as possible while avoiding obstacles and other dangers. The player must maneuver the airplane using a keyboard or joystick to dodge obstacles and collect bonuses to earn extra points. The game can be played solo or in multiplayer mode."
+            }
+        },
+        {
+            "@type": "Question",
+            "name": "How do I start playing Aviator?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Aviator is an arcade aviation game where the player must control a flying airplane. The goal of the game is to fly as many kilometers as possible while avoiding obstacles and other dangers. The player must maneuver the airplane using a keyboard or joystick to dodge obstacles and collect bonuses to earn extra points. The game can be played solo or in multiplayer mode."
+            }
+        },
+        {
+            "@type": "Question",
+            "name": "Can I play Aviator for real money?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Aviator is an arcade aviation game where the player must control a flying airplane. The goal of the game is to fly as many kilometers as possible while avoiding obstacles and other dangers. The player must maneuver the airplane using a keyboard or joystick to dodge obstacles and collect bonuses to earn extra points. The game can be played solo or in multiplayer mode."
+            }
+        },
+        {
+            "@type": "Question",
+            "name": "Is there a demo mode available?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Aviator is an arcade aviation game where the player must control a flying airplane. The goal of the game is to fly as many kilometers as possible while avoiding obstacles and other dangers. The player must maneuver the airplane using a keyboard or joystick to dodge obstacles and collect bonuses to earn extra points. The game can be played solo or in multiplayer mode."
+            }
+        }
+    ]
+}
+</script>
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "Steps to Gamble the Aviator Game Online in India",
+    "description": "There are several clear-cut, easy-to-understand steps we have described that you must take to enjoy the online casino Aviator gaming experience.",
+    "step": [
+        {
+            "@type": "HowToStep",
+            "position": 1,
+            "name": "Choose An Online Casino",
+            "text": "Find a trustworthy online casino that hosts Aviator to ensure pleasant gambling. You need to pick a gambling site that has all the necessary.",
+            "image": "https://test15.com/assets/images/steps/step.webp"
+        },
+        {
+            "@type": "HowToStep",
+            "position": 2,
+            "name": "Sign Up for An Account and Make a Deposit",
+            "text": "Find a trustworthy online casino that hosts Aviator to ensure pleasant gambling. You need to pick a gambling site that has all the necessary.",
+            "image": "https://test15.com/assets/images/steps/step.webp"
+        },
+        {
+            "@type": "HowToStep",
+            "position": 3,
+            "name": "Place a Bet",
+            "text": "Find a trustworthy online casino that hosts Aviator to ensure pleasant gambling. You need to pick a gambling site that has.",
+            "image": "https://test15.com/assets/images/steps/step.webp"
+        },
+        {
+            "@type": "HowToStep",
+            "position": 4,
+            "name": "Choose An Online Casino",
+            "text": "Find a trustworthy online casino that hosts Aviator to ensure pleasant gambling. You need to pick a gambling site that has all the.",
+            "image": "https://test15.com/assets/images/steps/step.webp"
+        },
+        {
+            "@type": "HowToStep",
+            "position": 5,
+            "name": "Sign Up for An Account and Make a Deposit",
+            "text": "Find a trustworthy online casino that hosts Aviator to ensure pleasant gambling.",
+            "image": "https://test15.com/assets/images/steps/step.webp"
+        }
+    ]
+}
+</script>
+                            <!-- head_custom: add verification tags, counters, or additional styles/scripts here -->
+        
+        </head>
+<body class="body" id="body">
+    
+    <main class="main">
+            <div class="container">
+            <section class="hero" id="hero">
+                <header class="header" id="header">
+                        <div class="header__inner">
+                                <div class="header__logo">
+                                        <a class="header__logo-wrapper" href="/" aria-label="To the main page">
+                                                <img src="assets/images/logo/logo.webp" width="141" height="41" alt="Aviator">
+                                        </a>
+                                </div>
+
+                                <nav class="header__nav menu" aria-label="Main navigation">
+                                        <ul class="menu__list">
+                                                <li class="menu__item">
+                                                        <a class="menu__link" href="app.html">App</a>
+                                                </li>
+                                                <li class="menu__item">
+                                                        <a class="menu__link" href="demo.html">Demo</a>
+                                                </li>
+                                                <li class="menu__item">
+                                                        <a class="menu__link" href="tips.html">Tips</a>
+                                                </li>
+                                                <li class="menu__item">
+                                                        <a class="menu__link" href="bonuses.html">Bonuses</a>
+                                                </li>
+                                                <li class="menu__item">
+                                                        <a class="menu__link" href="reviews.html">Reviews</a>
+                                                </li>
+                                                <li class="menu__item">
+                                                        <a class="menu__link" href="contact-us.html">Contact Us</a>
+                                                </li>
+                                                <li class="menu__item menu__item--has-submenu">
+                                                        <a class="menu__link" href="#" aria-haspopup="true" aria-expanded="false" data-desktop-submenu-trigger>New
+                                                                Versions</a>
+                                                        <ul class="menu__submenu" aria-label="New Versions submenu">
+                                                                <li class="menu__submenu-item"><a class="menu__submenu-link" href="authors.html">Author's</a></li>
+                                                                <li class="menu__submenu-item"><a class="menu__submenu-link" href="1win.html">1WIN</a>
+                                                                </li>
+                                                                <li class="menu__submenu-item"><a class="menu__submenu-link" href="comparison.html">Comparison</a>
+                                                                </li>
+                                                                <li class="menu__submenu-item"><a class="menu__submenu-link" href="sitemap.html">Sitemap</a></li>
+                                                        </ul>
+                                                </li>
+                                                <li class="menu__item menu__item--has-submenu menu__item--lang lang-item lang-item-en">
+                                                        <a class="menu__link menu__link--lang" href="#" aria-haspopup="true" aria-expanded="false" data-desktop-submenu-trigger>
+                                                                <span class="menu__lang">
+                                                                        <img class="menu__lang-flag" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAALCAMAAABBPP0LAAAAmVBMVEViZsViZMJiYrf9gnL8eWrlYkjgYkjZYkj8/PujwPybvPz4+PetraBEgfo+fvo3efkydfkqcvj8Y2T8UlL8Q0P8MzP9k4Hz8/Lu7u4DdPj9/VrKysI9fPoDc/EAZ7z7IiLHYkjp6ekCcOTk5OIASbfY/v21takAJrT5Dg6sYkjc3Nn94t2RkYD+y8KeYkjs/v7l5fz0dF22YkjWvcOLAAAAgElEQVR4AR2KNULFQBgGZ5J13KGGKvc/Cw1uPe62eb9+Jr1EUBFHSgxxjP2Eca6AfUSfVlUfBvm1Ui1bqafctqMndNkXpb01h5TLx4b6TIXgwOCHfjv+/Pz+5vPRw7txGWT2h6yO0/GaYltIp5PT1dEpLNPL/SdWjYjAAZtvRPgHJX4Xio+DSrkAAAAASUVORK5CYII=" alt="" width="16" height="11" loading="lazy">
+                                                                        <span class="menu__lang-text">English</span>
+                                                                </span>
+                                                        </a>
+                                                        <ul class="menu__submenu" aria-label="Language submenu">
+                                                                <li class="menu__submenu-item"><a class="menu__submenu-link" href="/es/" hreflang="es-ES" lang="es-ES"><span class="menu__lang"><img class="menu__lang-flag" src="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2716%27%20height%3D%2711%27%20viewBox%3D%270%200%2016%2011%27%3E%3Crect%20width%3D%2716%27%20height%3D%2711%27%20fill%3D%27%23AA151B%27%2F%3E%3Crect%20y%3D%272.75%27%20width%3D%2716%27%20height%3D%275.5%27%20fill%3D%27%23F1BF00%27%2F%3E%3C%2Fsvg%3E" alt="" width="16" height="11" loading="lazy"><span class="menu__lang-text">Español</span></span></a>
+                                                                </li>
+                                                        </ul>
+                                                </li>
+                                        </ul>
+
+                                        <a class="btn__cta" href="#play-now">Play now!</a>
+                                </nav>
+                        </div>
+                </header>
+
+                <div class="hero__inner">
+                        <div class="hero__content">
+                                <div class="hero__text">
+                                        <h1 class="hero__title">Aviator Game — Play for Real Money</h1>
+                                        <p class="hero__description">Play Aviator Game — a thrilling legal online game
+                                                with a maximum win of 1000x your bet. Created by Spribe, this crash game
+                                                has a high chance for players to win, with 97% RTP. Start playing
+                                                Aviator today and receive a welcome bonus of +500%!</p>
+                                </div>
+
+                                <a class="btn__cta btn__cta--hero" href="#play-now">Play now!</a>
+                        </div>
+
+                        <div class="hero__media">
+                                <img class="hero__image" src="assets/images/hero/aviator.webp" width="560" height="582" alt="Aviator">
+                        </div>
+                </div>
+        </section>
+    
+            <section  class="mobile-menu">
+            <div class="mobile-menu" data-mobile-menu>
+                <div class="mobile-menu__bar">
+                        <div class="mobile-menu__bar-inner">
+                                <button class="mobile-menu__toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="mobile-menu-drawer" data-mobile-menu-toggle>
+                                        <span class="mobile-menu__toggle-lines" aria-hidden="true"></span>
+                                </button>
+
+                                <div class="mobile-menu__logo">
+                                        <a class="header__logo-wrapper" href="/" aria-label="To the main page">
+                                                <img src="assets/images/logo/logo.webp" width="141" height="41" alt="Aviator">
+                                        </a>
+                                </div>
+                        </div>
+                </div>
+
+                <div class="mobile-menu__overlay" data-mobile-menu-overlay hidden></div>
+
+                <div class="mobile-menu__drawer" id="mobile-menu-drawer" aria-hidden="true" inert data-mobile-menu-drawer>
+                        <div class="mobile-menu__drawer-head">
+                                <span class="mobile-menu__drawer-title">Menu</span>
+                                <button class="mobile-menu__close" type="button" aria-label="Close menu" data-mobile-menu-close>
+                                        <span class="mobile-menu__close-icon" aria-hidden="true"></span>
+                                </button>
+                        </div>
+
+                        <nav class="mobile-menu__nav" aria-label="Mobile navigation">
+                                <ul class="mobile-menu__list">
+                                        <li class="mobile-menu__item"><a class="mobile-menu__link" href="app.html">App</a></li>
+                                        <li class="mobile-menu__item"><a class="mobile-menu__link" href="demo.html">Demo</a>
+                                        </li>
+                                        <li class="mobile-menu__item"><a class="mobile-menu__link" href="tips.html">Tips</a>
+                                        </li>
+                                        <li class="mobile-menu__item"><a class="mobile-menu__link" href="bonuses.html">Bonuses</a>
+                                        </li>
+                                        <li class="mobile-menu__item"><a class="mobile-menu__link" href="reviews.html">Reviews</a></li>
+                                        <li class="mobile-menu__item"><a class="mobile-menu__link" href="contact-us.html">Contact Us</a></li>
+                                        <li class="mobile-menu__item mobile-menu__item--has-submenu">
+                                                <a class="mobile-menu__link" href="#" aria-haspopup="true" aria-expanded="false" data-mobile-submenu-trigger>New
+                                                        Versions</a>
+                                                <ul class="mobile-menu__submenu" aria-label="New Versions submenu" hidden>
+                                                        <li class="mobile-menu__submenu-item"><a class="mobile-menu__submenu-link" href="authors.html">Author's</a></li>
+                                                        <li class="mobile-menu__submenu-item"><a class="mobile-menu__submenu-link" href="1win.html">1WIN</a>
+                                                        </li>
+                                                        <li class="mobile-menu__submenu-item"><a class="mobile-menu__submenu-link" href="comparison.html">Comparison</a>
+                                                        </li>
+                                                        <li class="mobile-menu__submenu-item"><a class="mobile-menu__submenu-link" href="sitemap.html">Sitemap</a></li>
+                                                </ul>
+                                        </li>
+                                        <li class="mobile-menu__item mobile-menu__item--has-submenu lang-item lang-item-en">
+                                                <a class="mobile-menu__link mobile-menu__link--lang" href="#" aria-haspopup="true" aria-expanded="false" data-mobile-submenu-trigger>
+                                                        <span class="mobile-menu__lang">
+                                                                <img class="mobile-menu__lang-flag" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAALCAMAAABBPP0LAAAAmVBMVEViZsViZMJiYrf9gnL8eWrlYkjgYkjZYkj8/PujwPybvPz4+PetraBEgfo+fvo3efkydfkqcvj8Y2T8UlL8Q0P8MzP9k4Hz8/Lu7u4DdPj9/VrKysI9fPoDc/EAZ7z7IiLHYkjp6ekCcOTk5OIASbfY/v21takAJrT5Dg6sYkjc3Nn94t2RkYD+y8KeYkjs/v7l5fz0dF22YkjWvcOLAAAAgElEQVR4AR2KNULFQBgGZ5J13KGGKvc/Cw1uPe62eb9+Jr1EUBFHSgxxjP2Eca6AfUSfVlUfBvm1Ui1bqafctqMndNkXpb01h5TLx4b6TIXgwOCHfjv+/Pz+5vPRw7txGWT2h6yO0/GaYltIp5PT1dEpLNPL/SdWjYjAAZtvRPgHJX4Xio+DSrkAAAAASUVORK5CYII=" alt="" width="16" height="11" loading="lazy">
+                                                                <span class="mobile-menu__lang-text">English</span>
+                                                        </span>
+                                                </a>
+                                                <ul class="mobile-menu__submenu" aria-label="Language submenu" hidden>
+                                                        <li class="mobile-menu__submenu-item"><a class="mobile-menu__submenu-link" href="/es/" hreflang="es-ES" lang="es-ES"><span class="mobile-menu__lang"><img class="mobile-menu__lang-flag" src="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2716%27%20height%3D%2711%27%20viewBox%3D%270%200%2016%2011%27%3E%3Crect%20width%3D%2716%27%20height%3D%2711%27%20fill%3D%27%23AA151B%27%2F%3E%3Crect%20y%3D%272.75%27%20width%3D%2716%27%20height%3D%275.5%27%20fill%3D%27%23F1BF00%27%2F%3E%3C%2Fsvg%3E" alt="" width="16" height="11" loading="lazy"><span class="mobile-menu__lang-text">Español</span></span></a>
+                                                        </li>
+                                                </ul>
+                                        </li>
+                                </ul>
+
+                                <a class="btn__cta" href="#play-now">Play now!</a>
+                        </nav>
+                </div>
+        </div>
+    </section>
+
+            <section class="casino" id="casino">
+                                <nav class="casino__menu" aria-label="Section navigation" data-casino-menu>
+                                        <ul class="casino__menu-list" data-casino-menu-list>
+                                                <li class="casino__menu-item"><a class="casino__menu-link" href="#casino">Where to play</a></li>
+                                                <li class="casino__menu-item"><a class="casino__menu-link" href="#characteristics">Characteristics</a></li>
+                                                <li class="casino__menu-item"><a class="casino__menu-link" href="#review">Review</a></li>
+                                                <li class="casino__menu-item"><a class="casino__menu-link" href="#symbols">Symbols</a></li>
+                                                <li class="casino__menu-item"><a class="casino__menu-link" href="#gameplay">Gameplay</a></li>
+                                                <li class="casino__menu-item"><a class="casino__menu-link" href="#rtp">RTP</a></li>
+                                                <li class="casino__menu-item"><a class="casino__menu-link" href="#bonuses">Bonuses</a></li>
+                                                <li class="casino__menu-item"><a class="casino__menu-link" href="#level">Level</a></li>
+                                                <li class="casino__menu-item"><a class="casino__menu-link" href="#conclusion">Conclusion</a></li>
+                                                <li class="casino__menu-item"><a class="casino__menu-link" href="#other-reviews">Other reviews</a></li>
+                                                <li class="casino__menu-item"><a class="casino__menu-link" href="#screenshots">Game Screenshots</a></li>
+                                                <li class="casino__menu-item"><a class="casino__menu-link" href="#faq">FAQ</a></li>
+                                        </ul>
+
+                                        <div class="casino__menu-dropdown" data-casino-menu-dropdown hidden aria-hidden="true">
+                                                <ul class="casino__menu-dropdown-list" data-casino-menu-overflow></ul>
+                                        </div>
+                                </nav>
+                                <h2 class="casino__title">
+                                        <span class="casino__title-top">Where <span class="casino__title-triangle" aria-hidden="true"></span> to play</span>
+                                        <span class="casino__title-bottom title--accent">The Aviator Game?</span>
+                                </h2>
+
+                                <p class="casino__description">In this article, we will explore the key features of the
+                                        Aviator casino game, discuss its gameplay mechanics, user interface, and overall
+                                        experience.</p><div class="payments__tables" aria-label="Payment methods list"><div class="payments__table-wrapper"><table class="payments__table" aria-label="Payment methods table"><thead class="payments__table-head"><tr class="payments__row"><th class="payments__cell payments__cell--header" scope="col">Method</th><th class="payments__cell payments__cell--header" scope="col">Withdrawal Availability</th><th class="payments__cell payments__cell--header" scope="col">Min Deposit/Withdrawal</th><th class="payments__cell payments__cell--header" scope="col">Withdrawal Time</th><th class="payments__cell payments__cell--header" scope="col">Fees</th></tr></thead><tbody class="payments__table-body"><tr class="payments__row"><td class="payments__cell">Visa</td><td class="payments__cell">Yes (limited)</td><td class="payments__cell">€25/€50</td><td class="payments__cell">1-3 days</td><td class="payments__cell">3% on deposit</td></tr><tr class="payments__row"><td class="payments__cell">Mastercard</td><td class="payments__cell">Yes (limited)</td><td class="payments__cell">€25/€50</td><td class="payments__cell">1-3 days</td><td class="payments__cell">3% on deposit</td></tr><tr class="payments__row"><td class="payments__cell">Skrill</td><td class="payments__cell">Yes</td><td class="payments__cell">€10/€20</td><td class="payments__cell">24-48 hours</td><td class="payments__cell">None</td></tr><tr class="payments__row"><td class="payments__cell">Neteller</td><td class="payments__cell">Yes</td><td class="payments__cell">€10/€20</td><td class="payments__cell">24-48 hours</td><td class="payments__cell">None</td></tr><tr class="payments__row"><td class="payments__cell">EcoPayz</td><td class="payments__cell">Yes</td><td class="payments__cell">€10/€20</td><td class="payments__cell">Instant-24 hours</td><td class="payments__cell">None</td></tr><tr class="payments__row"><td class="payments__cell">Bitcoin</td><td class="payments__cell">Yes</td><td class="payments__cell">€20 equiv/€100</td><td class="payments__cell">1-3 hours</td><td class="payments__cell">None</td></tr><tr class="payments__row"><td class="payments__cell">Paysafecard</td><td class="payments__cell">No</td><td class="payments__cell">€5/N/A</td><td class="payments__cell">N/A</td><td class="payments__cell">None</td></tr><tr class="payments__row"><td class="payments__cell">Bank Transfer</td><td class="payments__cell">Yes</td><td class="payments__cell">€100/€100</td><td class="payments__cell">3-7 days</td><td class="payments__cell">Varies by bank</td></tr></tbody></table></div></div><div class="payments__tables" aria-label="Payment methods list"><div class="payments__table-wrapper"><table class="payments__table" aria-label="Payment methods table"><thead class="payments__table-head"><tr class="payments__row"><th class="payments__cell payments__cell--header" scope="col">Method</th><th class="payments__cell payments__cell--header" scope="col">Withdrawal Availability</th><th class="payments__cell payments__cell--header" scope="col">Min Deposit/Withdrawal</th><th class="payments__cell payments__cell--header" scope="col">Withdrawal Time</th><th class="payments__cell payments__cell--header" scope="col">Fees</th></tr></thead><tbody class="payments__table-body"><tr class="payments__row"><td class="payments__cell">Visa</td><td class="payments__cell">Yes (limited)</td><td class="payments__cell">€25/€50</td><td class="payments__cell">1-3 days</td><td class="payments__cell">3% on deposit</td></tr><tr class="payments__row"><td class="payments__cell">Mastercard</td><td class="payments__cell">Yes (limited)</td><td class="payments__cell">€25/€50</td><td class="payments__cell">1-3 days</td><td class="payments__cell">3% on deposit</td></tr><tr class="payments__row"><td class="payments__cell">Skrill</td><td class="payments__cell">Yes</td><td class="payments__cell">€10/€20</td><td class="payments__cell">24-48 hours</td><td class="payments__cell">None</td></tr><tr class="payments__row"><td class="payments__cell">Neteller</td><td class="payments__cell">Yes</td><td class="payments__cell">€10/€20</td><td class="payments__cell">24-48 hours</td><td class="payments__cell">None</td></tr><tr class="payments__row"><td class="payments__cell">EcoPayz</td><td class="payments__cell">Yes</td><td class="payments__cell">€10/€20</td><td class="payments__cell">Instant-24 hours</td><td class="payments__cell">None</td></tr><tr class="payments__row"><td class="payments__cell">Bitcoin</td><td class="payments__cell">Yes</td><td class="payments__cell">€20 equiv/€100</td><td class="payments__cell">1-3 hours</td><td class="payments__cell">None</td></tr><tr class="payments__row"><td class="payments__cell">Paysafecard</td><td class="payments__cell">No</td><td class="payments__cell">€5/N/A</td><td class="payments__cell">N/A</td><td class="payments__cell">None</td></tr><tr class="payments__row"><td class="payments__cell">Bank Transfer</td><td class="payments__cell">Yes</td><td class="payments__cell">€100/€100</td><td class="payments__cell">3-7 days</td><td class="payments__cell">Varies by bank</td></tr></tbody></table></div></div>
+
+                                <ul class="casino__list" aria-label="Casino list">
+                                        <li class="casino__item">
+                                                <div class="card">
+                                                        <img class="card__logo" src="assets/images/casino/pari-match.webp" width="116" height="43" alt="PariMatch">
+                                                        <div class="card__title">PariMatch</div>
+                                                        <p class="card__subtitle">Description of the site in free form
+                                                        </p>
+
+                                                        <ul class="card__features" aria-label="Features">
+                                                                <li class="card__feature">
+                                                                        <img class="card__feature-icon" src="assets/svg/excellent.svg" width="20" height="20" alt="">
+                                                                        <span class="card__feature-text">Образцовая
+                                                                                поддержка клиентов</span>
+                                                                </li>
+                                                                <li class="card__feature">
+                                                                        <img class="card__feature-icon" src="assets/svg/excellent.svg" width="20" height="20" alt="">
+                                                                        <span class="card__feature-text">Широкий выбор
+                                                                                игр казино</span>
+                                                                </li>
+                                                                <li class="card__feature card__feature--accent">
+                                                                        <img class="card__feature-icon" src="assets/svg/bonus.svg" width="20" height="20" alt="">
+                                                                        <span class="card__feature-text">100% бонус на
+                                                                                ваш депозит</span>
+                                                                </li>
+                                                        </ul>
+
+                                                        <div class="card__divider" aria-hidden="true"></div>
+
+                                                        <div class="card__footer">
+                                                                <a class="btn__cta btn__cta--hero btn__cta--card" href="#play-now">Play now!</a>
+
+                                                                <div class="card__rating" aria-label="Rating">
+                                                                        <img class="card__rating-icon" src="assets/svg/star.svg" width="22" height="22" alt="">
+                                                                        <span class="card__rating-value">4.7</span>
+                                                                </div>
+                                                        </div>
+                                                </div>
+                                        </li>
+
+                                        <li class="casino__item">
+                                                <div class="card card--gold">
+                                                        <img class="card__logo" src="assets/images/casino/1win.webp" width="116" height="43" alt="1win">
+                                                        <div class="card__title">PariMatch</div>
+                                                        <p class="card__subtitle">Description of the site in free form
+                                                        </p>
+
+                                                        <ul class="card__features" aria-label="Features">
+                                                                <li class="card__feature">
+                                                                        <img class="card__feature-icon" src="assets/svg/excellent.svg" width="20" height="20" alt="">
+                                                                        <span class="card__feature-text">Образцовая
+                                                                                поддержка клиентов</span>
+                                                                </li>
+                                                                <li class="card__feature">
+                                                                        <img class="card__feature-icon" src="assets/svg/excellent.svg" width="20" height="20" alt="">
+                                                                        <span class="card__feature-text">Широкий выбор
+                                                                                игр казино</span>
+                                                                </li>
+                                                                <li class="card__feature card__feature--accent">
+                                                                        <img class="card__feature-icon" src="assets/svg/bonus.svg" width="20" height="20" alt="">
+                                                                        <span class="card__feature-text">100% бонус на
+                                                                                ваш депозит</span>
+                                                                </li>
+                                                        </ul>
+
+                                                        <div class="card__divider" aria-hidden="true"></div>
+
+                                                        <div class="card__footer">
+                                                                <a class="btn__cta btn__cta--hero btn__cta--card" href="#play-now">Play now!</a>
+
+                                                                <div class="card__rating" aria-label="Rating">
+                                                                        <img class="card__rating-icon" src="assets/svg/star.svg" width="22" height="22" alt="">
+                                                                        <span class="card__rating-value">4.7</span>
+                                                                </div>
+                                                        </div>
+                                                </div>
+                                        </li>
+
+                                        <li class="casino__item">
+                                                <div class="card">
+                                                        <img class="card__logo" src="assets/images/casino/2bet.webp" width="116" height="43" alt="2bet">
+                                                        <div class="card__title">PariMatch</div>
+                                                        <p class="card__subtitle">Description of the site in free form
+                                                        </p>
+
+                                                        <ul class="card__features" aria-label="Features">
+                                                                <li class="card__feature">
+                                                                        <img class="card__feature-icon" src="assets/svg/excellent.svg" width="20" height="20" alt="">
+                                                                        <span class="card__feature-text">Образцовая
+                                                                                поддержка клиентов</span>
+                                                                </li>
+                                                                <li class="card__feature">
+                                                                        <img class="card__feature-icon" src="assets/svg/excellent.svg" width="20" height="20" alt="">
+                                                                        <span class="card__feature-text">Широкий выбор
+                                                                                игр казино</span>
+                                                                </li>
+                                                                <li class="card__feature card__feature--accent">
+                                                                        <img class="card__feature-icon" src="assets/svg/bonus.svg" width="20" height="20" alt="">
+                                                                        <span class="card__feature-text">100% бонус на
+                                                                                ваш депозит</span>
+                                                                </li>
+                                                        </ul>
+
+                                                        <div class="card__divider" aria-hidden="true"></div>
+
+                                                        <div class="card__footer">
+                                                                <a class="btn__cta btn__cta--hero btn__cta--card" href="#play-now">Play now!</a>
+
+                                                                <div class="card__rating" aria-label="Rating">
+                                                                        <img class="card__rating-icon" src="assets/svg/star.svg" width="22" height="22" alt="">
+                                                                        <span class="card__rating-value">4.7</span>
+                                                                </div>
+                                                        </div>
+                                                </div>
+                                        </li>
+
+                                        <li class="casino__item">
+                                                <div class="card">
+                                                        <img class="card__logo" src="assets/images/casino/pari-match.webp" width="116" height="43" alt="PariMatch">
+                                                        <div class="card__title">PariMatch</div>
+                                                        <p class="card__subtitle">Description of the site in free form
+                                                        </p>
+
+                                                        <ul class="card__features" aria-label="Features">
+                                                                <li class="card__feature">
+                                                                        <img class="card__feature-icon" src="assets/svg/excellent.svg" width="20" height="20" alt="">
+                                                                        <span class="card__feature-text">Образцовая
+                                                                                поддержка клиентов</span>
+                                                                </li>
+                                                                <li class="card__feature">
+                                                                        <img class="card__feature-icon" src="assets/svg/excellent.svg" width="20" height="20" alt="">
+                                                                        <span class="card__feature-text">Широкий выбор
+                                                                                игр казино</span>
+                                                                </li>
+                                                                <li class="card__feature card__feature--accent">
+                                                                        <img class="card__feature-icon" src="assets/svg/bonus.svg" width="20" height="20" alt="">
+                                                                        <span class="card__feature-text">100% бонус на
+                                                                                ваш депозит</span>
+                                                                </li>
+                                                        </ul>
+
+                                                        <div class="card__divider" aria-hidden="true"></div>
+
+                                                        <div class="card__footer">
+                                                                <a class="btn__cta btn__cta--hero btn__cta--card" href="#play-now">Play now!</a>
+
+                                                                <div class="card__rating" aria-label="Rating">
+                                                                        <img class="card__rating-icon" src="assets/svg/star.svg" width="22" height="22" alt="">
+                                                                        <span class="card__rating-value">4.7</span>
+                                                                </div>
+                                                        </div>
+                                                </div>
+                                        </li>
+
+                                        <li class="casino__item">
+                                                <div class="card">
+                                                        <img class="card__logo" src="assets/images/casino/1win.webp" width="116" height="43" alt="1win">
+                                                        <div class="card__title">PariMatch</div>
+                                                        <p class="card__subtitle">Description of the site in free form
+                                                        </p>
+
+                                                        <ul class="card__features" aria-label="Features">
+                                                                <li class="card__feature">
+                                                                        <img class="card__feature-icon" src="assets/svg/excellent.svg" width="20" height="20" alt="">
+                                                                        <span class="card__feature-text">Образцовая
+                                                                                поддержка клиентов</span>
+                                                                </li>
+                                                                <li class="card__feature">
+                                                                        <img class="card__feature-icon" src="assets/svg/excellent.svg" width="20" height="20" alt="">
+                                                                        <span class="card__feature-text">Широкий выбор
+                                                                                игр казино</span>
+                                                                </li>
+                                                                <li class="card__feature card__feature--accent">
+                                                                        <img class="card__feature-icon" src="assets/svg/bonus.svg" width="20" height="20" alt="">
+                                                                        <span class="card__feature-text">100% бонус на
+                                                                                ваш депозит</span>
+                                                                </li>
+                                                        </ul>
+
+                                                        <div class="card__divider" aria-hidden="true"></div>
+
+                                                        <div class="card__footer">
+                                                                <a class="btn__cta btn__cta--hero btn__cta--card" href="#play-now">Play now!</a>
+
+                                                                <div class="card__rating" aria-label="Rating">
+                                                                        <img class="card__rating-icon" src="assets/svg/star.svg" width="22" height="22" alt="">
+                                                                        <span class="card__rating-value">4.7</span>
+                                                                </div>
+                                                        </div>
+                                                </div>
+                                        </li>
+
+                                        <li class="casino__item">
+                                                <div class="card">
+                                                        <img class="card__logo" src="assets/images/casino/2bet.webp" width="116" height="43" alt="2bet">
+                                                        <div class="card__title">PariMatch</div>
+                                                        <p class="card__subtitle">Description of the site in free form
+                                                        </p>
+
+                                                        <ul class="card__features" aria-label="Features">
+                                                                <li class="card__feature">
+                                                                        <img class="card__feature-icon" src="assets/svg/excellent.svg" width="20" height="20" alt="">
+                                                                        <span class="card__feature-text">Образцовая
+                                                                                поддержка клиентов</span>
+                                                                </li>
+                                                                <li class="card__feature">
+                                                                        <img class="card__feature-icon" src="assets/svg/excellent.svg" width="20" height="20" alt="">
+                                                                        <span class="card__feature-text">Широкий выбор
+                                                                                игр казино</span>
+                                                                </li>
+                                                                <li class="card__feature card__feature--accent">
+                                                                        <img class="card__feature-icon" src="assets/svg/bonus.svg" width="20" height="20" alt="">
+                                                                        <span class="card__feature-text">100% бонус на
+                                                                                ваш депозит</span>
+                                                                </li>
+                                                        </ul>
+
+                                                        <div class="card__divider" aria-hidden="true"></div>
+
+                                                        <div class="card__footer">
+                                                                <a class="btn__cta btn__cta--hero btn__cta--card" href="#play-now">Play now!</a>
+
+                                                                <div class="card__rating" aria-label="Rating">
+                                                                        <img class="card__rating-icon" src="assets/svg/star.svg" width="22" height="22" alt="">
+                                                                        <span class="card__rating-value">4.7</span>
+                                                                </div>
+                                                        </div>
+                                                </div>
+                                        </li>
+                                </ul>
+                                <p class="text text--limited text--pt20">In this article, we will explore the key
+                                        features of the
+                                        Aviator casino game, discuss its gameplay mechanics, user interface, and overall
+                                        experience.</p><p class="casino__description">тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест</p><p class="casino__description">тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест</p><p class="casino__description">тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест</p><p class="casino__description">тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест</p><p class="casino__description">тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест тест</p>
+                        </section>
+    
+            <section class="characteristics background--characteristics" id="characteristics">
+                                <div class="characteristics__inner">
+                                        <h2 class="characteristics__title">
+                                                <span class="characteristics__title-top">The Basic
+                                                        Characteristics</span>
+                                                <span class="characteristics__title-bottom title--accent">of The Aviator
+                                                        Game</span>
+                                        </h2>
+
+                                        <p class="characteristics__description">In this article, we will explore the key
+                                                features of the Aviator casino game, discuss its gameplay mechanics,
+                                                user interface, and overall experience.</p>
+
+                                        <div class="characteristics__list" aria-label="The basic characteristics list">
+                                                <div class="characteristics__card" role="group" aria-label="Characteristics group 1">
+                                                        <table class="characteristics__rows">
+                                                                <tbody>
+                                                                        <tr class="characteristics__row">
+                                                                                <th class="characteristics__cell characteristics__cell--heading" scope="row">
+                                                                                        <div class="characteristics__row-heading">
+                                                                                                <span class="characteristics__icon-wrapper" aria-hidden="true">
+                                                                                                        <img class="characteristics__icon" src="assets/svg/characteristics/pencil.svg" width="22" height="22" alt="">
+                                                                                                </span>
+                                                                                                <span class="characteristics__label">Official
+                                                                                                        Title</span>
+                                                                                        </div>
+                                                                                </th>
+                                                                                <td class="characteristics__cell characteristics__value">
+                                                                                        Aviator</td>
+                                                                        </tr>
+                                                                        <tr class="characteristics__row">
+                                                                                <th class="characteristics__cell characteristics__cell--heading" scope="row">
+                                                                                        <div class="characteristics__row-heading">
+                                                                                                <span class="characteristics__icon-wrapper" aria-hidden="true">
+                                                                                                        <img class="characteristics__icon" src="assets/svg/characteristics/cubes.svg" width="22" height="22" alt="">
+                                                                                                </span>
+                                                                                                <span class="characteristics__label">RTP</span>
+                                                                                        </div>
+                                                                                </th>
+                                                                                <td class="characteristics__cell characteristics__value">
+                                                                                        97%</td>
+                                                                        </tr>
+                                                                        <tr class="characteristics__row">
+                                                                                <th class="characteristics__cell characteristics__cell--heading" scope="row">
+                                                                                        <div class="characteristics__row-heading">
+                                                                                                <span class="characteristics__icon-wrapper" aria-hidden="true">
+                                                                                                        <img class="characteristics__icon" src="assets/svg/characteristics/chart.svg" width="22" height="22" alt="">
+                                                                                                </span>
+                                                                                                <span class="characteristics__label">Volatility</span>
+                                                                                        </div>
+                                                                                </th>
+                                                                                <td class="characteristics__cell characteristics__value">
+                                                                                        Medium</td>
+                                                                        </tr>
+                                                                        <tr class="characteristics__row">
+                                                                                <th class="characteristics__cell characteristics__cell--heading" scope="row">
+                                                                                        <div class="characteristics__row-heading">
+                                                                                                <span class="characteristics__icon-wrapper" aria-hidden="true">
+                                                                                                        <img class="characteristics__icon" src="assets/svg/characteristics/airplane.svg" width="22" height="22" alt="">
+                                                                                                </span>
+                                                                                                <span class="characteristics__label">Theme</span>
+                                                                                        </div>
+                                                                                </th>
+                                                                                <td class="characteristics__cell characteristics__value">
+                                                                                        Aviation</td>
+                                                                        </tr>
+                                                                        <tr class="characteristics__row">
+                                                                                <th class="characteristics__cell characteristics__cell--heading" scope="row">
+                                                                                        <div class="characteristics__row-heading">
+                                                                                                <span class="characteristics__icon-wrapper" aria-hidden="true">
+                                                                                                        <img class="characteristics__icon" src="assets/svg/characteristics/code.svg" width="22" height="22" alt="">
+                                                                                                </span>
+                                                                                                <span class="characteristics__label">Work
+                                                                                                        Algorithm</span>
+                                                                                        </div>
+                                                                                </th>
+                                                                                <td class="characteristics__cell characteristics__value">
+                                                                                        Provably Fair</td>
+                                                                        </tr>
+                                                                </tbody>
+                                                        </table>
+                                                </div>
+
+                                                <div class="characteristics__card" role="group" aria-label="Characteristics group 2">
+                                                        <table class="characteristics__rows">
+                                                                <tbody>
+                                                                        <tr class="characteristics__row">
+                                                                                <th class="characteristics__cell characteristics__cell--heading" scope="row">
+                                                                                        <div class="characteristics__row-heading">
+                                                                                                <span class="characteristics__icon-wrapper" aria-hidden="true">
+                                                                                                        <img class="characteristics__icon" src="assets/svg/characteristics/folder-search.svg" width="22" height="22" alt="">
+                                                                                                </span>
+                                                                                                <span class="characteristics__label">Results
+                                                                                                        History</span>
+                                                                                        </div>
+                                                                                </th>
+                                                                                <td class="characteristics__cell characteristics__value">
+                                                                                        Accessible for everyone</td>
+                                                                        </tr>
+                                                                        <tr class="characteristics__row">
+                                                                                <th class="characteristics__cell characteristics__cell--heading" scope="row">
+                                                                                        <div class="characteristics__row-heading">
+                                                                                                <span class="characteristics__icon-wrapper" aria-hidden="true">
+                                                                                                        <img class="characteristics__icon" src="assets/svg/characteristics/dollar.svg" width="22" height="22" alt="">
+                                                                                                </span>
+                                                                                                <span class="characteristics__label">INR
+                                                                                                        support</span>
+                                                                                        </div>
+                                                                                </th>
+                                                                                <td class="characteristics__cell characteristics__value">
+                                                                                        Yes</td>
+                                                                        </tr>
+                                                                        <tr class="characteristics__row">
+                                                                                <th class="characteristics__cell characteristics__cell--heading" scope="row">
+                                                                                        <div class="characteristics__row-heading">
+                                                                                                <span class="characteristics__icon-wrapper" aria-hidden="true">
+                                                                                                        <img class="characteristics__icon" src="assets/svg/characteristics/management.svg" width="22" height="22" alt="">
+                                                                                                </span>
+                                                                                                <span class="characteristics__label">Trial
+                                                                                                        Mode</span>
+                                                                                        </div>
+                                                                                </th>
+                                                                                <td class="characteristics__cell characteristics__value">
+                                                                                        Availability depends on the
+                                                                                        casino</td>
+                                                                        </tr>
+                                                                        <tr class="characteristics__row">
+                                                                                <th class="characteristics__cell characteristics__cell--heading" scope="row">
+                                                                                        <div class="characteristics__row-heading">
+                                                                                                <span class="characteristics__icon-wrapper" aria-hidden="true">
+                                                                                                        <img class="characteristics__icon" src="assets/svg/characteristics/live-chat.svg" width="22" height="22" alt="">
+                                                                                                </span>
+                                                                                                <span class="characteristics__label">Live
+                                                                                                        Chat</span>
+                                                                                        </div>
+                                                                                </th>
+                                                                                <td class="characteristics__cell characteristics__value">
+                                                                                        Yes (not available for demo
+                                                                                        gaming)</td>
+                                                                        </tr>
+                                                                        <tr class="characteristics__row">
+                                                                                <th class="characteristics__cell characteristics__cell--heading" scope="row">
+                                                                                        <div class="characteristics__row-heading">
+                                                                                                <span class="characteristics__icon-wrapper" aria-hidden="true">
+                                                                                                        <img class="characteristics__icon" src="assets/svg/characteristics/star.svg" width="22" height="22" alt="">
+                                                                                                </span>
+                                                                                                <span class="characteristics__label">Features</span>
+                                                                                        </div>
+                                                                                </th>
+                                                                                <td class="characteristics__cell characteristics__value">
+                                                                                        Auto bet, auto cash-out, live
+                                                                                        statistics</td>
+                                                                        </tr>
+                                                                </tbody>
+                                                        </table>
+                                                </div>
+                                        </div>
+                                </div>
+                                <p class="text text--limited">In this article, we will explore the key features of the
+                                        Aviator casino game, discuss its gameplay mechanics, user interface, and overall
+                                        experience.</p>
+                        </section>
+    
+            <section class="review" id="review">
+                                <div class="review__inner">
+                                        <div class="review__content">
+                                                <h2 class="review__title">
+                                                        <span class="review__title-top">The Aviator</span>
+                                                        <span class="review__title-bottom title--accent">Game
+                                                                Review</span>
+                                                </h2>
+
+                                                <p class="review__description">In this article, we will explore the key
+                                                        features of the Aviator casino game, discuss its gameplay
+                                                        mechanics, user interface, and overall experience.</p>
+
+                                                <p class="review__accent">In this article, we will explore the key
+                                                        features of the Aviator casino game, discuss its gameplay
+                                                        mechanics, user interface, and overall experience.</p>
+                                        </div>
+
+                                        <figure class="review__media" aria-hidden="true">
+                                                <img class="review__image" src="assets/images/phone-aviator.webp" width="443" height="428" loading="lazy" alt="">
+                                                <figcaption class="level__caption">Description Level Image</figcaption>
+                                        </figure>
+
+                                </div>
+                        </section>
+    
+            <section class="symbols" id="symbols">
+                                <div class="symbols__card">
+                                        <div class="symbols__content">
+                                                <h2 class="symbols__title">Symbols and paytable</h2>
+
+                                                <p class="symbols__description">Big Bass Bonanza is a captivating slot
+                                                        game born from the collaboration between Pragmatic Play and Reel
+                                                        Kingdom. As the waves of anticipation rise and the reels spin to
+                                                        a nautical rhythm, this slot promises not only the chance to win
+                                                        big prizes but also an immersive aquatic adventure. In this
+                                                        review, we will navigate through the game's vibrant visuals, its
+                                                        unique features, and explore why it has made waves in the world
+                                                        of online casinos. Whether you are an experienced angler or a
+                                                        novice explorer, Big Bass Bonanza lures you in with promises of
+                                                        hidden treasures beneath its waves. Join us to uncover the
+                                                        details of this underwater marvel.</p>
+
+                                                <div class="symbols__tables" aria-label="Symbols and paytable list">
+                                                        <table class="symbols__table" aria-label="Paytable group 1">
+                                                                <tbody>
+                                                                        <tr class="symbols__row">
+                                                                                <th class="symbols__cell symbols__cell--label" scope="row"><span class="symbols__label">📅
+                                                                                                Release Date</span></th>
+                                                                                <td class="symbols__cell symbols__cell--value">
+                                                                                        <span class="symbols__value">December
+                                                                                                2020</span>
+                                                                                </td>
+                                                                        </tr>
+                                                                        <tr class="symbols__row">
+                                                                                <th class="symbols__cell symbols__cell--label" scope="row"><span class="symbols__label">🎨
+                                                                                                December</span></th>
+                                                                                <td class="symbols__cell symbols__cell--value">
+                                                                                        <span class="symbols__value">Video
+                                                                                                Slot</span>
+                                                                                </td>
+                                                                        </tr>
+                                                                        <tr class="symbols__row">
+                                                                                <th class="symbols__cell symbols__cell--label" scope="row"><span class="symbols__label">🎰
+                                                                                                Game Type</span></th>
+                                                                                <td class="symbols__cell symbols__cell--value">
+                                                                                        <span class="symbols__value">Underwater
+                                                                                                World, Ocean,
+                                                                                                Fish</span>
+                                                                                </td>
+                                                                        </tr>
+                                                                        <tr class="symbols__row">
+                                                                                <th class="symbols__cell symbols__cell--label" scope="row"><span class="symbols__label">🎨
+                                                                                                Design</span></th>
+                                                                                <td class="symbols__cell symbols__cell--value">
+                                                                                        <span class="symbols__value">5</span>
+                                                                                </td>
+                                                                        </tr>
+                                                                        <tr class="symbols__row">
+                                                                                <th class="symbols__cell symbols__cell--label" scope="row"><span class="symbols__label">🎣
+                                                                                                Fishing</span></th>
+                                                                                <td class="symbols__cell symbols__cell--value">
+                                                                                        <span class="symbols__value">10</span>
+                                                                                </td>
+                                                                        </tr>
+                                                                        <tr class="symbols__row">
+                                                                                <th class="symbols__cell symbols__cell--label" scope="row"><span class="symbols__label">🔄
+                                                                                                Reels</span></th>
+                                                                                <td class="symbols__cell symbols__cell--value">
+                                                                                        <span class="symbols__value">$0.10</span>
+                                                                                </td>
+                                                                        </tr>
+                                                                </tbody>
+                                                        </table>
+
+                                                        <table class="symbols__table" aria-label="Paytable group 2">
+                                                                <tbody>
+                                                                        <tr class="symbols__row">
+                                                                                <th class="symbols__cell symbols__cell--label" scope="row"><span class="symbols__label">💶
+                                                                                                Minimum Bet</span></th>
+                                                                                <td class="symbols__cell symbols__cell--value">
+                                                                                        <span class="symbols__value">Scatter
+                                                                                                Symbols, Free
+                                                                                                Spins</span>
+                                                                                </td>
+                                                                        </tr>
+                                                                        <tr class="symbols__row">
+                                                                                <th class="symbols__cell symbols__cell--label" scope="row"><span class="symbols__label">💸
+                                                                                                Maximum Bet</span></th>
+                                                                                <td class="symbols__cell symbols__cell--value">
+                                                                                        <span class="symbols__value">96.71%</span>
+                                                                                </td>
+                                                                        </tr>
+                                                                        <tr class="symbols__row">
+                                                                                <th class="symbols__cell symbols__cell--label" scope="row"><span class="symbols__label">🎁
+                                                                                                Features</span></th>
+                                                                                <td class="symbols__cell symbols__cell--value">
+                                                                                        <span class="symbols__value">High</span>
+                                                                                </td>
+                                                                        </tr>
+                                                                        <tr class="symbols__row">
+                                                                                <th class="symbols__cell symbols__cell--label" scope="row"><span class="symbols__label">📈
+                                                                                                RTP (Return to
+                                                                                                Player)</span></th>
+                                                                                <td class="symbols__cell symbols__cell--value">
+                                                                                        <span class="symbols__value">2,100x
+                                                                                                your bet</span>
+                                                                                </td>
+                                                                        </tr>
+                                                                        <tr class="symbols__row">
+                                                                                <th class="symbols__cell symbols__cell--label" scope="row"><span class="symbols__label">🎖
+                                                                                                Volatility</span></th>
+                                                                                <td class="symbols__cell symbols__cell--value">
+                                                                                        <span class="symbols__value">Compatible</span>
+                                                                                </td>
+                                                                        </tr>
+                                                                        <tr class="symbols__row">
+                                                                                <th class="symbols__cell symbols__cell--label" scope="row"><span class="symbols__label">🎉
+                                                                                                Maximum Win</span></th>
+                                                                                <td class="symbols__cell symbols__cell--value">
+                                                                                        <span class="symbols__value">Pragmatic
+                                                                                                Play</span>
+                                                                                </td>
+                                                                        </tr>
+                                                                </tbody>
+                                                        </table>
+                                                </div>
+                                                <p class="text text--pt20">In this article, we will explore the key
+                                                        features of the
+                                                        Aviator casino game, discuss its gameplay mechanics, user
+                                                        interface, and overall
+                                                        experience. In this article, we will explore the key features of
+                                                        the
+                                                        Aviator casino game, discuss its gameplay mechanics, user
+                                                        interface, and overall
+                                                        experience.</p>
+                                        </div>
+                                </div>
+                        </section>
+    
+            <section class="gameplay" id="gameplay">
+                                <div class="gameplay__inner">
+                                        <h2 class="gameplay__title"><span class="title--accent">Gameplay</span>
+                                                in the game</h2>
+
+                                        <p class="gameplay__description">When approaching the Aviator game, you have to
+                                                understand certain rules to maximize your potential wins and excitement
+                                                levels. Although the game is uncomplicated, there is a lot to take into
+                                                consideration when you try to have a rewarding experience. We have put
+                                                all the basic rules into a detailed guide below.</p>
+
+                                        <div class="gameplay__list" aria-label="Gameplay steps">
+                                                <div class="gameplay__item" aria-label="Gameplay item 1">
+                                                        <div class="gameplay__text">
+                                                                <div class="gameplay__item-title">Aviator Game</div>
+                                                                <p class="gameplay__item-description">Aviator is an
+                                                                        arcade aviation game where the player must
+                                                                        control a flying airplane. The goal of the game
+                                                                        is to fly as many kilometers as possible while
+                                                                        avoiding obstacles and other dangers. The player
+                                                                        must maneuver the airplane using a keyboard or
+                                                                        joystick to dodge obstacles and collect bonuses
+                                                                        to earn extra points. The game can be played
+                                                                        solo or in multiplayer mode.</p>
+                                                        </div>
+
+                                                        <figure class="gameplay__media" aria-hidden="true">
+                                                                <img class="gameplay__image" src="assets/images/phone-aviator.webp" width="443" height="428" loading="lazy" alt="">
+                                                                <figcaption class="level__caption">Description Level
+                                                                        Image</figcaption>
+                                                        </figure>
+                                                </div>
+
+                                                <div class="gameplay__item gameplay__item--reverse" aria-label="Gameplay item 2">
+                                                        <div class="gameplay__text">
+                                                                <div class="gameplay__item-title">Aviator Game</div>
+                                                                <p class="gameplay__item-description">First and
+                                                                        foremost, it is essential to understand the
+                                                                        factors that can affect the multiplier and take
+                                                                        measures to minimize them. For example, one
+                                                                        should constantly monitor market news, analyze
+                                                                        asset prices, and take action when they change.
+                                                                        It is important to avoid overextending oneself
+                                                                        and exceeding one's limits. Understanding when
+                                                                        to retreat and accept losses is crucial to
+                                                                        prevent larger losses in the future.</p>
+                                                        </div>
+
+                                                        <figure class="gameplay__media" aria-hidden="true">
+                                                                <img class="gameplay__image" src="assets/images/phone-aviator.webp" width="443" height="428" loading="lazy" alt="">
+                                                                <figcaption class="level__caption">Description Level
+                                                                        Image</figcaption>
+                                                        </figure>
+                                                </div>
+
+                                                <div class="gameplay__item" aria-label="Gameplay item 3">
+                                                        <div class="gameplay__text">
+                                                                <div class="gameplay__item-title">Aviator Game</div>
+                                                                <p class="gameplay__item-description">The game offers
+                                                                        players numerous opportunities for investment
+                                                                        and earning money. Players can purchase aviation
+                                                                        goods and services, and also participate in
+                                                                        various aviation competitions. The game provides
+                                                                        many avenues for players to invest and earn
+                                                                        money. Players can use their funds to acquire
+                                                                        aviation products and services, as well as take
+                                                                        part in different aviation contests.</p>
+                                                        </div>
+
+                                                        <figure class="gameplay__media" aria-hidden="true">
+                                                                <img class="gameplay__image" src="assets/images/phone-aviator.webp" width="443" height="428" loading="lazy" alt="">
+                                                                <figcaption class="level__caption">Description Level
+                                                                        Image</figcaption>
+                                                        </figure>
+                                                </div>
+                                        </div>
+                                </div>
+                        </section>
+    
+            <section class="rtp" id="rtp">
+                                <div class="rtp__card">
+                                        <div class="rtp__inner">
+                                                <div class="rtp__content">
+                                                        <h2 class="rtp__title">What Is <span class="title--accent">Aviator RTP</span>
+                                                        </h2>
+
+                                                        <p class="rtp__description">Return to Player (RTP for short) is
+                                                                a mathematical value that indicates what proportion of
+                                                                bets will be repaid to the player over time. The Aviator
+                                                                game has a 97% RTP, meaning that for every 2,000 INR
+                                                                spent, you can expect to get a payout of 1,940 INR.
+                                                                Remember that this value cannot be true for everyone or
+                                                                within a specific timeframe. The calculations apply to
+                                                                long-term gambling; moreover, it is about all players.
+                                                        </p>
+                                                </div>
+
+                                                <figure class="rtp__media" aria-hidden="true">
+                                                        <img class="rtp__badge" src="assets/images/rtp/rtp.webp" width="211" height="207" loading="lazy" alt="" aria-hidden="true">
+                                                        <img class="rtp__image" src="assets/images/phone-aviator.webp" width="518" height="500" loading="lazy" alt="">
+                                                        <figcaption class="level__caption">Description Level Image
+                                                        </figcaption>
+                                                </figure>
+                                        </div>
+                                </div>
+                        </section>
+    
+            <section class="pros" id="pros">
+                                <div class="pros__inner">
+                                        <h2 class="pros__title">Pros and <span class="title--accent">cons</span>
+                                        </h2>
+                                        <p class="pros__description">In this article, we will explore the key features
+                                                of the Aviator casino game, discuss its gameplay mechanics, user
+                                                interface, and overall experience.</p>
+
+                                        <div class="pros__tables" aria-label="Pros and cons lists">
+                                                <ul class="pros__table" aria-label="Pros list">
+                                                        <li class="pros__row"><span class="pros__emoji pros__emoji--plus" aria-hidden="true">✅</span><span class="pros__text">Bono de 10 giros gratis en
+                                                                        Aviator</span></li>
+                                                        <li class="pros__row"><span class="pros__emoji pros__emoji--plus" aria-hidden="true">✅</span><span class="pros__text">Generoso bono de
+                                                                        bienvenida</span></li>
+                                                        <li class="pros__row"><span class="pros__emoji pros__emoji--plus" aria-hidden="true">✅</span><span class="pros__text">Atención al cliente
+                                                                        multilingüe</span></li>
+                                                </ul>
+
+                                                <ul class="pros__table" aria-label="Cons list">
+                                                        <li class="pros__row"><span class="pros__emoji pros__emoji--minus" aria-hidden="true">🚫</span><span class="pros__text">Sin opción de retransmisión
+                                                                        en directo</span></li>
+                                                        <li class="pros__row"><span class="pros__emoji pros__emoji--minus" aria-hidden="true">🚫</span><span class="pros__text">No hay chat en directo</span>
+                                                        </li>
+                                                        <li class="pros__row"><span class="pros__emoji pros__emoji--minus" aria-hidden="true">🚫</span><span class="pros__text">Puede requerir alta atención
+                                                                        para jugar</span></li>
+                                                </ul>
+                                        </div>
+                                </div>
+                                <p class="text text--limited text--pt20">In this article, we will explore the key
+                                        features of the
+                                        Aviator casino game, discuss its gameplay mechanics, user interface, and overall
+                                        experience.</p>
+                        </section>
+    
+            <section class="bonuses" id="bonuses">
+                                <div class="bonuses__inner">
+                                        <h2 class="bonuses__title">Bonuses and<br>promo <img class="bonuses__title-icon" src="assets/svg/percent.svg" width="60" height="60" loading="lazy" alt=""> <span class="title--accent">codes</span>
+                                        </h2>
+                                        <p class="bonuses__description">By making use of exclusive bonus codes, you may
+                                                increase your initial betting budget for the Aviator game. Because of
+                                                that, you will be able to take more risks and that might help you walk
+                                                away with larger sums in the bank.</p>
+
+                                        <div class="bonuses__list" aria-label="Bonuses and promo codes cards">
+                                                <div class="card card--bonus" aria-label="Bonus card 1">
+                                                        <img class="card__logo" src="assets/images/casino/pari-match.webp" width="170" height="63" loading="lazy" alt="PariMatch">
+                                                        <div class="card__title">PariMatch</div>
+                                                        <p class="card__subtitle">Description of the site in free form
+                                                        </p>
+
+                                                        <div class="card__divider" aria-hidden="true"></div>
+
+                                                        <div class="card__actions">
+                                                                <button class="btn btn__promo-code" type="button" aria-label="Promo code">
+                                                                        <span class="btn__promo-code-text">FREE30</span>
+                                                                        <span class="btn__promo-code-icon" aria-hidden="true"></span>
+                                                                </button>
+
+                                                                <a class="btn btn__cta btn__cta--promo" href="#" aria-label="Use promo code">
+                                                                        <span class="btn__cta-text">Use promo
+                                                                                code</span>
+                                                                        <img class="btn__cta-gift" src="assets/svg/gift.svg" width="50" height="50" loading="lazy" alt="">
+                                                                </a>
+                                                        </div>
+                                                </div>
+
+                                                <div class="card card--bonus" aria-label="Bonus card 2">
+                                                        <img class="card__logo" src="assets/images/casino/1win.webp" width="170" height="63" loading="lazy" alt="1win">
+                                                        <div class="card__title">1win</div>
+                                                        <p class="card__subtitle">Description of the site in free form
+                                                        </p>
+
+                                                        <div class="card__divider" aria-hidden="true"></div>
+
+                                                        <div class="card__actions">
+                                                                <button class="btn btn__promo-code" type="button" aria-label="Promo code">
+                                                                        <span class="btn__promo-code-text">FREE30</span>
+                                                                        <span class="btn__promo-code-icon" aria-hidden="true"></span>
+                                                                </button>
+
+                                                                <a class="btn btn__cta btn__cta--promo" href="#" aria-label="Use promo code">
+                                                                        <span class="btn__cta-text">Use promo
+                                                                                code</span>
+                                                                        <img class="btn__cta-gift" src="assets/svg/gift.svg" width="50" height="50" loading="lazy" alt="">
+                                                                </a>
+                                                        </div>
+                                                </div>
+
+                                                <div class="card card--bonus" aria-label="Bonus card 3">
+                                                        <img class="card__logo" src="assets/images/casino/2bet.webp" width="170" height="63" loading="lazy" alt="2bet">
+                                                        <div class="card__title">2bet</div>
+                                                        <p class="card__subtitle">Description of the site in free form
+                                                        </p>
+
+                                                        <div class="card__divider" aria-hidden="true"></div>
+
+                                                        <div class="card__actions">
+                                                                <button class="btn btn__promo-code" type="button" aria-label="Promo code">
+                                                                        <span class="btn__promo-code-text">FREE30</span>
+                                                                        <span class="btn__promo-code-icon" aria-hidden="true"></span>
+                                                                </button>
+
+                                                                <a class="btn btn__cta btn__cta--promo" href="#" aria-label="Use promo code">
+                                                                        <span class="btn__cta-text">Use promo
+                                                                                code</span>
+                                                                        <img class="btn__cta-gift" src="assets/svg/gift.svg" width="50" height="50" loading="lazy" alt="">
+                                                                </a>
+                                                        </div>
+                                                </div>
+                                        </div>
+                                        <p class="text text--limited text--pt20">In this article, we will explore the
+                                                key features
+                                                of the
+                                                Aviator casino game, discuss its gameplay mechanics, user interface, and
+                                                overall
+                                                experience.</p>
+                                </div>
+                        </section>
+    
+            <section class="steps background--characteristics" id="steps">
+                                <div class="steps__inner">
+                                        <h2 class="steps__title">Steps to Gamble the<br>Aviator Game Online in India
+                                        </h2>
+                                        <p class="steps__description">There are several clear-cut, easy-to-understand
+                                                steps we have described that you must take to enjoy the online casino
+                                                Aviator gaming experience.</p>
+
+                                        <div class="steps__list" aria-label="Steps cards">
+                                                <div class="steps__card" aria-label="Step 1">
+                                                        <img class="steps__card-image" src="assets/images/steps/step.webp" width="408" height="171" loading="lazy" alt="">
+                                                        <div class="steps__card-content">
+                                                                <span class="steps__card-step">Step 1</span>
+                                                                <div class="steps__card-title">Choose An Online Casino
+                                                                </div>
+                                                                <p class="steps__card-description">Find a trustworthy
+                                                                        online casino that hosts Aviator to ensure
+                                                                        pleasant gambling. You need to pick a gambling
+                                                                        site that has all the necessary.</p>
+                                                        </div>
+                                                </div>
+
+                                                <div class="steps__card" aria-label="Step 2">
+                                                        <img class="steps__card-image" src="assets/images/steps/step.webp" width="408" height="171" loading="lazy" alt="">
+                                                        <div class="steps__card-content">
+                                                                <span class="steps__card-step">Step 2</span>
+                                                                <div class="steps__card-title">Sign Up for An Account
+                                                                        and Make a Deposit</div>
+                                                                <p class="steps__card-description">Find a trustworthy
+                                                                        online casino that hosts Aviator to ensure
+                                                                        pleasant gambling. You need to pick a gambling
+                                                                        site that has all the necessary.</p>
+                                                        </div>
+                                                </div>
+
+                                                <div class="steps__card" aria-label="Step 3">
+                                                        <img class="steps__card-image" src="assets/images/steps/step.webp" width="408" height="171" loading="lazy" alt="">
+                                                        <div class="steps__card-content">
+                                                                <span class="steps__card-step">Step 3</span>
+                                                                <div class="steps__card-title">Place a Bet</div>
+                                                                <p class="steps__card-description">Find a trustworthy
+                                                                        online casino that hosts Aviator to ensure
+                                                                        pleasant gambling. You need to pick a gambling
+                                                                        site that has.</p>
+                                                        </div>
+                                                </div>
+
+                                                <div class="steps__card" aria-label="Step 4">
+                                                        <img class="steps__card-image" src="assets/images/steps/step.webp" width="408" height="171" loading="lazy" alt="">
+                                                        <div class="steps__card-content">
+                                                                <span class="steps__card-step">Step 4</span>
+                                                                <div class="steps__card-title">Choose An Online Casino
+                                                                </div>
+                                                                <p class="steps__card-description">Find a trustworthy
+                                                                        online casino that hosts Aviator to ensure
+                                                                        pleasant gambling. You need to pick a gambling
+                                                                        site that has all the.</p>
+                                                        </div>
+                                                </div>
+
+                                                <div class="steps__card" aria-label="Step 5">
+                                                        <img class="steps__card-image" src="assets/images/steps/step.webp" width="408" height="171" loading="lazy" alt="">
+                                                        <div class="steps__card-content">
+                                                                <span class="steps__card-step">Step 5</span>
+                                                                <div class="steps__card-title">Sign Up for An Account
+                                                                        and Make a Deposit</div>
+                                                                <p class="steps__card-description">Find a trustworthy
+                                                                        online casino that hosts Aviator to ensure
+                                                                        pleasant gambling.</p>
+                                                        </div>
+                                                </div>
+                                        </div>
+                                        <p class="text text--limited text--pt20">In this article, we will explore the
+                                                key features of the
+                                                Aviator casino game, discuss its gameplay mechanics, user interface, and
+                                                overall
+                                                experience.</p>
+                                </div>
+                        </section>
+    
+            <section class="feature" id="feature">
+                                <div class="feature__inner">
+                                        <h2 class="feature__title">All Feature Buy Slots:<br>Reviews, Videos &amp; <img class="feature__title-icon" src="assets/svg/video.svg" width="70" height="70" loading="lazy" alt=""> Demo Play</h2>
+                                        <p class="feature__description">When approaching the Aviator game, you have to
+                                                understand certain rules to maximize your potential wins and excitement
+                                                levels.</p>
+
+                                        <div class="feature__list" aria-label="Feature cards">
+                                                <div class="feature__card" aria-label="Feature card 1">
+                                                        <img class="feature__card-image" src="assets/images/feature/feature-1.webp" width="298" height="172" loading="lazy" alt="">
+                                                        <div class="feature__card-content">
+                                                                <div class="feature__card-title">Choose An Online Casino
+                                                                </div>
+                                                                <p class="feature__card-description">Find a trustworthy
+                                                                        online casino that hosts Aviator to ensure</p>
+
+                                                                <div class="feature__card-badge" aria-label="1500">
+                                                                        <img class="feature__card-badge-icon" src="assets/svg/diamond.svg" width="17" height="16" loading="lazy" alt="">
+                                                                        <span class="feature__card-badge-text">1500</span>
+                                                                </div>
+                                                        </div>
+                                                </div>
+
+                                                <div class="feature__card" aria-label="Feature card 2">
+                                                        <img class="feature__card-image" src="assets/images/feature/feature-2.webp" width="298" height="172" loading="lazy" alt="">
+                                                        <div class="feature__card-content">
+                                                                <div class="feature__card-title">Choose An Online Casino
+                                                                </div>
+                                                                <p class="feature__card-description">Find a trustworthy
+                                                                        online casino that hosts Aviator to ensure</p>
+
+                                                                <div class="feature__card-badge" aria-label="1500">
+                                                                        <img class="feature__card-badge-icon" src="assets/svg/diamond.svg" width="17" height="16" loading="lazy" alt="">
+                                                                        <span class="feature__card-badge-text">1500</span>
+                                                                </div>
+                                                        </div>
+                                                </div>
+
+                                                <div class="feature__card" aria-label="Feature card 3">
+                                                        <img class="feature__card-image" src="assets/images/feature/feature-3.webp" width="298" height="172" loading="lazy" alt="">
+                                                        <div class="feature__card-content">
+                                                                <div class="feature__card-title">Choose An Online Casino
+                                                                </div>
+                                                                <p class="feature__card-description">Find a trustworthy
+                                                                        online casino that hosts Aviator to ensure</p>
+
+                                                                <div class="feature__card-badge" aria-label="1500">
+                                                                        <img class="feature__card-badge-icon" src="assets/svg/diamond.svg" width="17" height="16" loading="lazy" alt="">
+                                                                        <span class="feature__card-badge-text">1500</span>
+                                                                </div>
+                                                        </div>
+                                                </div>
+
+                                                <div class="feature__card" aria-label="Feature card 4">
+                                                        <img class="feature__card-image" src="assets/images/feature/feature-4.webp" width="298" height="172" loading="lazy" alt="">
+                                                        <div class="feature__card-content">
+                                                                <div class="feature__card-title">Choose An Online Casino
+                                                                </div>
+                                                                <p class="feature__card-description">Find a trustworthy
+                                                                        online casino that hosts Aviator to ensure</p>
+
+                                                                <div class="feature__card-badge" aria-label="1500">
+                                                                        <img class="feature__card-badge-icon" src="assets/svg/diamond.svg" width="17" height="16" loading="lazy" alt="">
+                                                                        <span class="feature__card-badge-text">1500</span>
+                                                                </div>
+                                                        </div>
+                                                </div>
+                                        </div>
+                                        <p class="text text--limited">In this article, we will explore the key features
+                                                of the
+                                                Aviator casino game, discuss its gameplay mechanics, user interface, and
+                                                overall
+                                                experience.</p>
+                                </div>
+                        </section>
+    
+            <section class="level" id="level">
+                                <div class="level__inner">
+                                        <div class="level__content">
+                                                <h2 class="level__title">
+                                                        <span class="level__title-top">Second</span>
+                                                        <span class="level__title-bottom">Level Header</span>
+                                                </h2>
+
+                                                <p class="level__description">In this article, we will explore the key
+                                                        features of the Aviator
+                                                        casino game.</p>
+
+                                                <h3 class="level__subtitle">
+                                                        Gameplay Mechanics
+                                                </h3>
+
+                                                <p class="level__accent">In this article, we will explore the key
+                                                        features of the Aviator
+                                                        casino game, discuss its gameplay mechanics.</p>
+                                                <h4 class="level__subheading">
+                                                        List Gameplay
+                                                </h4>
+
+                                                <ul class="list list--bulleted" aria-label="Gameplay bullet list">
+                                                        <li class="list__item">We will explore the key features of the
+                                                                Aviator</li>
+                                                        <li class="list__item">Casino game, discuss its gameplay
+                                                                mechanics</li>
+                                                        <li class="list__item">User interface and overall experience
+                                                        </li>
+                                                </ul>
+
+                                                <h4 class="level__subheading">
+                                                        Gameplay List Numbered
+                                                </h4>
+
+                                                <ol class="list list--ordered" aria-label="Gameplay numbered list">
+                                                        <li class="list__item">We will explore the key features of the
+                                                                Aviator</li>
+                                                        <li class="list__item">Casino game, discuss its gameplay
+                                                                mechanics</li>
+                                                        <li class="list__item">User interface and overall experience
+                                                        </li>
+                                                </ol>
+
+                                                <h4 class="level__subheading">
+                                                        Gameplay Table
+                                                </h4>
+
+                                                <table class="table" aria-label="Gameplay table">
+                                                        <tbody class="table__body">
+                                                                <tr class="table__row">
+                                                                        <th class="table__cell table__cell--label" scope="row"><span class="table__label">Release
+                                                                                        Date</span></th>
+                                                                        <td class="table__cell table__cell--value"><span class="table__value">December
+                                                                                        2020</span></td>
+                                                                </tr>
+                                                                <tr class="table__row">
+                                                                        <th class="table__cell table__cell--label" scope="row"><span class="table__label">December</span>
+                                                                        </th>
+                                                                        <td class="table__cell table__cell--value"><span class="table__value">Video
+                                                                                        Slot</span></td>
+                                                                </tr>
+                                                                <tr class="table__row">
+                                                                        <th class="table__cell table__cell--label" scope="row"><span class="table__label">Game
+                                                                                        Type</span></th>
+                                                                        <td class="table__cell table__cell--value"><span class="table__value">Underwater
+                                                                                        World, Ocean, Fish</span></td>
+                                                                </tr>
+                                                                <tr class="table__row">
+                                                                        <th class="table__cell table__cell--label" scope="row"><span class="table__label">Design</span>
+                                                                        </th>
+                                                                        <td class="table__cell table__cell--value"><span class="table__value">5</span>
+                                                                        </td>
+                                                                </tr>
+                                                        </tbody>
+                                                </table>
+                                        </div>
+
+                                        <figure class="level__media">
+                                                <img class="level__image" src="assets/images/phone-aviator.webp" width="443" height="428" loading="lazy" alt="Aviator game interface on a phone">
+                                                <figcaption class="level__caption">Description Level Image</figcaption>
+                                        </figure>
+                                </div>
+                        </section>
+    
+            <section class="conclusion" id="conclusion">
+                                <div class="conclusion__card">
+                                        <div class="conclusion__inner">
+                                                <h2 class="conclusion__title">Conclusion</h2>
+                                                <p class="conclusion__description">In conclusion, we want to say the
+                                                        game’s success can be attributed to the high RTP of 97%,
+                                                        user-friendly interface, availability of demo mode for practice,
+                                                        and engaging aviation-themed design. Additionally, players have
+                                                        access to various Aviator airplane game strategies, tips, and
+                                                        tricks to enhance their gameplay experience and potentially
+                                                        increase their winnings.However, while Aviator offers numerous
+                                                        advantages.</p>
+
+                                                <div class="conclusion__actions" aria-label="Conclusion actions">
+                                                        <a class="btn__cta btn__cta--hero" href="#play-now">Play
+                                                                now!</a>
+
+                                                        <div class="conclusion__rating" aria-label="Rating 3.7 out of 5">
+                                                                <div class="conclusion__stars" aria-hidden="true">
+                                                                        <img class="conclusion__star" src="assets/svg/stars/star.svg" width="26" height="26" loading="lazy" alt="">
+                                                                        <img class="conclusion__star" src="assets/svg/stars/star.svg" width="26" height="26" loading="lazy" alt="">
+                                                                        <img class="conclusion__star" src="assets/svg/stars/star.svg" width="26" height="26" loading="lazy" alt="">
+                                                                        <img class="conclusion__star" src="assets/svg/stars/star-half.svg" width="26" height="26" loading="lazy" alt="">
+                                                                        <img class="conclusion__star" src="assets/svg/stars/star-empty.svg" width="26" height="26" loading="lazy" alt="">
+                                                                </div>
+                                                                <span class="conclusion__rating-value">3.7</span>
+                                                        </div>
+                                                </div>
+                                        </div>
+                                </div>
+                        </section>
+    
+            <section class="other-reviews" id="other-reviews">
+                                <div class="other-reviews__inner">
+                                        <div class="other-reviews__media" aria-hidden="true">
+                                                <img class="other-reviews__image" src="assets/images/kishor-singha.webp" width="137" height="161" loading="lazy" alt="">
+
+                                        </div>
+
+                                        <div class="other-reviews__content">
+                                                <h2 class="other-reviews__title">Kishor Singha</h2>
+                                                <p class="other-reviews__description">Kishor Singha is a renowned name
+                                                        in the world of online gambling, particularly renowned for his
+                                                        expertise in the Aviator crash game. Born in the vibrant city of
+                                                        Delhi, India, Kishor's passion for gaming.</p>
+
+                                                <div class="other-reviews__actions" aria-label="Actions and social media">
+                                                        <a class="btn__cta btn__cta--hero btn__cta--card" href="#">More...</a>
+
+                                                        <div class="other-reviews__social" aria-label="Social media links">
+                                                                <a class="other-reviews__social-link" href="#" aria-label="Facebook">
+                                                                        <img class="other-reviews__social-icon" src="assets/svg/sosial-media/facebook.svg" width="32" height="32" loading="lazy" alt="">
+                                                                </a>
+                                                                <a class="other-reviews__social-link" href="#" aria-label="Instagram">
+                                                                        <img class="other-reviews__social-icon" src="assets/svg/sosial-media/instagram.svg" width="32" height="32" loading="lazy" alt="">
+                                                                </a>
+                                                                <a class="other-reviews__social-link" href="#" aria-label="Twitter X">
+                                                                        <img class="other-reviews__social-icon" src="assets/svg/sosial-media/twitter-x.svg" width="32" height="32" loading="lazy" alt="">
+                                                                </a>
+                                                                <a class="other-reviews__social-link" href="#" aria-label="WhatsApp">
+                                                                        <img class="other-reviews__social-icon" src="assets/svg/sosial-media/whatsapp.svg" width="32" height="32" loading="lazy" alt="">
+                                                                </a>
+                                                                <a class="other-reviews__social-link" href="#" aria-label="Telegram">
+                                                                        <img class="other-reviews__social-icon" src="assets/svg/sosial-media/telegram.svg" width="32" height="32" loading="lazy" alt="">
+                                                                </a>
+                                                                <a class="other-reviews__social-link" href="#" aria-label="VKontakte">
+                                                                        <img class="other-reviews__social-icon" src="assets/svg/sosial-media/vkontakte.svg" width="32" height="32" loading="lazy" alt="">
+                                                                </a>
+                                                                <a class="other-reviews__social-link" href="#" aria-label="TikTok">
+                                                                        <img class="other-reviews__social-icon" src="assets/svg/sosial-media/tiktok.svg" width="32" height="32" loading="lazy" alt="">
+                                                                </a>
+                                                                <a class="other-reviews__social-link" href="#" aria-label="YouTube">
+                                                                        <img class="other-reviews__social-icon" src="assets/svg/sosial-media/youtube.svg" width="32" height="32" loading="lazy" alt="">
+                                                                </a>
+                                                                <a class="other-reviews__social-link" href="#" aria-label="Snapchat">
+                                                                        <img class="other-reviews__social-icon" src="assets/svg/sosial-media/snapchat.svg" width="32" height="32" loading="lazy" alt="">
+                                                                </a>
+                                                                <a class="other-reviews__social-link" href="#" aria-label="Discord">
+                                                                        <img class="other-reviews__social-icon" src="assets/svg/sosial-media/discord.svg" width="32" height="32" loading="lazy" alt="">
+                                                                </a>
+                                                        </div>
+                                                </div>
+                                        </div>
+                                </div>
+                        </section>
+    
+            <section class="screenshots" id="screenshots">
+                                <div class="screenshots__inner">
+                                        <h2 class="screenshots__title">Game <img class="screenshots__title-icon" src="assets/svg/image.svg" width="44" height="53" loading="lazy" alt=""> Screenshots</h2>
+
+                                        <div class="screenshots__list" data-lightbox-gallery aria-label="Game screenshots">
+                                                <button class="screenshots__item" type="button" data-lightbox-item data-lightbox-src="assets/images/screenshots/screenshot-1.webp" data-lightbox-alt="Game screenshot 1" aria-label="Open screenshot 1">
+                                                        <img class="screenshots__image" src="assets/images/screenshots/screenshot-1.webp" width="234" height="420" loading="lazy" alt="">
+                                                </button>
+
+                                                <button class="screenshots__item" type="button" data-lightbox-item data-lightbox-src="assets/images/screenshots/screenshot-2.webp" data-lightbox-alt="Game screenshot 2" aria-label="Open screenshot 2">
+                                                        <img class="screenshots__image" src="assets/images/screenshots/screenshot-2.webp" width="233" height="420" loading="lazy" alt="">
+                                                </button>
+
+                                                <button class="screenshots__item" type="button" data-lightbox-item data-lightbox-src="assets/images/screenshots/screenshot-3.webp" data-lightbox-alt="Game screenshot 3" aria-label="Open screenshot 3">
+                                                        <img class="screenshots__image" src="assets/images/screenshots/screenshot-3.webp" width="233" height="420" loading="lazy" alt="">
+                                                </button>
+
+                                                <button class="screenshots__item" type="button" data-lightbox-item data-lightbox-src="assets/images/screenshots/screenshot-4.webp" data-lightbox-alt="Game screenshot 4" aria-label="Open screenshot 4">
+                                                        <img class="screenshots__image" src="assets/images/screenshots/screenshot-4.webp" width="234" height="420" loading="lazy" alt="">
+                                                </button>
+
+                                                <button class="screenshots__item" type="button" data-lightbox-item data-lightbox-src="assets/images/screenshots/screenshot-5.webp" data-lightbox-alt="Game screenshot 5" aria-label="Open screenshot 5">
+                                                        <img class="screenshots__image" src="assets/images/screenshots/screenshot-5.webp" width="233" height="420" loading="lazy" alt="">
+                                                </button>
+                                        </div>
+                                </div>
+                        </section>
+    
+            <section class="feedback" id="feedback">
+                                <div class="feedback__inner">
+                                        <h2 class="faq__title">Feedback</h2>
+
+                                        <div class="feedback__intro" aria-label="Feedback summary">
+                                                <div class="feedback__score" aria-label="Overall rating 4,7 out of 5">
+                                                        <img class="feedback__score-icon" src="assets/svg/stars/star.svg" width="70" height="70" loading="lazy" alt="">
+                                                        <span class="feedback__score-value">4,7</span>
+                                                </div>
+
+                                                <p class="feedback__description">In this article, we will explore the
+                                                        key features of the Aviator casino game, discuss its gameplay
+                                                </p>
+                                        </div>
+
+                                        <div class="feedback__summary" aria-label="Rating summary">
+                                                <div class="feedback__chip" aria-label="5 stars: 24 reviews">
+                                                        <div class="feedback__chip-stars" aria-hidden="true">
+                                                                <img class="feedback__chip-star" src="assets/svg/stars/star.svg" width="16" height="16" loading="lazy" alt="">
+                                                                <img class="feedback__chip-star" src="assets/svg/stars/star.svg" width="16" height="16" loading="lazy" alt="">
+                                                                <img class="feedback__chip-star" src="assets/svg/stars/star.svg" width="16" height="16" loading="lazy" alt="">
+                                                                <img class="feedback__chip-star" src="assets/svg/stars/star.svg" width="16" height="16" loading="lazy" alt="">
+                                                                <img class="feedback__chip-star" src="assets/svg/stars/star.svg" width="16" height="16" loading="lazy" alt="">
+                                                        </div>
+                                                        <span class="feedback__chip-value">24</span>
+                                                </div>
+
+                                                <div class="feedback__chip" aria-label="4 stars: 12 reviews">
+                                                        <div class="feedback__chip-stars" aria-hidden="true">
+                                                                <img class="feedback__chip-star" src="assets/svg/stars/star.svg" width="16" height="16" loading="lazy" alt="">
+                                                                <img class="feedback__chip-star" src="assets/svg/stars/star.svg" width="16" height="16" loading="lazy" alt="">
+                                                                <img class="feedback__chip-star" src="assets/svg/stars/star.svg" width="16" height="16" loading="lazy" alt="">
+                                                                <img class="feedback__chip-star" src="assets/svg/stars/star.svg" width="16" height="16" loading="lazy" alt="">
+                                                        </div>
+                                                        <span class="feedback__chip-value">12</span>
+                                                </div>
+
+                                                <div class="feedback__chip" aria-label="3 stars: 5 reviews">
+                                                        <div class="feedback__chip-stars" aria-hidden="true">
+                                                                <img class="feedback__chip-star" src="assets/svg/stars/star.svg" width="16" height="16" loading="lazy" alt="">
+                                                                <img class="feedback__chip-star" src="assets/svg/stars/star.svg" width="16" height="16" loading="lazy" alt="">
+                                                                <img class="feedback__chip-star" src="assets/svg/stars/star.svg" width="16" height="16" loading="lazy" alt="">
+                                                        </div>
+                                                        <span class="feedback__chip-value">5</span>
+                                                </div>
+
+                                                <div class="feedback__chip feedback__chip--muted" aria-label="2 stars: 2 reviews">
+                                                        <div class="feedback__chip-stars" aria-hidden="true">
+                                                                <img class="feedback__chip-star feedback__chip-star--dark" src="assets/svg/stars/star.svg" width="16" height="16" loading="lazy" alt="">
+                                                                <img class="feedback__chip-star feedback__chip-star--dark" src="assets/svg/stars/star.svg" width="16" height="16" loading="lazy" alt="">
+                                                        </div>
+                                                        <span class="feedback__chip-value">2</span>
+                                                </div>
+
+                                                <div class="feedback__chip feedback__chip--muted" aria-label="1 star: 1 review">
+                                                        <div class="feedback__chip-stars" aria-hidden="true">
+                                                                <img class="feedback__chip-star feedback__chip-star--dark" src="assets/svg/stars/star.svg" width="16" height="16" loading="lazy" alt="">
+                                                        </div>
+                                                        <span class="feedback__chip-value">1</span>
+                                                </div>
+                                        </div>
+
+                                        <div class="feedback__list" aria-label="Player feedback">
+                                                <div class="feedback__card">
+                                                        <header class="feedback__card-head">
+                                                                <div class="feedback__author">
+
+                                                                        <div class="feedback__avatar feedback__avatar--blue" aria-hidden="true">
+                                                                                <span class="feedback__avatar-initials">AR</span>
+                                                                        </div>
+                                                                        <div class="feedback__author-meta">
+                                                                                <div class="feedback__author-name">
+                                                                                        Aleksander R.</div>
+                                                                                <time class="feedback__author-time" datetime="2026-03-07">6 days
+                                                                                        ago</time>
+                                                                        </div>
+                                                                </div>
+
+                                                                <div class="feedback__card-stars" aria-label="Rating: 5 out of 5">
+                                                                        <img class="feedback__star" src="assets/svg/stars/star.svg" width="24" height="24" loading="lazy" alt="">
+                                                                        <img class="feedback__star" src="assets/svg/stars/star.svg" width="24" height="24" loading="lazy" alt="">
+                                                                        <img class="feedback__star" src="assets/svg/stars/star.svg" width="24" height="24" loading="lazy" alt="">
+                                                                        <img class="feedback__star" src="assets/svg/stars/star.svg" width="24" height="24" loading="lazy" alt="">
+                                                                        <img class="feedback__star" src="assets/svg/stars/star.svg" width="24" height="24" loading="lazy" alt="">
+                                                                </div>
+                                                        </header>
+
+                                                        <div class="feedback__card-body">
+                                                                <div class="feedback__card-title">Whenever I need
+                                                                        assistance</div>
+                                                                <p class="feedback__card-text">Whenever I need
+                                                                        assistance, Aviator-Game. Its support team is
+                                                                        always there. They're friendly, professional,
+                                                                        and truly care about players. It's reassuring to
+                                                                        know I have a team of real experts by my side,
+                                                                        as Aviator player!</p>
+                                                        </div>
+                                                </div>
+
+                                                <div class="feedback__card feedback__card--tall">
+                                                        <header class="feedback__card-head">
+                                                                <div class="feedback__author">
+                                                                        <div class="feedback__avatar" aria-hidden="true">
+                                                                                <img class="feedback__avatar-image" src="assets/images/feedback.webp" width="60" height="60" loading="lazy" alt="">
+                                                                        </div>
+                                                                        <div class="feedback__author-meta">
+                                                                                <div class="feedback__author-name">
+                                                                                        Aleksander R.</div>
+                                                                                <time class="feedback__author-time" datetime="2026-03-07">6 days
+                                                                                        ago</time>
+                                                                        </div>
+                                                                </div>
+
+                                                                <div class="feedback__card-stars" aria-label="Rating: 4 out of 5">
+                                                                        <img class="feedback__star" src="assets/svg/stars/star.svg" width="24" height="24" loading="lazy" alt="">
+                                                                        <img class="feedback__star" src="assets/svg/stars/star.svg" width="24" height="24" loading="lazy" alt="">
+                                                                        <img class="feedback__star" src="assets/svg/stars/star.svg" width="24" height="24" loading="lazy" alt="">
+                                                                        <img class="feedback__star" src="assets/svg/stars/star.svg" width="24" height="24" loading="lazy" alt="">
+                                                                        <img class="feedback__star" src="assets/svg/stars/star-empty.svg" width="24" height="24" loading="lazy" alt="">
+                                                                </div>
+                                                        </header>
+
+                                                        <div class="feedback__card-body">
+                                                                <div class="feedback__card-title">Best support team
+                                                                </div>
+                                                                <p class="feedback__card-text">Whenever I need
+                                                                        assistance, Aviator-Game. Its support team is
+                                                                        always there. They're friendly, professional,
+                                                                        and truly care about players. It's reassuring to
+                                                                        know I have a team of real experts by my side,
+                                                                        as Aviator player! Whenever I need assistance,
+                                                                        Aviator-Game. Its support team is always there.
+                                                                        They're friendly, professional, and truly care
+                                                                        about players. It's reassuring to know I have a
+                                                                        team of real experts by my side, as Aviator
+                                                                        player!</p>
+                                                        </div>
+                                                </div>
+
+                                                <div class="feedback__card">
+                                                        <header class="feedback__card-head">
+                                                                <div class="feedback__author">
+                                                                        <div class="feedback__avatar" aria-hidden="true">
+                                                                                <img class="feedback__avatar-image" src="assets/images/feedback.webp" width="60" height="60" loading="lazy" alt="">
+                                                                        </div>
+                                                                        <div class="feedback__author-meta">
+                                                                                <div class="feedback__author-name">
+                                                                                        Aleksander R.</div>
+                                                                                <time class="feedback__author-time" datetime="2026-03-07">6 days
+                                                                                        ago</time>
+                                                                        </div>
+                                                                </div>
+
+                                                                <div class="feedback__card-stars" aria-label="Rating: 3 out of 5">
+                                                                        <img class="feedback__star" src="assets/svg/stars/star.svg" width="24" height="24" loading="lazy" alt="">
+                                                                        <img class="feedback__star" src="assets/svg/stars/star.svg" width="24" height="24" loading="lazy" alt="">
+                                                                        <img class="feedback__star" src="assets/svg/stars/star.svg" width="24" height="24" loading="lazy" alt="">
+                                                                        <img class="feedback__star" src="assets/svg/stars/star-empty.svg" width="24" height="24" loading="lazy" alt="">
+                                                                        <img class="feedback__star" src="assets/svg/stars/star-empty.svg" width="24" height="24" loading="lazy" alt="">
+                                                                </div>
+                                                        </header>
+
+                                                        <div class="feedback__card-body">
+                                                                <div class="feedback__card-title">Quick payouts</div>
+                                                                <p class="feedback__card-text">Whenever I need
+                                                                        assistance, Aviator-Game. Its support team is
+                                                                        always there. They're friendly, professional,
+                                                                        and truly care about players.</p>
+                                                        </div>
+                                                </div>
+
+                                                <div class="feedback__card">
+                                                        <header class="feedback__card-head">
+                                                                <div class="feedback__author">
+                                                                        <div class="feedback__avatar feedback__avatar--green" aria-hidden="true">
+                                                                                <span class="feedback__avatar-initials">AR</span>
+                                                                        </div>
+                                                                        <div class="feedback__author-meta">
+                                                                                <div class="feedback__author-name">
+                                                                                        Aleksander R.</div>
+                                                                                <time class="feedback__author-time" datetime="2026-03-07">6 days
+                                                                                        ago</time>
+                                                                        </div>
+                                                                </div>
+
+                                                                <div class="feedback__card-stars" aria-label="Rating: 5 out of 5">
+                                                                        <img class="feedback__star" src="assets/svg/stars/star.svg" width="24" height="24" loading="lazy" alt="">
+                                                                        <img class="feedback__star" src="assets/svg/stars/star.svg" width="24" height="24" loading="lazy" alt="">
+                                                                        <img class="feedback__star" src="assets/svg/stars/star.svg" width="24" height="24" loading="lazy" alt="">
+                                                                        <img class="feedback__star" src="assets/svg/stars/star.svg" width="24" height="24" loading="lazy" alt="">
+                                                                        <img class="feedback__star" src="assets/svg/stars/star.svg" width="24" height="24" loading="lazy" alt="">
+                                                                </div>
+                                                        </header>
+
+                                                        <div class="feedback__card-body">
+                                                                <div class="feedback__card-title">Smooth gameplay</div>
+                                                                <p class="feedback__card-text">Whenever I need
+                                                                        assistance, Aviator-Game. Its support team is
+                                                                        always there. They're friendly, professional,
+                                                                        and truly care about players. It's reassuring to
+                                                                        know I have a team of real experts by my side,
+                                                                        as Aviator player!</p>
+                                                        </div>
+                                                </div>
+
+                                                <div class="feedback__card">
+                                                        <header class="feedback__card-head">
+                                                                <div class="feedback__author">
+                                                                        <div class="feedback__avatar feedback__avatar--blue-deep" aria-hidden="true">
+                                                                                <span class="feedback__avatar-initials">AR</span>
+                                                                        </div>
+                                                                        <div class="feedback__author-meta">
+                                                                                <div class="feedback__author-name">
+                                                                                        Aleksander R.</div>
+                                                                                <time class="feedback__author-time" datetime="2026-03-07">6 days
+                                                                                        ago</time>
+                                                                        </div>
+                                                                </div>
+
+                                                                <div class="feedback__card-stars" aria-label="Rating: 3 out of 5">
+                                                                        <img class="feedback__star" src="assets/svg/stars/star.svg" width="24" height="24" loading="lazy" alt="">
+                                                                        <img class="feedback__star" src="assets/svg/stars/star.svg" width="24" height="24" loading="lazy" alt="">
+                                                                        <img class="feedback__star" src="assets/svg/stars/star.svg" width="24" height="24" loading="lazy" alt="">
+                                                                        <img class="feedback__star" src="assets/svg/stars/star-empty.svg" width="24" height="24" loading="lazy" alt="">
+                                                                        <img class="feedback__star" src="assets/svg/stars/star-empty.svg" width="24" height="24" loading="lazy" alt="">
+                                                                </div>
+                                                        </header>
+
+                                                        <div class="feedback__card-body">
+                                                                <div class="feedback__card-title">Whenever I need
+                                                                        assistance</div>
+                                                                <p class="feedback__card-text">Whenever I need
+                                                                        assistance, Aviator-Game. Its support team is
+                                                                        always there. They're friendly, professional,
+                                                                        and truly care about players. It's reassuring to
+                                                                        know I have a team of real experts by my side,
+                                                                        as Aviator player!</p>
+                                                        </div>
+                                                </div>
+                                        </div>
+                                        <div class="feedback__btn">
+                                                <a class="btn__cta btn__cta--hero btn__cta--card" href="#">View all
+                                                        reviews</a>
+                                        </div>
+                                </div>
+                        </section>
+    
+            <section class="faq" id="faq">
+                                <div class="faq__inner">
+                                        <h2 class="faq__title">FAQ</h2>
+                                        <p class="faq__description">In this article, we will explore the key features of
+                                                the Aviator casino game, discuss its gameplay mechanics, user interface,
+                                                and overall experience.</p>
+
+                                        <div class="faq__list" aria-label="Frequently asked questions">
+                                                <details class="faq__item">
+                                                        <summary class="faq__question">
+                                                                <span class="faq__question-text">What is the Aviator
+                                                                        game?</span>
+                                                                <span class="faq__toggle" aria-hidden="true"></span>
+                                                        </summary>
+                                                        <div class="faq__answer">
+                                                                <p class="faq__answer-text">Aviator is an arcade
+                                                                        aviation game where the player must control a
+                                                                        flying airplane. The goal of the game is to fly
+                                                                        as many kilometers as possible while avoiding
+                                                                        obstacles and other dangers. The player must
+                                                                        maneuver the airplane using a keyboard or
+                                                                        joystick to dodge obstacles and collect bonuses
+                                                                        to earn extra points. The game can be played
+                                                                        solo or in multiplayer mode.</p>
+                                                        </div>
+                                                </details>
+
+                                                <details class="faq__item">
+                                                        <summary class="faq__question">
+                                                                <span class="faq__question-text">How do I start playing
+                                                                        Aviator?</span>
+                                                                <span class="faq__toggle" aria-hidden="true"></span>
+                                                        </summary>
+                                                        <div class="faq__answer">
+                                                                <p class="faq__answer-text">Aviator is an arcade
+                                                                        aviation game where the player must control a
+                                                                        flying airplane. The goal of the game is to fly
+                                                                        as many kilometers as possible while avoiding
+                                                                        obstacles and other dangers. The player must
+                                                                        maneuver the airplane using a keyboard or
+                                                                        joystick to dodge obstacles and collect bonuses
+                                                                        to earn extra points. The game can be played
+                                                                        solo or in multiplayer mode.</p>
+                                                        </div>
+                                                </details>
+
+                                                <details class="faq__item">
+                                                        <summary class="faq__question">
+                                                                <span class="faq__question-text">Can I play Aviator for
+                                                                        real money?</span>
+                                                                <span class="faq__toggle" aria-hidden="true"></span>
+                                                        </summary>
+                                                        <div class="faq__answer">
+                                                                <p class="faq__answer-text">Aviator is an arcade
+                                                                        aviation game where the player must control a
+                                                                        flying airplane. The goal of the game is to fly
+                                                                        as many kilometers as possible while avoiding
+                                                                        obstacles and other dangers. The player must
+                                                                        maneuver the airplane using a keyboard or
+                                                                        joystick to dodge obstacles and collect bonuses
+                                                                        to earn extra points. The game can be played
+                                                                        solo or in multiplayer mode.</p>
+                                                        </div>
+                                                </details>
+
+                                                <details class="faq__item">
+                                                        <summary class="faq__question">
+                                                                <span class="faq__question-text">Is there a demo mode
+                                                                        available?</span>
+                                                                <span class="faq__toggle" aria-hidden="true"></span>
+                                                        </summary>
+                                                        <div class="faq__answer">
+                                                                <p class="faq__answer-text">Aviator is an arcade
+                                                                        aviation game where the player must control a
+                                                                        flying airplane. The goal of the game is to fly
+                                                                        as many kilometers as possible while avoiding
+                                                                        obstacles and other dangers. The player must
+                                                                        maneuver the airplane using a keyboard or
+                                                                        joystick to dodge obstacles and collect bonuses
+                                                                        to earn extra points. The game can be played
+                                                                        solo or in multiplayer mode.</p>
+                                                        </div>
+                                                </details>
+                                        </div>
+                                </div>
+                        </section>
+    
+    </div>
+    </main>
+    
+        <footer class="footer" id="footer">
+        <div class="footer__inner">
+            <div class="footer__main" aria-label="Footer navigation">
+                <div class="footer__col footer__col--brand">
+                    <div class="footer__logo">
+                        <a class="footer__logo-wrapper" href="/" aria-label="To the main page">
+                            <img src="assets/images/logo/logo.webp" width="141" height="41"
+                                loading="lazy" alt="Aviator">
+                        </a>
+                    </div>
+
+                    <a class="btn__cta" href="#play-now">Play now!</a>
+                </div>
+
+                <nav class="footer__col footer__col--links" aria-label="Footer column 1">
+                    <ul class="footer__links">
+                        <li class="footer__item"><a class="footer__link"
+                                href="/#where-to-play">Where to
+                                play</a></li>
+                        <li class="footer__item"><a class="footer__link"
+                                href="/#characteristics">Characteristics</a></li>
+                        <li class="footer__item"><a class="footer__link"
+                                href="/#review">Review</a></li>
+                        <li class="footer__item"><a class="footer__link"
+                                href="/#symbols">Symbols</a>
+                        </li>
+                    </ul>
+                </nav>
+
+                <nav class="footer__col footer__col--links" aria-label="Footer column 2">
+                    <ul class="footer__links">
+                        <li class="footer__item"><a class="footer__link"
+                                href="/#gameplay">Gameplay</a>
+                        </li>
+                        <li class="footer__item"><a class="footer__link" href="/#rtp">RTP</a>
+                        </li>
+                        <li class="footer__item"><a class="footer__link"
+                                href="/#bonuses">Bonuses</a>
+                        </li>
+                        <li class="footer__item"><a class="footer__link"
+                                href="/#conclusion">Conclusion</a></li>
+                    </ul>
+                </nav>
+
+                <nav class="footer__col footer__col--links" aria-label="Footer column 3">
+                    <ul class="footer__links">
+                        <li class="footer__item"><a class="footer__link"
+                                href="terms-and-conditions.html">Terms and
+                                Conditions</a></li>
+                        <li class="footer__item"><a class="footer__link"
+                                href="cookie-policy.html">Cookie
+                                Policy</a></li>
+                        <li class="footer__item"><a class="footer__link"
+                                href="privacy-policy.html">Privacy
+                                Policy</a></li>
+                        <li class="footer__item"><a class="footer__link"
+                                href="sitemap.html">Sitemap</a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+
+            <div class="footer__info" aria-label="Footer disclaimer">
+                <svg class="footer__age-icon" width="63" height="63" viewBox="0 0 34 34" role="img"
+                    aria-label="18+">
+                    <circle cx="17" cy="17" r="16" fill="none" stroke="var(--color-white)"
+                        stroke-width="2">
+                    </circle>
+                    <text x="17" y="22" text-anchor="middle" font-size="14"
+                        font-family="Inter, Arial, sans-serif" font-weight="700"
+                        fill="var(--color-white)">18+</text>
+                </svg>
+
+                <div class="footer__info-text">
+                    <span class="footer__info-copy">test15.com is one of Spribe’s independent
+                        affiliates. We are experts in presenting accurate, objective information
+                        about cutting-edge casino games and iGaming products. Please go over our
+                        terms and conditions and privacy policy. Please be aware that the
+                        activities of users on third-party sites are not under the control of
+                        our organization.</span>
+                </div>
+
+                <div class="footer__payments" aria-label="Payment systems">
+                    <img class="footer__payment" src="assets/images/payment-systems/visa.webp"
+                        width="80" height="40" loading="lazy" alt="Visa">
+                    <img class="footer__payment" src="assets/images/payment-systems/mc.webp"
+                        width="80" height="40" loading="lazy" alt="Mastercard">
+                    <img class="footer__payment" src="assets/images/payment-systems/ae.webp"
+                        width="80" height="40" loading="lazy" alt="American Express">
+                    <img class="footer__payment" src="assets/images/payment-systems/paypal.webp"
+                        width="80" height="40" loading="lazy" alt="PayPal">
+                </div>
+            </div>
+
+            <div class="footer__copyright" aria-label="Copyright">© Copyright 2024-2026</div>
+        </div>
+    </footer>
+    
+    
+            <script defer src="assets/js/main.js"></script>
+            <script defer src="assets/js/lightbox.js"></script>
+            <script defer src="assets/js/faq.js"></script>
+        <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"f0098cf5c92242a68e8c3297c50585dc","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
