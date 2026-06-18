@@ -1522,4 +1522,94 @@ HTML,
             $this->assertSame($value, data_get($page->og_data, "head_meta.{$metaIndex}.content"));
         }
     }
+
+    public function test_site_creation_can_create_new_head_meta_and_link_entries_by_missing_index(): void
+    {
+        $user = User::factory()->create();
+
+        $payload = [
+            'name' => 'Missing Head Index Site',
+            'domain' => 'missing-head-index.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/missing-head-index.example',
+            'status' => 'draft',
+            'locale' => 'en',
+            'default_locale' => 'en',
+            'ai_clone_templates' => true,
+            'ai_source_domain' => 'test.com',
+            'ai_field_prompts' => [],
+            'ai_field_edits' => [
+                ['file' => 'index-raw_html.md', 'path' => 'pages.0.og_data.head_meta.8.property', 'value' => 'og:locale:alternate'],
+                ['file' => 'index-raw_html.md', 'path' => 'pages.0.og_data.head_meta.8.content', 'value' => 'en_US'],
+                ['file' => 'index-raw_html.md', 'path' => 'pages.0.og_data.head_links.0.rel', 'value' => 'alternate'],
+                ['file' => 'index-raw_html.md', 'path' => 'pages.0.og_data.head_links.0.href', 'value' => 'https://site.example/es/'],
+                ['file' => 'index-raw_html.md', 'path' => 'pages.0.og_data.head_links.0.hreflang', 'value' => 'es'],
+            ],
+        ];
+
+        $response = $this->actingAs($user)->postJson('/api/sites', $payload);
+        $response->assertCreated();
+
+        $targetFile = $this->templatesRoot . '/missing-head-index.example/index-raw_html.md';
+        $updated = Yaml::parseFile($targetFile);
+
+        $this->assertSame('og:locale:alternate', data_get($updated, 'pages.0.og_data.head_meta.8.property'));
+        $this->assertSame('en_US', data_get($updated, 'pages.0.og_data.head_meta.8.content'));
+        $this->assertSame('alternate', data_get($updated, 'pages.0.og_data.head_links.0.rel'));
+        $this->assertSame('https://site.example/es/', data_get($updated, 'pages.0.og_data.head_links.0.href'));
+        $this->assertSame('es', data_get($updated, 'pages.0.og_data.head_links.0.hreflang'));
+
+        $site = Site::where('domain', 'missing-head-index.example')->firstOrFail();
+        $page = Page::where('site_id', $site->id)->where('slug', 'index')->firstOrFail();
+
+        $this->assertSame('og:locale:alternate', data_get($page->og_data, 'head_meta.8.property'));
+        $this->assertSame('en_US', data_get($page->og_data, 'head_meta.8.content'));
+        $this->assertSame('alternate', data_get($page->og_data, 'head_links.0.rel'));
+        $this->assertSame('https://site.example/es/', data_get($page->og_data, 'head_links.0.href'));
+        $this->assertSame('es', data_get($page->og_data, 'head_links.0.hreflang'));
+    }
+
+    public function test_site_creation_accepts_empty_manual_head_values_after_request_null_conversion(): void
+    {
+        $user = User::factory()->create();
+
+        $sourceFile = $this->templatesRoot . '/test.com/index-raw_html.md';
+        $fixture = Yaml::parseFile($sourceFile);
+        data_set($fixture, 'pages.0.og_data.head_meta.1.property', 'og:title');
+        data_set($fixture, 'pages.0.og_data.head_meta.1.content', 'Existing OG Title');
+        file_put_contents($sourceFile, "---\n" . Yaml::dump($fixture, 8, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK));
+
+        $payload = [
+            'name' => 'Empty Head Value Site',
+            'domain' => 'empty-head-value.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/empty-head-value.example',
+            'status' => 'draft',
+            'locale' => 'en',
+            'default_locale' => 'en',
+            'ai_clone_templates' => true,
+            'ai_source_domain' => 'test.com',
+            'ai_field_prompts' => [],
+            'ai_field_edits' => [
+                ['file' => 'index-raw_html.md', 'path' => 'pages.0.meta_keywords', 'value' => null],
+                ['file' => 'index-raw_html.md', 'path' => 'pages.0.og_data.head_meta.1.content', 'value' => null],
+            ],
+        ];
+
+        $response = $this->actingAs($user)->postJson('/api/sites', $payload);
+        $response->assertCreated();
+        $response->assertJsonPath('ai_generation.manual_updated_fields', 2);
+
+        $targetFile = $this->templatesRoot . '/empty-head-value.example/index-raw_html.md';
+        $updated = Yaml::parseFile($targetFile);
+
+        $this->assertSame('', data_get($updated, 'pages.0.meta_keywords'));
+        $this->assertSame('', data_get($updated, 'pages.0.og_data.head_meta.1.content'));
+
+        $site = Site::where('domain', 'empty-head-value.example')->firstOrFail();
+        $page = Page::where('site_id', $site->id)->where('slug', 'index')->firstOrFail();
+
+        $this->assertSame('', $page->meta_keywords);
+        $this->assertSame('', data_get($page->og_data, 'head_meta.1.content'));
+    }
 }

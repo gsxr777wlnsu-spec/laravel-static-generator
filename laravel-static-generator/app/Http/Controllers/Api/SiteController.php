@@ -57,7 +57,9 @@ class SiteController extends Controller
             'payload_keys' => array_keys($request->all()),
         ]);
 
-        $validator = Validator::make($request->all(), [
+        $input = $this->normalizeAiFieldEditValues($request->all());
+
+        $validator = Validator::make($input, [
             'name' => 'required|string|max:255',
             'domain' => 'required|string|unique:sites,domain',
             'template_set' => 'required|string|max:100',
@@ -891,6 +893,23 @@ class SiteController extends Controller
             'stored_path' => $reportPath,
             'view_url' => route('admin.sites.creation-log', ['id' => $site->id]),
         ];
+    }
+
+    private function normalizeAiFieldEditValues(array $input): array
+    {
+        if (!isset($input['ai_field_edits']) || !is_array($input['ai_field_edits'])) {
+            return $input;
+        }
+
+        foreach ($input['ai_field_edits'] as $index => $edit) {
+            if (!is_array($edit) || !array_key_exists('value', $edit) || $edit['value'] !== null) {
+                continue;
+            }
+
+            $input['ai_field_edits'][$index]['value'] = '';
+        }
+
+        return $input;
     }
 
     /**

@@ -5,17 +5,23 @@
             $pageOgData = is_array($page->og_data ?? null) ? $page->og_data : [];
             $headMetaItems = isset($pageOgData['head_meta']) && is_array($pageOgData['head_meta']) ? $pageOgData['head_meta'] : [];
             $headLinkItems = isset($pageOgData['head_links']) && is_array($pageOgData['head_links']) ? $pageOgData['head_links'] : [];
+            $headCustomRaw = isset($pageOgData['head_custom']) && is_string($pageOgData['head_custom']) ? trim($pageOgData['head_custom']) : '';
+            $headExtra = isset($pageOgData['head_extra']) && is_string($pageOgData['head_extra']) ? trim($pageOgData['head_extra']) : '';
             $domain = (string) ($site->domain ?? 'site.com');
-
+            $metaTitle = trim((string) ($page->meta_title ?? $page->title ?? ''));
+            $metaDescription = trim((string) ($page->meta_description ?? ''));
+            $canonical = trim((string) ($page->canonical ?? url($page->slug)));
+            $defaultLocale = trim((string) ($page->locale ?? 'en'));
+            $ogLocale = str_replace('-', '_', $defaultLocale);
             $metaKey = static function (array $meta): ?string {
-                $name = strtolower(trim((string) ($meta['name'] ?? '')));
-                if ($name !== '') {
-                    return 'name:' . $name;
-                }
-
                 $property = strtolower(trim((string) ($meta['property'] ?? '')));
                 if ($property !== '') {
                     return 'property:' . $property;
+                }
+
+                $name = strtolower(trim((string) ($meta['name'] ?? '')));
+                if ($name !== '') {
+                    return 'name:' . $name;
                 }
 
                 $httpEquiv = strtolower(trim((string) ($meta['http_equiv'] ?? '')));
@@ -25,104 +31,189 @@
 
                 return null;
             };
-            $blockedHeadMetaKeys = [
-                'name:geo.region',
-                'name:geo.position',
-                'name:icbm',
-                'name:contact',
-                'name:copyright',
-                'name:designer',
-                'name:generator',
-                'name:author',
-                'name:rating',
-                'name:telegram:channel',
-                'name:telegram:bot',
-                'property:vk:image',
-                'property:vk:app_id',
-                'name:twitter:title',
-                'name:twitter:description',
-                'name:twitter:site',
-                'name:twitter:creator',
-                'name:twitter:image',
-                'property:og:image',
+            $headCustomResidual = $headCustomRaw;
+            $standardMeta = [
+                'name:robots' => 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
+                'property:og:locale' => $ogLocale,
+                'property:og:locale:alternate' => '',
+                'property:og:type' => 'website',
+                'property:og:title' => $metaTitle,
+                'property:og:description' => $metaDescription,
+                'property:og:url' => $canonical,
+                'property:og:site_name' => $domain,
+                'property:article:published_time' => '2020-12-07T18:05:01+00:00',
+                'property:article:modified_time' => '2026-04-20T10:43:59+00:00',
+                'name:twitter:card' => 'summary_large_image',
             ];
-
-            $defaultHeadMeta = [
-                ['name' => 'robots', 'content' => 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1'],
-                ['name' => 'og:type', 'property' => 'og:type', 'content' => 'website'],
-                ['property' => 'og:locale', 'content' => ($page->locale ?? 'en') . '_' . strtoupper($page->locale ?? 'en')],
-                ['name' => 'og:title', 'property' => 'og:title', 'content' => (string) ($page->meta_title ?? $page->title ?? '')],
-                ['name' => 'og:description', 'property' => 'og:description', 'content' => (string) ($page->meta_description ?? '')],
-                ['property' => 'article:published_time', 'content' => '2020-12-07T18:05:01+00:00'],
-                ['property' => 'article:modified_time', 'content' => '2026-04-20T10:43:59+00:00'],
-                ['property' => 'article:author', 'content' => $domain],
-                ['name' => 'twitter:card', 'content' => 'summary_large_image'],
-            ];
-
-            $mergedMetaMap = [];
-            foreach ($defaultHeadMeta as $meta) {
-                $key = $metaKey($meta);
-                if ($key === null || in_array($key, $blockedHeadMetaKeys, true)) {
+            $extraHeadMeta = [];
+            foreach ($headMetaItems as $meta) {
+                if (!is_array($meta)) {
                     continue;
                 }
-                $mergedMetaMap[$key] = $meta;
+
+                $key = $metaKey($meta);
+                $content = trim((string) ($meta['content'] ?? ''));
+                if ($key === null || $content === '') {
+                    continue;
+                }
+
+                $normalizedMeta = [
+                    'name' => isset($meta['name']) ? trim((string) $meta['name']) : null,
+                    'property' => isset($meta['property']) ? trim((string) $meta['property']) : null,
+                    'http_equiv' => isset($meta['http_equiv']) ? trim((string) $meta['http_equiv']) : null,
+                    'content' => $content,
+                ];
+
+                if (array_key_exists($key, $standardMeta)) {
+                    $standardMeta[$key] = $content;
+                    continue;
+                }
+
+                $extraHeadMeta[] = $normalizedMeta;
+            }
+            $alternateLinks = [];
+            $extraLinks = [];
+            foreach ($headLinkItems as $link) {
+                if (!is_array($link)) {
+                    continue;
+                }
+
+                $href = trim((string) ($link['href'] ?? ''));
+                if ($href === '') {
+                    continue;
+                }
+
+                $normalizedLink = [
+                    'rel' => isset($link['rel']) ? trim((string) $link['rel']) : null,
+                    'href' => $href,
+                    'hreflang' => isset($link['hreflang']) ? trim((string) $link['hreflang']) : null,
+                    'type' => isset($link['type']) ? trim((string) $link['type']) : null,
+                    'sizes' => isset($link['sizes']) ? trim((string) $link['sizes']) : null,
+                ];
+
+                if (strtolower((string) ($normalizedLink['rel'] ?? '')) === 'alternate') {
+                    $alternateLinks[] = $normalizedLink;
+                    continue;
+                }
+
+                $extraLinks[] = $normalizedLink;
             }
 
-            foreach ($headMetaItems as $meta) {
-                if (!is_array($meta) || !array_key_exists('content', $meta)) {
-                    continue;
+            if ($alternateLinks === [] && isset($languageVersions) && count($languageVersions) > 0) {
+                foreach ($languageVersions as $version) {
+                    $alternateLinks[] = [
+                        'rel' => 'alternate',
+                        'href' => $version->canonical ?? url($version->slug),
+                        'hreflang' => $version->locale,
+                        'type' => null,
+                        'sizes' => null,
+                    ];
                 }
+            }
 
-                $key = $metaKey($meta);
-                if ($key === null || in_array($key, $blockedHeadMetaKeys, true)) {
-                    continue;
+            $appendGraphNode = static function (array &$graph, array $node): void {
+                unset($node['@context']);
+                if ($node !== []) {
+                    $graph[] = $node;
                 }
+            };
+            $jsonLdGraph = [];
+            if ($headExtra !== '') {
+                preg_match_all('/<script\b[^>]*type=(["\'])application\/ld\+json\1[^>]*>(.*?)<\/script>/is', $headExtra, $scriptMatches);
+                foreach ($scriptMatches[2] ?? [] as $scriptBody) {
+                    $decoded = json_decode(trim((string) $scriptBody), true);
+                    if (!is_array($decoded)) {
+                        continue;
+                    }
 
-                $mergedMetaMap[$key] = [
-                    'name' => isset($meta['name']) ? (string) $meta['name'] : null,
-                    'property' => isset($meta['property']) ? (string) $meta['property'] : null,
-                    'http_equiv' => isset($meta['http_equiv']) ? (string) $meta['http_equiv'] : null,
-                    'content' => (string) $meta['content'],
+                    if (isset($decoded['@graph']) && is_array($decoded['@graph'])) {
+                        foreach ($decoded['@graph'] as $graphNode) {
+                            if (is_array($graphNode)) {
+                                $appendGraphNode($jsonLdGraph, $graphNode);
+                            }
+                        }
+                        continue;
+                    }
+
+                    $appendGraphNode($jsonLdGraph, $decoded);
+                }
+            }
+
+            if ($jsonLdGraph === []) {
+                $jsonLdGraph = [
+                    [
+                        '@type' => 'WebPage',
+                        '@id' => "https://{$domain}/#webpage",
+                        'url' => "https://{$domain}/",
+                    ],
+                    [
+                        '@type' => 'VideoGame',
+                        'additionalType' => 'https://schema.org/WebApplication',
+                        '@id' => "https://{$domain}/#aviator-game",
+                        'name' => 'Aviator',
+                        'description' => 'Play Aviator Game — a thrilling legal online game with a maximum win of 1000x your bet. Created by Spribe, this crash game has a high chance for players to win with 97% RTP.',
+                        'url' => "https://{$domain}/",
+                        'image' => "https://{$domain}/assets/images/aviator.jpg",
+                        'author' => [
+                            '@type' => 'Organization',
+                            'name' => 'Spribe',
+                        ],
+                        'gamePlatform' => ['Web Browser', 'Mobile', 'Desktop'],
+                        'genre' => 'Crash Game',
+                        'applicationCategory' => 'GameApplication',
+                        'operatingSystem' => 'Web Browser',
+                        'aggregateRating' => [
+                            '@type' => 'AggregateRating',
+                            'ratingValue' => '4.7',
+                            'bestRating' => '5',
+                            'worstRating' => '1',
+                            'ratingCount' => '44',
+                        ],
+                    ],
+                    [
+                        '@type' => 'Organization',
+                        '@id' => "https://{$domain}/#organization",
+                        'name' => 'Aviator Game',
+                        'url' => "https://{$domain}/",
+                        'logo' => [
+                            '@type' => 'ImageObject',
+                            'url' => "https://{$domain}/assets/images/favicon/apple-touch-icon.png",
+                            'width' => 180,
+                            'height' => 180,
+                        ],
+                    ],
                 ];
             }
 
-            $mergedHeadMeta = array_values($mergedMetaMap);
-            $publishedIndex = null;
-            $modifiedIndex = null;
-            foreach ($mergedHeadMeta as $idx => $meta) {
-                $property = strtolower(trim((string) ($meta['property'] ?? '')));
-                if ($property === 'article:published_time') {
-                    $publishedIndex = $idx;
-                }
-                if ($property === 'article:modified_time') {
-                    $modifiedIndex = $idx;
-                }
-            }
-
-            if ($publishedIndex !== null && $modifiedIndex !== null && $modifiedIndex !== $publishedIndex + 1) {
-                $modifiedMeta = $mergedHeadMeta[$modifiedIndex];
-                array_splice($mergedHeadMeta, $modifiedIndex, 1);
-
-                if ($modifiedIndex < $publishedIndex) {
-                    $publishedIndex--;
-                }
-
-                array_splice($mergedHeadMeta, $publishedIndex + 1, 0, [$modifiedMeta]);
-            }
+            $jsonLdPayload = json_encode([
+                '@context' => 'https://schema.org',
+                '@graph' => array_values($jsonLdGraph),
+            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 @endphp
-        <meta charset="utf-8">
-        <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>{{ $page->meta_title ?? $page->title }}</title>
-        <meta name="description" content="{{ $page->meta_description ?? '' }}">
-        <meta name="keywords" content="{{ $page->meta_keywords ?? 'game, play, bet, aviator' }}">
-        <link rel="canonical" href="{{ $page->canonical ?? url($page->slug) }}">
+        <meta name="robots" content="{{ e($standardMeta['name:robots']) }}">
+@if($metaTitle !== '')
+        <title>{{ $metaTitle }}</title>
+@endif
+@if($metaDescription !== '')
+        <meta name="description" content="{{ $metaDescription }}">
+@endif
+@if($canonical !== '')
+        <link rel="canonical" href="{{ $canonical }}">
+@endif
+        <meta property="og:locale" content="{{ e($standardMeta['property:og:locale']) }}">
+@if($standardMeta['property:og:locale:alternate'] !== '')
+        <meta property="og:locale:alternate" content="{{ e($standardMeta['property:og:locale:alternate']) }}">
+@endif
+        <meta property="og:type" content="{{ e($standardMeta['property:og:type']) }}">
+        <meta property="og:title" content="{{ e($standardMeta['property:og:title']) }}">
+        <meta property="og:description" content="{{ e($standardMeta['property:og:description']) }}">
+        <meta property="og:url" content="{{ e($standardMeta['property:og:url']) }}">
+        <meta property="og:site_name" content="{{ e($standardMeta['property:og:site_name']) }}">
+        <meta property="article:published_time" content="{{ e($standardMeta['property:article:published_time']) }}">
+        <meta property="article:modified_time" content="{{ e($standardMeta['property:article:modified_time']) }}">
+        <meta name="twitter:card" content="{{ e($standardMeta['name:twitter:card']) }}">
 @php
-foreach ($mergedHeadMeta as $meta) {
-    if (!is_array($meta) || !array_key_exists('content', $meta)) {
-        continue;
-    }
-
+foreach ($extraHeadMeta as $meta) {
     $metaAttributes = [];
     if (!empty($meta['name'])) {
         $metaAttributes[] = 'name="' . e((string) $meta['name']) . '"';
@@ -134,108 +225,46 @@ foreach ($mergedHeadMeta as $meta) {
         $metaAttributes[] = 'http-equiv="' . e((string) $meta['http_equiv']) . '"';
     }
     $metaAttributes[] = 'content="' . e((string) $meta['content']) . '"';
-
     echo '        <meta ' . implode(' ', $metaAttributes) . '>' . PHP_EOL;
 }
-@endphp
-@php
-foreach ($headLinkItems as $link) {
-    if (!is_array($link) || !isset($link['href'])) {
-        continue;
-    }
 
-    $rel = strtolower(trim((string) ($link['rel'] ?? '')));
-    if (in_array($rel, ['stylesheet', 'publisher', 'icon', 'shortcut icon', 'apple-touch-icon', 'manifest'], true)) {
-        continue;
+foreach ($alternateLinks as $link) {
+    $linkAttributes = ['rel="alternate"', 'href="' . e((string) $link['href']) . '"'];
+    if (!empty($link['hreflang'])) {
+        $linkAttributes[] = 'hreflang="' . e((string) $link['hreflang']) . '"';
     }
+    echo '        <link ' . implode(' ', $linkAttributes) . '>' . PHP_EOL;
+}
 
+foreach ($extraLinks as $link) {
     $linkAttributes = [];
-    if (isset($link['rel'])) {
+    if (!empty($link['rel'])) {
         $linkAttributes[] = 'rel="' . e((string) $link['rel']) . '"';
     }
     $linkAttributes[] = 'href="' . e((string) $link['href']) . '"';
-    if (isset($link['type'])) {
+    if (!empty($link['type'])) {
         $linkAttributes[] = 'type="' . e((string) $link['type']) . '"';
     }
-    if (isset($link['sizes'])) {
+    if (!empty($link['sizes'])) {
         $linkAttributes[] = 'sizes="' . e((string) $link['sizes']) . '"';
     }
-    if (isset($link['hreflang'])) {
+    if (!empty($link['hreflang'])) {
         $linkAttributes[] = 'hreflang="' . e((string) $link['hreflang']) . '"';
     }
-
     echo '        <link ' . implode(' ', $linkAttributes) . '>' . PHP_EOL;
 }
 @endphp
-        <link href="/assets/css/style.css" rel="stylesheet">
+        <link rel="stylesheet" href="/assets/css/style.css">
         <link rel="icon" type="image/png" href="/assets/images/favicon/favicon-96x96.png" sizes="96x96">
         <link rel="icon" type="image/svg+xml" href="/assets/images/favicon/favicon.svg">
         <link rel="shortcut icon" href="/assets/images/favicon/favicon.ico">
         <link rel="apple-touch-icon" sizes="180x180" href="/assets/images/favicon/apple-touch-icon.png">
         <link rel="manifest" href="/assets/images/favicon/site.webmanifest">
-@if(isset($pageOgData['head_extra']) && is_string($pageOgData['head_extra']) && trim($pageOgData['head_extra']) !== '')
-@php echo preg_replace('/^/m', '        ', trim($pageOgData['head_extra'])) . PHP_EOL; @endphp
-@else
-            <script type="application/ld+json">
-{
-    "@@context": "https://schema.org",
-    "@@type": "WebPage",
-    "@@id": "https://{{ $domain }}/#webpage",
-    "url": "https://{{ $domain }}/"
-}
-            </script>
-            <script type="application/ld+json">
-{
-    "@@context": "https://schema.org",
-    "@@type": "VideoGame",
-    "additionalType": "https://schema.org/WebApplication",
-    "@@id": "https://{{ $domain }}/#aviator-game",
-    "name": "Aviator",
-    "description": "Play Aviator Game — a thrilling legal online game with a maximum win of 1000x your bet. Created by Spribe, this crash game has a high chance for players to win with 97% RTP.",
-    "url": "https://{{ $domain }}/",
-    "image": "https://{{ $domain }}/assets/images/aviator.jpg",
-    "author": {
-        "@@type": "Organization",
-        "name": "Spribe"
-    },
-    "gamePlatform": ["Web Browser", "Mobile", "Desktop"],
-    "genre": "Crash Game",
-    "applicationCategory": "GameApplication",
-    "operatingSystem": "Web Browser",
-    "aggregateRating": {
-        "@@type": "AggregateRating",
-        "ratingValue": "4.7",
-        "bestRating": "5",
-        "worstRating": "1",
-        "ratingCount": "44"
-    }
-}
-            </script>
-            <script type="application/ld+json">
-{
-    "@@context": "https://schema.org",
-    "@@type": "Organization",
-    "@@id": "https://{{ $domain }}/#organization",
-    "name": "Aviator Game",
-    "url": "https://{{ $domain }}/",
-    "logo": {
-        "@@type": "ImageObject",
-        "url": "https://{{ $domain }}/assets/images/favicon/apple-touch-icon.png",
-        "width": 180,
-        "height": 180
-    }
-}
-            </script>
-@endif
-@if(isset($pageOgData['head_custom']) && is_string($pageOgData['head_custom']) && trim($pageOgData['head_custom']) !== '')
-@php echo preg_replace('/^/m', '        ', trim($pageOgData['head_custom'])) . PHP_EOL; @endphp
-@endif
-
-        @if(isset($languageVersions) && count($languageVersions) > 0)
-            @foreach($languageVersions as $version)
-            <link rel="alternate" hreflang="{{ $version->locale }}" href="{{ $version->canonical ?? url($version->slug) }}">
-            @endforeach
-            <link rel="alternate" hreflang="x-default" href="{{ $page->canonical ?? url($page->slug) }}">
+        <script type="application/ld+json">
+{!! $jsonLdPayload !!}
+        </script>
+@if($headCustomResidual !== '')
+@php echo preg_replace('/^/m', '        ', $headCustomResidual) . PHP_EOL; @endphp
 @endif
 </head>
 <body class="body" id="body">

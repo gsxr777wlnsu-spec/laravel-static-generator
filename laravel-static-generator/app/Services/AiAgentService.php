@@ -972,6 +972,15 @@ class AiAgentService
 
                 $currentValue = Arr::get($data, $item['path']);
                 if (!is_string($currentValue)) {
+                    $headMetaOrLinkPath = $this->parseHeadMetaOrLinkCreationPath($item['path']);
+                    if ($headMetaOrLinkPath !== null) {
+                        $applied = $this->applyHeadMetaOrLinkCreationEdit($data, $headMetaOrLinkPath, $item['value']);
+                        if ($applied) {
+                            $fileUpdates++;
+                            $updatedFields++;
+                            $updatedPaths[] = $item['path'];
+                        }
+                    }
                     continue;
                 }
 
@@ -3086,12 +3095,76 @@ class AiAgentService
 
         $normalizedNewValue = trim($newValue);
         if ($normalizedNewValue === '') {
-            return null;
+            unset($blocks[$scriptIndex]);
+
+            return implode("\n", array_values($blocks));
         }
 
         $blocks[$scriptIndex] = $normalizedNewValue;
 
         return implode("\n", $blocks);
+    }
+
+    private function parseHeadMetaOrLinkCreationPath(string $path): ?array
+    {
+        if (preg_match('/^pages\.(\d+)\.og_data\.(head_meta|head_links)\.(\d+)\.(name|property|http_equiv|content|rel|href|hreflang|type|sizes)$/', $path, $matches) !== 1) {
+            return null;
+        }
+
+        $collection = $matches[2];
+        $field = $matches[4];
+
+        $allowedFields = $collection === 'head_meta'
+            ? ['name', 'property', 'http_equiv', 'content']
+            : ['rel', 'href', 'hreflang', 'type', 'sizes'];
+
+        if (!in_array($field, $allowedFields, true)) {
+            return null;
+        }
+
+        return [
+            'collection_path' => "pages.{$matches[1]}.og_data.{$collection}",
+            'item_index' => (int) $matches[3],
+            'field' => $field,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param array{collection_path:string,item_index:int,field:string} $parsedPath
+     */
+    private function applyHeadMetaOrLinkCreationEdit(array &$data, array $parsedPath, string $newValue): bool
+    {
+        $items = Arr::get($data, $parsedPath['collection_path']);
+        if ($items === null) {
+            $items = [];
+        }
+
+        if (!is_array($items)) {
+            return false;
+        }
+
+        $itemIndex = $parsedPath['item_index'];
+        for ($i = count($items); $i <= $itemIndex; $i++) {
+            if (!array_key_exists($i, $items)) {
+                $items[$i] = [];
+            }
+        }
+
+        if (!is_array($items[$itemIndex])) {
+            $items[$itemIndex] = [];
+        }
+
+        $currentValue = $items[$itemIndex][$parsedPath['field']] ?? null;
+        $currentValue = is_string($currentValue) ? $currentValue : '';
+        if ($currentValue === $newValue) {
+            return false;
+        }
+
+        $items[$itemIndex][$parsedPath['field']] = $newValue;
+        Arr::set($data, $parsedPath['collection_path'], $items);
+
+        return true;
     }
 
     /**

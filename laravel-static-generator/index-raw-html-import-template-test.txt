@@ -12,19 +12,22 @@
 #
 # Variables for this import:
 # {site_name} is reused in SEO text fields.
-{site_name} = Play Aviator Game
+{site_name} = Cleopatra Slot in Canada - 150 Free Spins, Free Demo & Casino Review
 # {site} is reused in domain/canonical and prompts.
-{site} = test11.com
-# {promt_lang} is reused in AI prompts.
-{promt_lang} = английском
-# {meta_description_total} sets the target description length for prompts.
-{meta_description_total} = 160
+{site} = cleopatraslot.ca
+{html_lang} = en-CA
+{og_locale} = en_CA
+{og_locale_alternate} = en_US
+{canonical_url} = https://{site}/
+{alt_en_url} = https://cleopatraslot.ca/
+{alt_es_url} = https://cleopatraslot.ca/es/
+{page_description} = Claim 150 Free Spins 👑 & up to 640 CAD bonus on Cleopatra slot! Free demo, no download needed, instant play for Canadian players. Start now!
 # {payments__table_min_deposit_withdrawal} Переменная минимального депозита в таблице оплаты payments__table.
 {payments__table_min_deposit_withdrawal} = €175/€250
 
 [FORM]
-name = test11
-ф
+name = cleopatraslot
+
 domain = {site}
 
 template_set = base
@@ -33,7 +36,7 @@ output_path = generated/{site}
 
 status = draft
 
-locale = en
+locale = {html_lang}
 
 sftp_host = 
 
@@ -64,7 +67,7 @@ path = pages.0.title
 send_current_value = true
 value:
 ```text
-Aviator Game
+{site_name}
 ```
 
 prompt:
@@ -83,7 +86,7 @@ path = pages.0.meta_title
 send_current_value = true
 value:
 ```text
-Aviator Game
+{site_name}
 ```
 
 prompt:
@@ -102,12 +105,12 @@ path = pages.0.meta_description
 send_current_value = false
 value:
 ```text
-{site_name} - a thrilling legal online game with a maximum win of 1000x your bet. Created by Spribe
+{page_description}
 ```
 
 prompt:
 ```text
-напиши сео оптимизированное описание на {meta_description_total} символов на {promt_lang} языке для сайта {site_name} {site} 
+
 ```
 
 [FIELD]
@@ -121,7 +124,7 @@ path = pages.0.meta_keywords
 send_current_value = true
 value:
 ```text
-game, play, bet, aviator
+
 ```
 
 prompt:
@@ -140,7 +143,26 @@ path = pages.0.canonical
 send_current_value = true
 value:
 ```text
-https://{site}/
+{canonical_url}
+```
+
+prompt:
+```text
+
+```
+
+[FIELD]
+file = index-raw_html.md
+
+section = HEAD
+
+label = page locale (5 chars)
+
+path = pages.0.locale
+send_current_value = true
+value:
+```text
+{html_lang}
 ```
 
 prompt:
@@ -159,7 +181,7 @@ path = pages.0.og_data.head_links.0.href
 send_current_value = true
 value:
 ```text
-https://{site}/
+{alt_en_url}
 ```
 
 prompt:
@@ -179,6 +201,63 @@ send_current_value = true
 value:
 ```text
 en
+```
+
+prompt:
+```text
+
+```
+
+[FIELD]
+file = index-raw_html.md
+
+section = HEAD
+
+label = Head link #2: alternate rel (9 chars)
+
+path = pages.0.og_data.head_links.1.rel
+send_current_value = true
+value:
+```text
+alternate
+```
+
+prompt:
+```text
+
+```
+
+[FIELD]
+file = index-raw_html.md
+
+section = HEAD
+
+label = Head link #2: alternate href (18 chars)
+
+path = pages.0.og_data.head_links.1.href
+send_current_value = true
+value:
+```text
+{alt_es_url}
+```
+
+prompt:
+```text
+
+```
+
+[FIELD]
+file = index-raw_html.md
+
+section = HEAD
+
+label = Head link #2: alternate hreflang (2 chars)
+
+path = pages.0.og_data.head_links.1.hreflang
+send_current_value = true
+value:
+```text
+es
 ```
 
 prompt:
@@ -235,7 +314,7 @@ path = pages.0.og_data.head_meta.2.content
 send_current_value = true
 value:
 ```text
-en_EN
+{og_locale}
 ```
 
 prompt:
@@ -254,7 +333,45 @@ path = pages.0.og_data.head_meta.3.content
 send_current_value = true
 value:
 ```text
-Aviator Game
+{site_name}
+```
+
+prompt:
+```text
+
+```
+
+[FIELD]
+file = index-raw_html.md
+
+section = HEAD
+
+label = Head meta: og:locale:alternate (5 chars)
+
+path = pages.0.og_data.head_meta.10.property
+send_current_value = true
+value:
+```text
+og:locale:alternate
+```
+
+prompt:
+```text
+
+```
+
+[FIELD]
+file = index-raw_html.md
+
+section = HEAD
+
+label = Head meta: og:locale:alternate content (5 chars)
+
+path = pages.0.og_data.head_meta.10.content
+send_current_value = true
+value:
+```text
+{og_locale_alternate}
 ```
 
 prompt:
@@ -273,7 +390,7 @@ path = pages.0.og_data.head_meta.4.content
 send_current_value = true
 value:
 ```text
-{site_name}
+{page_description}
 ```
 
 prompt:
@@ -330,7 +447,7 @@ path = pages.0.og_data.head_meta.7.content
 send_current_value = true
 value:
 ```text
-Aviator
+
 ```
 
 prompt:
@@ -362,7 +479,7 @@ file = index-raw_html.md
 
 section = HEAD
 
-label = Head JSON-LD script block #1 (182 chars)
+label = Head JSON-LD script block #1 (target @graph)
 
 path = pages.0.og_data.head_extra.__script__.0
 send_current_value = true
@@ -370,10 +487,56 @@ value:
 ```text
 <script type="application/ld+json">
 {
-    "@context": "https://schema.org",
-    "@type": "WebPage",
-    "@id": "https://{site}/#webpage",
-    "url": "https://{site}/"
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "url": "{canonical_url}",
+      "name": "{site_name}",
+      "description": "{page_description}",
+      "inLanguage": "{html_lang}",
+      "datePublished": "2020-12-07T18:05:01+00:00",
+      "dateModified": "2026-04-20T10:43:59+00:00",
+      "mainEntity": {
+        "@type": "VideoGame",
+        "name": "Cleopatra Slot",
+        "image": "https://{site}/assets/images/aviator.jpg",
+        "description": "{page_description}",
+        "applicationCategory": "Game",
+        "applicationSubcategory": "Slot Machine",
+        "operatingSystem": "Multi-platform",
+        "author": {
+          "@type": "Organization",
+          "name": "Spribe"
+        },
+        "aggregateRating": {
+          "@type": "AggregateRating",
+          "ratingValue": "4.7",
+          "reviewCount": "44",
+          "bestRating": "5",
+          "worstRating": "1"
+        }
+      }
+    },
+    {
+      "@type": "HowTo",
+      "name": "Steps to Gamble the Aviator Game Online in India",
+      "description": "There are several clear-cut, easy-to-understand steps we have described that you must take to enjoy the online casino Aviator gaming experience."
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is the Aviator game?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Aviator is a crash-style gambling game where players place bets and cash out before the plane flies away to secure potential winnings."
+          }
+        }
+      ]
+    }
+  ]
 }
 </script>
 ```
@@ -388,61 +551,13 @@ file = index-raw_html.md
 
 section = HEAD
 
-label = Head JSON-LD script block #2 (1908 chars)
+label = Head JSON-LD script block #2 (leave empty to remove legacy script)
 
 path = pages.0.og_data.head_extra.__script__.1
 send_current_value = true
 value:
 ```text
-<script type="application/ld+json">
-{
-    "@context": "https://schema.org",
-    "@type": "VideoGame",
-    "additionalType": "https://schema.org/WebApplication",
-    "@id": "https://{site}/#aviator-game",
-    "name": "Aviator",
-    "description": "{site_name} — a thrilling legal online game with a maximum win of 1000x your bet. Created by Spribe, this crash game has a high chance for players to win, with 97% RTP.",
-    "url": "https://{site}/",
-    "image": "https://{site}/assets/images/aviator.jpg",
-    "author": {
-        "@type": "Organization",
-        "name": "Spribe"
-    },
-    "gamePlatform": ["Web Browser", "Mobile", "Desktop"],
-    "genre": "Crash Game",
-    "applicationCategory": "GameApplication",
-    "operatingSystem": "Web Browser",
-    "aggregateRating": {
-        "@type": "AggregateRating",
-        "ratingValue": "4.7",
-        "bestRating": "5",
-        "worstRating": "1",
-        "ratingCount": "44"
-    },
-    "review": {
-        "@type": "Review",
-        "author": {
-            "@type": "Person",
-            "name": "Kishor Singha",
-            "image": "https://{site}/assets/images/kishor-singha.webp",
-            "description": "Kishor Singha is a renowned name in the world of online gambling, particularly renowned for his expertise in the Aviator crash game. Born in the vibrant city of Delhi, India, Kishor's passion for gaming."
-        },
-        "reviewRating": {
-            "@type": "Rating",
-            "ratingValue": "4.7",
-            "bestRating": "5",
-            "worstRating": "1"
-        },
-        "reviewBody": "In this article, we will explore the key features of the Aviator casino game, discuss its gameplay mechanics, user interface, and overall experience."
-    },
-    "offers": {
-        "@type": "Offer",
-        "availability": "https://schema.org/InStock",
-        "price": "0",
-        "priceCurrency": "USD"
-    }
-}
-</script>
+
 ```
 
 prompt:
@@ -455,27 +570,13 @@ file = index-raw_html.md
 
 section = HEAD
 
-label = Head JSON-LD script block #3 (395 chars)
+label = Head JSON-LD script block #3 (leave empty to remove legacy script)
 
 path = pages.0.og_data.head_extra.__script__.2
 send_current_value = true
 value:
 ```text
-<script type="application/ld+json">
-{
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    "@id": "https://{site}/#organization",
-    "name": "Aviator Game",
-    "url": "https://{site}/",
-    "logo": {
-        "@type": "ImageObject",
-        "url": "https://{site}/assets/images/favicon/apple-touch-icon.png",
-        "width": 180,
-        "height": 180
-    }
-}
-</script>
+
 ```
 
 prompt:
@@ -488,53 +589,14 @@ file = index-raw_html.md
 
 section = HEAD
 
-label = Head JSON-LD script block #4 (2477 chars)
+label = Head JSON-LD script block #4 (leave empty to remove legacy script)
 
 path = pages.0.og_data.head_extra.__script__.3
 send_current_value = true
 # Auto-synced from # SECTION FAQ visible question/answer fields after AI generation.
 value:
 ```text
-<script type="application/ld+json">
-{
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    "mainEntity": [
-        {
-            "@type": "Question",
-            "name": "What is the Aviator game?",
-            "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "Aviator is an arcade aviation game where the player must control a flying airplane. The goal of the game is to fly as many kilometers as possible while avoiding obstacles and other dangers. The player must maneuver the airplane using a keyboard or joystick to dodge obstacles and collect bonuses to earn extra points. The game can be played solo or in multiplayer mode."
-            }
-        },
-        {
-            "@type": "Question",
-            "name": "How do I start playing Aviator?",
-            "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "Aviator is an arcade aviation game where the player must control a flying airplane. The goal of the game is to fly as many kilometers as possible while avoiding obstacles and other dangers. The player must maneuver the airplane using a keyboard or joystick to dodge obstacles and collect bonuses to earn extra points. The game can be played solo or in multiplayer mode."
-            }
-        },
-        {
-            "@type": "Question",
-            "name": "Can I play Aviator for real money?",
-            "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "Aviator is an arcade aviation game where the player must control a flying airplane. The goal of the game is to fly as many kilometers as possible while avoiding obstacles and other dangers. The player must maneuver the airplane using a keyboard or joystick to dodge obstacles and collect bonuses to earn extra points. The game can be played solo or in multiplayer mode."
-            }
-        },
-        {
-            "@type": "Question",
-            "name": "Is there a demo mode available?",
-            "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "Aviator is an arcade aviation game where the player must control a flying airplane. The goal of the game is to fly as many kilometers as possible while avoiding obstacles and other dangers. The player must maneuver the airplane using a keyboard or joystick to dodge obstacles and collect bonuses to earn extra points. The game can be played solo or in multiplayer mode."
-            }
-        }
-    ]
-}
-</script>
+
 ```
 
 prompt:
@@ -547,58 +609,14 @@ file = index-raw_html.md
 
 section = HEAD
 
-label = Head JSON-LD script block #5 (2114 chars)
+label = Head JSON-LD script block #5 (leave empty to remove legacy script)
 
 path = pages.0.og_data.head_extra.__script__.4
 send_current_value = true
 # Auto-synced from # SECTION STEPS visible heading/description/step fields after AI generation.
 value:
 ```text
-<script type="application/ld+json">
-{
-    "@context": "https://schema.org",
-    "@type": "HowTo",
-    "name": "Steps to Gamble the Aviator Game Online in India",
-    "description": "There are several clear-cut, easy-to-understand steps we have described that you must take to enjoy the online casino Aviator gaming experience.",
-    "step": [
-        {
-            "@type": "HowToStep",
-            "position": 1,
-            "name": "Choose An Online Casino",
-            "text": "Find a trustworthy online casino that hosts Aviator to ensure pleasant gambling. You need to pick a gambling site that has all the necessary.",
-            "image": "https://{site}/assets/images/steps/step.webp"
-        },
-        {
-            "@type": "HowToStep",
-            "position": 2,
-            "name": "Sign Up for An Account and Make a Deposit",
-            "text": "Find a trustworthy online casino that hosts Aviator to ensure pleasant gambling. You need to pick a gambling site that has all the necessary.",
-            "image": "https://{site}/assets/images/steps/step.webp"
-        },
-        {
-            "@type": "HowToStep",
-            "position": 3,
-            "name": "Place a Bet",
-            "text": "Find a trustworthy online casino that hosts Aviator to ensure pleasant gambling. You need to pick a gambling site that has.",
-            "image": "https://{site}/assets/images/steps/step.webp"
-        },
-        {
-            "@type": "HowToStep",
-            "position": 4,
-            "name": "Choose An Online Casino",
-            "text": "Find a trustworthy online casino that hosts Aviator to ensure pleasant gambling. You need to pick a gambling site that has all the.",
-            "image": "https://{site}/assets/images/steps/step.webp"
-        },
-        {
-            "@type": "HowToStep",
-            "position": 5,
-            "name": "Sign Up for An Account and Make a Deposit",
-            "text": "Find a trustworthy online casino that hosts Aviator to ensure pleasant gambling.",
-            "image": "https://{site}/assets/images/steps/step.webp"
-        }
-    ]
-}
-</script>
+
 ```
 
 prompt:
@@ -617,7 +635,7 @@ path = pages.0.og_data.head_custom
 send_current_value = true
 value:
 ```text
-<!-- head_custom: add verification tags, counters, or additional styles/scripts here -->
+<meta name="tail-marker" content="tail-marker">
 ```
 
 prompt:
@@ -679,7 +697,7 @@ value:
 
 prompt:
 ```text
-сделай сео рерайт текста на английском «{site_name} — a thrilling legal online game with a maximum win of 1000x your bet. Created by Spribe, this crash game has a high chance for players to win, with 97% RTP. Start playing Aviator today and receive a welcome bonus of +500%!»
+
 ```
 
 [FIELD]

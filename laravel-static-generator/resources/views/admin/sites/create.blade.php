@@ -295,6 +295,7 @@ let isSubmitting = false;
 const SITE_CREATE_TIMEOUT_MS = 180000;
 const pendingBlockOperations = [];
 const queuedBlockOperationKeys = new Set();
+const importedHiddenFieldEdits = [];
 
 function parseImportMultiline(lines, startIndex) {
     const marker = lines[startIndex]?.trim() || '';
@@ -581,10 +582,34 @@ function resetPendingBlockOperations() {
     renderBlockOperations();
 }
 
+function resetCreateSiteImportState() {
+    siteCreateForm?.reset();
+    importedHiddenFieldEdits.splice(0, importedHiddenFieldEdits.length);
+
+    document.querySelectorAll('.ai-prompt-row').forEach((row) => {
+        const manualInput = row.querySelector('.ai-manual-input');
+        const promptInput = row.querySelector('.ai-prompt-input');
+        const sendCurrentValueCheckbox = row.querySelector('.ai-send-current-value-checkbox');
+
+        if (manualInput) {
+            manualInput.value = manualInput.defaultValue ?? '';
+        }
+
+        if (promptInput) {
+            promptInput.value = promptInput.defaultValue ?? '';
+        }
+
+        if (sendCurrentValueCheckbox) {
+            sendCurrentValueCheckbox.checked = sendCurrentValueCheckbox.defaultChecked;
+        }
+    });
+}
+
 function applyCreateSiteImportTemplate(rawText) {
     const parsedImport = parseCreateSiteImportTemplate(rawText);
     const blocks = parsedImport.blocks || [];
 
+    resetCreateSiteImportState();
     resetPendingBlockOperations();
 
     const stats = {
@@ -608,7 +633,20 @@ function applyCreateSiteImportTemplate(rawText) {
         if (block.type === 'FIELD') {
             const row = findPromptRow(values.file || 'index-raw_html.md', values.path || '');
             if (!row) {
-                stats.skipped += 1;
+                const importedValue = Object.prototype.hasOwnProperty.call(values, 'value')
+                    ? String(values.value ?? '')
+                    : null;
+
+                if (values.file && values.path && importedValue !== null) {
+                    importedHiddenFieldEdits.push({
+                        file: values.file,
+                        path: values.path,
+                        value: importedValue,
+                    });
+                    stats.fields += 1;
+                } else {
+                    stats.skipped += 1;
+                }
                 return;
             }
 
@@ -1591,6 +1629,16 @@ siteCreateForm.addEventListener('submit', async function(e) {
                 };
             })
             .filter(Boolean);
+
+        for (const importedFieldEdit of importedHiddenFieldEdits) {
+            const alreadyPresent = data.ai_field_edits.some((item) =>
+                item.file === importedFieldEdit.file && item.path === importedFieldEdit.path
+            );
+
+            if (!alreadyPresent) {
+                data.ai_field_edits.push(importedFieldEdit);
+            }
+        }
 
         data.ai_block_operations = pendingBlockOperations.map(({ _label, _key, ...operation }) => operation);
 
