@@ -48,7 +48,13 @@
         } catch (error) {}
     })();
     </script>
-    <link rel="stylesheet" href="/build/assets/app-BO56juKC.css">
+    @php
+        $adminViteManifest = json_decode(file_get_contents(public_path('build/manifest.json')), true);
+        $adminCssFile = $adminViteManifest['resources/css/app.css']['file'] ?? null;
+    @endphp
+    @if($adminCssFile)
+        <link rel="stylesheet" href="/build/{{ $adminCssFile }}">
+    @endif
 </head>
 <body class="h-full bg-gray-50 dark:bg-gray-900">
     <div class="min-h-full">
