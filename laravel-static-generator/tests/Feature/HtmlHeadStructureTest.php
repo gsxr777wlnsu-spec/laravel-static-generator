@@ -66,10 +66,10 @@ HTML,
         $head = $this->extractHead($html);
 
         $expectedSequence = [
-            '<meta name="robots"',
             '<title>',
             '<meta name="description"',
             '<link rel="canonical"',
+            '<meta name="robots"',
             '<meta property="og:locale"',
             '<meta property="og:locale:alternate"',
             '<meta property="og:type"',
@@ -113,6 +113,73 @@ HTML,
         $this->assertSame(1, substr_count($head, '<link rel="manifest" href="/assets/images/favicon/site.webmanifest">'));
         $this->assertStringContainsString('"@graph"', $head);
         $this->assertMatchesRegularExpression('/<link rel="stylesheet" href="\/assets\/css\/style\.css">\s*<link rel="icon" type="image\/png" href="\/assets\/images\/favicon\/favicon-96x96\.png" sizes="96x96">\s*<link rel="icon" type="image\/svg\+xml" href="\/assets\/images\/favicon\/favicon\.svg">\s*<link rel="shortcut icon" href="\/assets\/images\/favicon\/favicon\.ico">\s*<link rel="apple-touch-icon" sizes="180x180" href="\/assets\/images\/favicon\/apple-touch-icon\.png">\s*<link rel="manifest" href="\/assets\/images\/favicon\/site\.webmanifest">\s*<script type="application\/ld\+json">[\s\S]*<\/script>\s*<meta name="tail-marker" content="tail-marker">\s*$/', $head);
+    }
+
+    public function test_page_head_omits_alternates_when_no_alternates_exist(): void
+    {
+        $site = Site::create([
+            'name' => 'Default Alternate',
+            'domain' => 'default-alternate.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/default-alternate.example',
+            'status' => 'active',
+            'locale' => 'en',
+            'default_locale' => 'en',
+        ]);
+
+        $page = Page::create([
+            'site_id' => $site->id,
+            'slug' => 'index',
+            'title' => 'Default Alternate',
+            'template_key' => 'index',
+            'status' => 'published',
+            'meta_title' => 'Default Alternate',
+            'meta_description' => 'Default alternate description',
+            'canonical' => 'https://default-alternate.example/',
+            'locale' => 'en',
+            'og_data' => [],
+        ]);
+
+        $html = app(HtmlGeneratorInterface::class)->generatePage($page->fresh(['site']));
+
+        $this->assertSame(0, substr_count($html, '<link rel="alternate"'));
+    }
+
+    public function test_page_head_skips_alternate_links_without_hreflang(): void
+    {
+        $site = Site::create([
+            'name' => 'Incomplete Alternate',
+            'domain' => 'incomplete-alternate.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/incomplete-alternate.example',
+            'status' => 'active',
+            'locale' => 'en',
+            'default_locale' => 'en',
+        ]);
+
+        $page = Page::create([
+            'site_id' => $site->id,
+            'slug' => 'index',
+            'title' => 'Incomplete Alternate',
+            'template_key' => 'index',
+            'status' => 'published',
+            'meta_title' => 'Incomplete Alternate',
+            'meta_description' => 'Incomplete alternate description',
+            'canonical' => 'https://incomplete-alternate.example/',
+            'locale' => 'en',
+            'og_data' => [
+                'head_links' => [
+                    ['rel' => 'alternate', 'href' => 'https://incomplete-alternate.example/es/', 'hreflang' => ''],
+                    ['rel' => 'alternate', 'href' => '', 'hreflang' => 'de'],
+                ],
+            ],
+        ]);
+
+        $html = app(HtmlGeneratorInterface::class)->generatePage($page->fresh(['site']));
+
+        $this->assertStringNotContainsString('<link rel="alternate" href="https://incomplete-alternate.example/es/"', $html);
+        $this->assertStringNotContainsString('hreflang=""', $html);
+        $this->assertSame(0, substr_count($html, '<link rel="alternate"'));
     }
 
     private function extractHead(string $html): string

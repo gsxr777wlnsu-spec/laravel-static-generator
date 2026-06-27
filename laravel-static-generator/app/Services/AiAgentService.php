@@ -21,7 +21,6 @@ class AiAgentService
         'title',
         'meta_title',
         'meta_description',
-        'meta_keywords',
         'canonical',
     ];
 
@@ -45,6 +44,7 @@ class AiAgentService
         'telegram:channel',
         'telegram:bot',
         'twitter:title',
+        'twitter:card',
         'twitter:description',
         'twitter:site',
         'twitter:creator',
@@ -55,6 +55,7 @@ class AiAgentService
      * @var array<int, string>
      */
     private const HEAD_META_CONTENT_EXCLUDED_PROPERTIES = [
+        'og:type',
         'vk:image',
         'vk:app_id',
         'og:image',
@@ -375,6 +376,10 @@ class AiAgentService
         $headExtra = Arr::get($page, 'og_data.head_extra');
         if (is_string($headExtra)) {
             foreach ($this->extractHeadExtraScriptBlocks($headExtra) as $scriptIndex => $scriptBlock) {
+                if ($scriptIndex > 0) {
+                    continue;
+                }
+
                 $path = "pages.{$pageIndex}.og_data.head_extra.__script__.{$scriptIndex}";
                 $fields[] = $this->buildPageField(
                     path: $path,
@@ -3482,6 +3487,7 @@ class AiAgentService
                 'section_path' => $sectionPath,
                 'target_key' => (string) ($target['key'] ?? $key),
                 'target_type' => (string) ($target['type'] ?? 'text'),
+                'attribute' => (string) ($target['attribute'] ?? ''),
                 'tag' => (string) ($target['tag'] ?? 'text'),
                 'block_key' => (string) ($target['block_key'] ?? $key),
                 'block_type' => (string) ($target['block_type'] ?? 'text'),
@@ -3603,9 +3609,9 @@ class AiAgentService
             }
         }
 
-        $altNodes = $xpath->query('.//*[@alt]', $root);
-        if ($altNodes !== false) {
-            foreach ($altNodes as $node) {
+        $imageAttributeNodes = $xpath->query('.//img', $root);
+        if ($imageAttributeNodes !== false) {
+            foreach ($imageAttributeNodes as $node) {
                 if (!$node instanceof DOMElement) {
                     continue;
                 }
@@ -3614,40 +3620,42 @@ class AiAgentService
                     continue;
                 }
 
-                $value = trim((string) $node->getAttribute('alt'));
+                foreach (['src', 'class', 'width', 'height', 'alt'] as $attribute) {
+                    $value = trim((string) $node->getAttribute($attribute));
 
-                $key = $this->shortHash('attr|' . $this->buildNodePath($node) . '@alt');
-                $blockElement = $this->closestRawHtmlBlockElement($node);
-                $blockKey = $blockElement instanceof DOMElement
-                    ? $this->shortHash('struct|' . $this->buildNodePath($blockElement))
-                    : $key;
-                $blockTag = $blockElement instanceof DOMElement ? strtolower($blockElement->tagName) : strtolower($node->tagName);
-                $itemElement = $this->closestRawHtmlItemElement($node);
-                $itemKey = $itemElement instanceof DOMElement
-                    ? $this->shortHash('struct|' . $this->buildNodePath($itemElement))
-                    : $key;
-                $targets[$key] = [
-                    'key' => $key,
-                    'type' => 'attr',
-                    'node' => $node,
-                    'tag' => strtolower($node->tagName),
-                    'attribute' => 'alt',
-                    'value' => $value,
-                    'group_key' => null,
-                    'line_index' => null,
-                    'block_key' => $blockKey,
-                    'block_tag' => $blockTag,
-                    'block_type' => $this->classifyRawHtmlBlockElement($blockElement),
-                    'block_label' => $blockElement instanceof DOMElement
-                        ? $this->labelForRawHtmlBlock((string) ($module ?? 'raw_html'), $blockElement)
-                        : $this->labelForRawHtmlTarget((string) ($module ?? 'raw_html'), ['tag' => strtolower($node->tagName), 'type' => 'attr']),
-                    'item_key' => $itemKey,
-                    'item_tag' => $itemElement instanceof DOMElement ? strtolower($itemElement->tagName) : strtolower($node->tagName),
-                    'item_label' => $itemElement instanceof DOMElement
-                        ? $this->labelForRawHtmlItem($itemElement)
-                        : '',
-                ];
-                $ordered[] = $key;
+                    $key = $this->shortHash('attr|' . $this->buildNodePath($node) . '@' . $attribute);
+                    $blockElement = $this->closestRawHtmlBlockElement($node);
+                    $blockKey = $blockElement instanceof DOMElement
+                        ? $this->shortHash('struct|' . $this->buildNodePath($blockElement))
+                        : $key;
+                    $blockTag = $blockElement instanceof DOMElement ? strtolower($blockElement->tagName) : strtolower($node->tagName);
+                    $itemElement = $this->closestRawHtmlItemElement($node);
+                    $itemKey = $itemElement instanceof DOMElement
+                        ? $this->shortHash('struct|' . $this->buildNodePath($itemElement))
+                        : $key;
+                    $targets[$key] = [
+                        'key' => $key,
+                        'type' => 'attr',
+                        'node' => $node,
+                        'tag' => strtolower($node->tagName),
+                        'attribute' => $attribute,
+                        'value' => $value,
+                        'group_key' => null,
+                        'line_index' => null,
+                        'block_key' => $blockKey,
+                        'block_tag' => $blockTag,
+                        'block_type' => $this->classifyRawHtmlBlockElement($blockElement),
+                        'block_label' => $blockElement instanceof DOMElement
+                            ? $this->labelForRawHtmlBlock((string) ($module ?? 'raw_html'), $blockElement)
+                            : $this->labelForRawHtmlTarget((string) ($module ?? 'raw_html'), ['tag' => strtolower($node->tagName), 'type' => 'attr', 'attribute' => $attribute]),
+                        'item_key' => $itemKey,
+                        'item_tag' => $itemElement instanceof DOMElement ? strtolower($itemElement->tagName) : strtolower($node->tagName),
+                        'item_label' => $itemElement instanceof DOMElement
+                            ? $this->labelForRawHtmlItem($itemElement)
+                            : '',
+                    ];
+                    $ordered[] = $key;
+                }
             }
         }
 
@@ -3948,7 +3956,8 @@ class AiAgentService
         $tag = strtolower((string) ($target['tag'] ?? 'text'));
         $type = (string) ($target['type'] ?? 'text');
         if ($type === 'attr') {
-            return "{$module} :: {$tag} alt";
+            $attribute = strtolower((string) ($target['attribute'] ?? 'attr'));
+            return "{$module} :: {$tag} {$attribute}";
         }
 
         $lineIndex = $target['line_index'] ?? null;
@@ -4048,9 +4057,13 @@ class AiAgentService
         if (
             $virtualPath['type'] === 'attr'
             && ($target['node'] ?? null) instanceof DOMElement
-            && (($target['attribute'] ?? '') === 'alt')
         ) {
-            $target['node']->setAttribute('alt', $newValue);
+            $attribute = (string) ($target['attribute'] ?? '');
+            if (!in_array($attribute, ['src', 'class', 'width', 'height', 'alt'], true)) {
+                return null;
+            }
+
+            $target['node']->setAttribute($attribute, $newValue);
             return $this->innerHtml($root);
         }
 

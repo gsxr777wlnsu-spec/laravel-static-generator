@@ -92,6 +92,10 @@
                 ];
 
                 if (strtolower((string) ($normalizedLink['rel'] ?? '')) === 'alternate') {
+                    if ($normalizedLink['hreflang'] === null || $normalizedLink['hreflang'] === '') {
+                        continue;
+                    }
+
                     $alternateLinks[] = $normalizedLink;
                     continue;
                 }
@@ -190,7 +194,6 @@
                 '@graph' => array_values($jsonLdGraph),
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 @endphp
-        <meta name="robots" content="{{ e($standardMeta['name:robots']) }}">
 @if($metaTitle !== '')
         <title>{{ $metaTitle }}</title>
 @endif
@@ -200,6 +203,7 @@
 @if($canonical !== '')
         <link rel="canonical" href="{{ $canonical }}">
 @endif
+        <meta name="robots" content="{{ e($standardMeta['name:robots']) }}">
         <meta property="og:locale" content="{{ e($standardMeta['property:og:locale']) }}">
 @if($standardMeta['property:og:locale:alternate'] !== '')
         <meta property="og:locale:alternate" content="{{ e($standardMeta['property:og:locale:alternate']) }}">
@@ -254,6 +258,12 @@ foreach ($extraLinks as $link) {
     echo '        <link ' . implode(' ', $linkAttributes) . '>' . PHP_EOL;
 }
 @endphp
+        <style>
+            img[width][height] {
+                max-width: 100%;
+                object-fit: contain;
+            }
+        </style>
         <link rel="stylesheet" href="/assets/css/style.css">
         <link rel="icon" type="image/png" href="/assets/images/favicon/favicon-96x96.png" sizes="96x96">
         <link rel="icon" type="image/svg+xml" href="/assets/images/favicon/favicon.svg">

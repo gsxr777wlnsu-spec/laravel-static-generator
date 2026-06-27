@@ -16,11 +16,16 @@
 # {site} is reused in domain/canonical and prompts.
 {site} = cleopatraslot.ca
 {html_lang} = en-CA
-{og_locale} = en_CA
 {og_locale_alternate} = en_US
+# Required. Used for canonical and generated alternate links.
 {canonical_url} = https://{site}/
-{alt_en_url} = https://cleopatraslot.ca/
-{alt_es_url} = https://cleopatraslot.ca/es/
+# Repeat {alternate_lang} as many times as needed. Alternate links are generated only when two or more languages are declared.
+{alternate_lang} = en
+{alternate_lang} = es
+{alternate_lang} = ru
+{alternate_lang} = cn
+{alternate_lang} = de
+{alternate_lang} = ro
 {page_description} = Claim 150 Free Spins 👑 & up to 640 CAD bonus on Cleopatra slot! Free demo, no download needed, instant play for Canadian players. Start now!
 # {payments__table_min_deposit_withdrawal} Переменная минимального депозита в таблице оплаты payments__table.
 {payments__table_min_deposit_withdrawal} = €175/€250
@@ -118,25 +123,6 @@ file = index-raw_html.md
 
 section = HEAD
 
-label = meta_keywords (24 chars)
-
-path = pages.0.meta_keywords
-send_current_value = true
-value:
-```text
-
-```
-
-prompt:
-```text
-
-```
-
-[FIELD]
-file = index-raw_html.md
-
-section = HEAD
-
 label = canonical (22 chars)
 
 path = pages.0.canonical
@@ -175,101 +161,6 @@ file = index-raw_html.md
 
 section = HEAD
 
-label = Head link: alternate href (17 chars)
-
-path = pages.0.og_data.head_links.0.href
-send_current_value = true
-value:
-```text
-{alt_en_url}
-```
-
-prompt:
-```text
-
-```
-
-[FIELD]
-file = index-raw_html.md
-
-section = HEAD
-
-label = Head link: alternate hreflang (2 chars)
-
-path = pages.0.og_data.head_links.0.hreflang
-send_current_value = true
-value:
-```text
-en
-```
-
-prompt:
-```text
-
-```
-
-[FIELD]
-file = index-raw_html.md
-
-section = HEAD
-
-label = Head link #2: alternate rel (9 chars)
-
-path = pages.0.og_data.head_links.1.rel
-send_current_value = true
-value:
-```text
-alternate
-```
-
-prompt:
-```text
-
-```
-
-[FIELD]
-file = index-raw_html.md
-
-section = HEAD
-
-label = Head link #2: alternate href (18 chars)
-
-path = pages.0.og_data.head_links.1.href
-send_current_value = true
-value:
-```text
-{alt_es_url}
-```
-
-prompt:
-```text
-
-```
-
-[FIELD]
-file = index-raw_html.md
-
-section = HEAD
-
-label = Head link #2: alternate hreflang (2 chars)
-
-path = pages.0.og_data.head_links.1.hreflang
-send_current_value = true
-value:
-```text
-es
-```
-
-prompt:
-```text
-
-```
-
-[FIELD]
-file = index-raw_html.md
-
-section = HEAD
-
 label = Head meta: robots (67 chars)
 
 path = pages.0.og_data.head_meta.0.content
@@ -289,32 +180,13 @@ file = index-raw_html.md
 
 section = HEAD
 
-label = Head meta: og:type (7 chars)
-
-path = pages.0.og_data.head_meta.1.content
-send_current_value = true
-value:
-```text
-website
-```
-
-prompt:
-```text
-
-```
-
-[FIELD]
-file = index-raw_html.md
-
-section = HEAD
-
 label = Head meta: og:locale (5 chars)
 
 path = pages.0.og_data.head_meta.2.content
 send_current_value = true
 value:
 ```text
-{og_locale}
+{html_lang}
 ```
 
 prompt:
@@ -460,25 +332,6 @@ file = index-raw_html.md
 
 section = HEAD
 
-label = Head meta: twitter:card (19 chars)
-
-path = pages.0.og_data.head_meta.8.content
-send_current_value = true
-value:
-```text
-summary_large_image
-```
-
-prompt:
-```text
-
-```
-
-[FIELD]
-file = index-raw_html.md
-
-section = HEAD
-
 label = Head JSON-LD script block #1 (target @graph)
 
 path = pages.0.og_data.head_extra.__script__.0
@@ -539,84 +392,6 @@ value:
   ]
 }
 </script>
-```
-
-prompt:
-```text
-
-```
-
-[FIELD]
-file = index-raw_html.md
-
-section = HEAD
-
-label = Head JSON-LD script block #2 (leave empty to remove legacy script)
-
-path = pages.0.og_data.head_extra.__script__.1
-send_current_value = true
-value:
-```text
-
-```
-
-prompt:
-```text
-
-```
-
-[FIELD]
-file = index-raw_html.md
-
-section = HEAD
-
-label = Head JSON-LD script block #3 (leave empty to remove legacy script)
-
-path = pages.0.og_data.head_extra.__script__.2
-send_current_value = true
-value:
-```text
-
-```
-
-prompt:
-```text
-
-```
-
-[FIELD]
-file = index-raw_html.md
-
-section = HEAD
-
-label = Head JSON-LD script block #4 (leave empty to remove legacy script)
-
-path = pages.0.og_data.head_extra.__script__.3
-send_current_value = true
-# Auto-synced from # SECTION FAQ visible question/answer fields after AI generation.
-value:
-```text
-
-```
-
-prompt:
-```text
-
-```
-
-[FIELD]
-file = index-raw_html.md
-
-section = HEAD
-
-label = Head JSON-LD script block #5 (leave empty to remove legacy script)
-
-path = pages.0.og_data.head_extra.__script__.4
-send_current_value = true
-# Auto-synced from # SECTION STEPS visible heading/description/step fields after AI generation.
-value:
-```text
-
 ```
 
 prompt:
@@ -720,6 +495,118 @@ tag = a
 value:
 ```text
 Play now!
+```
+
+prompt:
+```text
+
+```
+
+[FIELD]
+file = index-raw_html.md
+
+section = HERO
+
+label = hero :: img src (32 chars)
+
+path = pages.0.sections.0.raw_html.__attr__.003072fc76bfa802
+send_current_value = true
+prompt_path = pages.0.sections.0.raw_html.__attr__.003072fc76bfa802
+
+target_key = 003072fc76bfa802
+
+block_key = 003072fc76bfa802
+
+tag = img
+attribute = src
+
+value:
+```text
+/assets/images/hero/aviator.webp
+```
+
+prompt:
+```text
+
+```
+
+[FIELD]
+file = index-raw_html.md
+
+section = HERO
+
+label = hero :: img class (11 chars)
+
+path = pages.0.sections.0.raw_html.__attr__.0b452ca1eb7d782b
+send_current_value = true
+prompt_path = pages.0.sections.0.raw_html.__attr__.0b452ca1eb7d782b
+
+target_key = 0b452ca1eb7d782b
+
+block_key = 0b452ca1eb7d782b
+
+tag = img
+attribute = class
+
+value:
+```text
+hero__image
+```
+
+prompt:
+```text
+
+```
+
+[FIELD]
+file = index-raw_html.md
+
+section = HERO
+
+label = hero :: img width (3 chars)
+
+path = pages.0.sections.0.raw_html.__attr__.eaa62b5031557ea1
+send_current_value = true
+prompt_path = pages.0.sections.0.raw_html.__attr__.eaa62b5031557ea1
+
+target_key = eaa62b5031557ea1
+
+block_key = eaa62b5031557ea1
+
+tag = img
+attribute = width
+
+value:
+```text
+560
+```
+
+prompt:
+```text
+
+```
+
+[FIELD]
+file = index-raw_html.md
+
+section = HERO
+
+label = hero :: img height (3 chars)
+
+path = pages.0.sections.0.raw_html.__attr__.1314474a4ad68e61
+send_current_value = true
+prompt_path = pages.0.sections.0.raw_html.__attr__.1314474a4ad68e61
+
+target_key = 1314474a4ad68e61
+
+block_key = 1314474a4ad68e61
+
+tag = img
+attribute = height
+
+value:
+```text
+582
 ```
 
 prompt:

@@ -22,10 +22,18 @@
         $value = e((string) ($field['value'] ?? ''));
         $showPrompt = ($field['show_prompt'] ?? true) === true;
         $promptNotice = !$showPrompt && (($field['prompt_path'] ?? '') !== ($field['path'] ?? ''));
+        $tag = e((string) ($field['tag'] ?? ''));
+        $attribute = e((string) ($field['attribute'] ?? ''));
+        $isImageSrc = strtolower((string) ($field['tag'] ?? '')) === 'img'
+            && strtolower((string) ($field['attribute'] ?? '')) === 'src';
 
-        $html = '<div class="ai-prompt-row rounded-md border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800" data-file="' . $file . '" data-path="' . $path . '" data-prompt-path="' . $promptPath . '">';
+        $html = '<div class="ai-prompt-row rounded-md border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800" data-file="' . $file . '" data-path="' . $path . '" data-prompt-path="' . $promptPath . '" data-tag="' . $tag . '" data-attribute="' . $attribute . '">';
         $html .= '<div class="mb-2 text-xs font-medium text-gray-700 dark:text-gray-300">' . $label . ' (' . $length . ' chars)</div>';
         $html .= '<textarea rows="' . $rows . '" class="ai-manual-input mb-2 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white" placeholder="Edit field value manually">' . $value . '</textarea>';
+        if ($isImageSrc) {
+            $html .= '<label class="mb-2 inline-flex cursor-pointer items-center rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500">Замена<input type="file" accept="image/*" class="ai-image-replacement-input hidden"></label>';
+            $html .= '<div class="ai-image-replacement-name mb-2 hidden text-xs text-gray-500 dark:text-gray-400"></div>';
+        }
 
         if ($showPrompt) {
             $html .= '<textarea rows="2" class="ai-prompt-input block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white" placeholder="Instruction for AI to rewrite this field"></textarea>';
@@ -85,10 +93,10 @@
     </summary>
 
     <div class="border-t border-gray-200 px-4 py-8 dark:border-gray-700">
-        <section class="mb-20">
-            <h2 class="mb-10 break-words text-[48px] font-semibold uppercase leading-none text-gray-950 dark:text-white">
+        <details class="mb-20 rounded-md border border-gray-200 p-4 dark:border-gray-700">
+            <summary class="mb-10 cursor-pointer break-words text-[48px] font-semibold uppercase leading-none text-gray-950 dark:text-white">
                 SECTION HEAD
-            </h2>
+            </summary>
 
             <div class="mb-[60px]">
                 <h3 class="mb-6 break-words text-[32px] font-semibold uppercase leading-tight text-gray-900 dark:text-white">
@@ -101,7 +109,7 @@
                     @endforeach
                 </div>
             </div>
-        </section>
+        </details>
 
         @foreach($knownSectionPaths as $sectionPath)
             @php
@@ -129,10 +137,10 @@
                 $tableContainers = is_array($control['table_containers'] ?? null) ? $control['table_containers'] : [];
             @endphp
 
-            <section class="ai-template-section mb-20" data-file="{{ $fileItem['file'] }}" data-section-path="{{ $sectionPath }}" data-section-label="{{ $sectionTitle }}">
-                <h2 class="mb-10 break-words text-[48px] font-semibold uppercase leading-none text-gray-950 dark:text-white">
+            <details class="ai-template-section mb-20 rounded-md border border-gray-200 p-4 dark:border-gray-700" data-file="{{ $fileItem['file'] }}" data-section-path="{{ $sectionPath }}" data-section-label="{{ $sectionTitle }}">
+                <summary class="mb-10 cursor-pointer break-words text-[48px] font-semibold uppercase leading-none text-gray-950 dark:text-white">
                     {{ $sectionTitle }}
-                </h2>
+                </summary>
 
                 <div class="space-y-[60px]">
                     @foreach($blocks as $block)
@@ -369,7 +377,7 @@
                         </button>
                     </div>
                 </div>
-            </section>
+            </details>
         @endforeach
     </div>
 </details>

@@ -296,6 +296,7 @@ const SITE_CREATE_TIMEOUT_MS = 180000;
 const pendingBlockOperations = [];
 const queuedBlockOperationKeys = new Set();
 const importedHiddenFieldEdits = [];
+const pendingImageReplacements = [];
 
 function parseImportMultiline(lines, startIndex) {
     const marker = lines[startIndex]?.trim() || '';
@@ -355,6 +356,53 @@ function substituteImportVariablesForJsonLd(value, variables) {
     return output;
 }
 
+function buildAlternateHref(canonicalUrl, lang, isDefaultLang = false) {
+    const canonical = String(canonicalUrl || '').trim();
+    const normalizedLang = String(lang || '').trim();
+
+    if (canonical === '' || normalizedLang === '') {
+        return '';
+    }
+
+    if (isDefaultLang) {
+        return canonical;
+    }
+
+    return `${canonical.replace(/\/+$/, '')}/${normalizedLang}/`;
+}
+
+function appendAlternateLangBlocks(blocks, alternateLangs, canonicalUrl) {
+    const langs = Array.from(new Set((alternateLangs || [])
+        .map((lang) => String(lang || '').trim())
+        .filter((lang) => lang !== '')));
+
+    if (langs.length < 2) {
+        return;
+    }
+
+    langs.forEach((lang, index) => {
+        const href = buildAlternateHref(canonicalUrl, lang, index === 0);
+        if (href === '') {
+            return;
+        }
+
+        [
+            ['rel', 'alternate'],
+            ['href', href],
+            ['hreflang', lang],
+        ].forEach(([field, value]) => {
+            blocks.push({
+                type: 'FIELD',
+                values: {
+                    file: 'index-raw_html.md',
+                    path: `pages.0.og_data.head_links.${index}.${field}`,
+                    value,
+                },
+            });
+        });
+    });
+}
+
 function collectImportVariableTokens(value) {
     const matches = String(value ?? '').match(/\{([A-Za-z0-9_:-]+)\}/g) || [];
     return matches.map((token) => token.slice(1, -1));
@@ -364,6 +412,7 @@ function parseCreateSiteImportTemplate(rawText) {
     const lines = String(rawText || '').replaceAll('\r\n', '\n').replaceAll('\r', '\n').split('\n');
     const blocks = [];
     const variables = {};
+    const variableValues = {};
     const variableDeclarationCounts = {};
     const variableUsage = {};
     const warnings = [];
@@ -404,6 +453,8 @@ function parseCreateSiteImportTemplate(rawText) {
             if (variable) {
                 variableDeclarationCounts[variable.name] = (variableDeclarationCounts[variable.name] || 0) + 1;
                 variables[variable.name] = substituteImportVariables(variable.value, variables);
+                variableValues[variable.name] = variableValues[variable.name] || [];
+                variableValues[variable.name].push(variables[variable.name]);
                 registerVariableUsage(variable.value);
             }
 
@@ -434,8 +485,20 @@ function parseCreateSiteImportTemplate(rawText) {
 
     pushCurrent();
 
+    const hasCanonicalUrl = Object.prototype.hasOwnProperty.call(variables, 'canonical_url') && String(variables.canonical_url || '').trim() !== '';
+
+    if (!hasCanonicalUrl) {
+        warnings.push('Variable {canonical_url} is required.');
+    }
+
+    if (Array.isArray(variableValues.alternate_lang) && variableValues.alternate_lang.length > 0) {
+        if (hasCanonicalUrl) {
+            appendAlternateLangBlocks(blocks, variableValues.alternate_lang, variables.canonical_url);
+        }
+    }
+
     Object.entries(variableDeclarationCounts).forEach(([name, count]) => {
-        if (count > 1) {
+        if (count > 1 && name !== 'alternate_lang') {
             warnings.push(`Variable {${name}} is declared ${count} times. Last value wins.`);
         }
     });
@@ -447,7 +510,7 @@ function parseCreateSiteImportTemplate(rawText) {
     });
 
     Object.keys(variables).forEach((name) => {
-        if (!variableUsage[name]) {
+        if (!variableUsage[name] && name !== 'alternate_lang') {
             warnings.push(`Variable {${name}} is declared but not used anywhere in the import file.`);
         }
     });
@@ -585,6 +648,7 @@ function resetPendingBlockOperations() {
 function resetCreateSiteImportState() {
     siteCreateForm?.reset();
     importedHiddenFieldEdits.splice(0, importedHiddenFieldEdits.length);
+    pendingImageReplacements.splice(0, pendingImageReplacements.length);
 
     document.querySelectorAll('.ai-prompt-row').forEach((row) => {
         const manualInput = row.querySelector('.ai-manual-input');
@@ -602,7 +666,53 @@ function resetCreateSiteImportState() {
         if (sendCurrentValueCheckbox) {
             sendCurrentValueCheckbox.checked = sendCurrentValueCheckbox.defaultChecked;
         }
+
+        const imageReplacementName = row.querySelector('.ai-image-replacement-name');
+        if (imageReplacementName) {
+            imageReplacementName.textContent = '';
+            imageReplacementName.classList.add('hidden');
+        }
     });
+}
+
+function readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(reader.error || new Error('Could not read file.'));
+        reader.readAsDataURL(file);
+    });
+}
+
+function buildReplacementImageSrc(currentSrc, fileName) {
+    const cleanFileName = String(fileName || 'image').replace(/[^A-Za-z0-9._-]/g, '-');
+    const normalizedSrc = String(currentSrc || '').trim();
+    const slashIndex = normalizedSrc.lastIndexOf('/');
+
+    if (slashIndex < 0) {
+        return cleanFileName;
+    }
+
+    return `${normalizedSrc.slice(0, slashIndex + 1)}${cleanFileName}`;
+}
+
+function queueImageReplacement(row, file, dataUrl, nextSrc) {
+    const key = `${row.dataset.file || ''}::${row.dataset.path || ''}`;
+    const existingIndex = pendingImageReplacements.findIndex((item) => `${item.file}::${item.path}` === key);
+    const replacement = {
+        file: row.dataset.file || 'index-raw_html.md',
+        path: row.dataset.path || '',
+        src: nextSrc,
+        filename: file.name || 'image',
+        data_url: dataUrl,
+    };
+
+    if (existingIndex >= 0) {
+        pendingImageReplacements[existingIndex] = replacement;
+        return;
+    }
+
+    pendingImageReplacements.push(replacement);
 }
 
 function applyCreateSiteImportTemplate(rawText) {
@@ -1129,6 +1239,37 @@ function renderQueuedBlockEditor(button, operation) {
 }
 
 document.addEventListener('change', function (event) {
+    const imageInput = event.target.closest('.ai-image-replacement-input');
+    if (imageInput) {
+        const row = imageInput.closest('.ai-prompt-row');
+        const manualInput = row?.querySelector('.ai-manual-input');
+        const file = imageInput.files?.[0] || null;
+        if (!row || !manualInput || !file) {
+            return;
+        }
+
+        const currentSrc = manualInput.value || manualInput.defaultValue || '';
+        const nextSrc = buildReplacementImageSrc(currentSrc, file.name);
+        readFileAsDataUrl(file)
+            .then((dataUrl) => {
+                manualInput.value = nextSrc;
+                queueImageReplacement(row, file, dataUrl, nextSrc);
+
+                const nameElement = row.querySelector('.ai-image-replacement-name');
+                if (nameElement) {
+                    nameElement.textContent = `Selected: ${file.name}`;
+                    nameElement.classList.remove('hidden');
+                }
+            })
+            .catch((error) => {
+                renderSiteCreateFeedback('Image replacement failed: ' + (error?.message || String(error)), 'error');
+            })
+            .finally(() => {
+                imageInput.value = '';
+            });
+        return;
+    }
+
     const select = event.target.closest('.ai-standard-block-type');
     if (!select) {
         return;
@@ -1641,6 +1782,7 @@ siteCreateForm.addEventListener('submit', async function(e) {
         }
 
         data.ai_block_operations = pendingBlockOperations.map(({ _label, _key, ...operation }) => operation);
+        data.ai_image_replacements = pendingImageReplacements.map((replacement) => ({ ...replacement }));
 
         console.info('[site-create] request:start', {
             debugId: debugRequestId,
@@ -1650,6 +1792,7 @@ siteCreateForm.addEventListener('submit', async function(e) {
             aiPromptCount: Array.isArray(data.ai_field_prompts) ? data.ai_field_prompts.length : 0,
             aiEditCount: Array.isArray(data.ai_field_edits) ? data.ai_field_edits.length : 0,
             aiBlockOperationCount: Array.isArray(data.ai_block_operations) ? data.ai_block_operations.length : 0,
+            aiImageReplacementCount: Array.isArray(data.ai_image_replacements) ? data.ai_image_replacements.length : 0,
         });
 
         const response = await fetch('/api/sites', {

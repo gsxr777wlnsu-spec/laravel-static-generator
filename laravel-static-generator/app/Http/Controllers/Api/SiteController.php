@@ -128,6 +128,12 @@ class SiteController extends Controller
             'ai_block_operations.*.anchor_key' => 'nullable|string|max:64',
             'ai_block_operations.*.anchor_position' => 'nullable|in:before,after',
             'ai_block_operations.*.module' => 'nullable|string|max:255',
+            'ai_image_replacements' => 'nullable|array',
+            'ai_image_replacements.*.file' => 'required_with:ai_image_replacements|string|max:255',
+            'ai_image_replacements.*.path' => 'required_with:ai_image_replacements|string|max:1000',
+            'ai_image_replacements.*.src' => 'required_with:ai_image_replacements|string|max:1000',
+            'ai_image_replacements.*.filename' => 'required_with:ai_image_replacements|string|max:255',
+            'ai_image_replacements.*.data_url' => 'required_with:ai_image_replacements|string|max:15000000',
         ]);
 
         if ($validator->fails()) {
@@ -159,6 +165,7 @@ class SiteController extends Controller
         $aiFieldPrompts = $data['ai_field_prompts'] ?? [];
         $aiFieldEdits = $data['ai_field_edits'] ?? [];
         $aiBlockOperations = $data['ai_block_operations'] ?? [];
+        $aiImageReplacements = $data['ai_image_replacements'] ?? [];
 
         Log::info('site.create.validated', [
             'name' => $data['name'] ?? null,
@@ -170,6 +177,7 @@ class SiteController extends Controller
             'ai_prompt_count' => is_array($aiFieldPrompts) ? count($aiFieldPrompts) : 0,
             'ai_edit_count' => is_array($aiFieldEdits) ? count($aiFieldEdits) : 0,
             'ai_block_operation_count' => is_array($aiBlockOperations) ? count($aiBlockOperations) : 0,
+            'ai_image_replacement_count' => is_array($aiImageReplacements) ? count($aiImageReplacements) : 0,
             'ai_prompt_summary' => $this->summarizeFieldEntries(
                 is_array($aiFieldPrompts) ? $aiFieldPrompts : [],
                 'prompt'
@@ -188,7 +196,8 @@ class SiteController extends Controller
             $data['ai_source_domain'],
             $data['ai_field_prompts'],
             $data['ai_field_edits'],
-            $data['ai_block_operations']
+            $data['ai_block_operations'],
+            $data['ai_image_replacements']
         );
 
         $site = $this->sites->create($data);
@@ -228,6 +237,7 @@ class SiteController extends Controller
                     prompts: is_array($aiFieldPrompts) ? $aiFieldPrompts : [],
                     fieldEdits: is_array($aiFieldEdits) ? $aiFieldEdits : [],
                     blockOperations: is_array($aiBlockOperations) ? $aiBlockOperations : [],
+                    imageReplacements: is_array($aiImageReplacements) ? $aiImageReplacements : [],
                     debugId: $debugId
                 );
                 $aiGeneration['received_block_operations'] = $this->summarizeBlockOperations(
@@ -631,6 +641,7 @@ class SiteController extends Controller
         array $prompts,
         array $fieldEdits,
         array $blockOperations,
+        array $imageReplacements = [],
         ?string $debugId = null
     ): array {
         if ($userId <= 0) {
@@ -654,6 +665,15 @@ class SiteController extends Controller
             'source_domain' => $sourceDomain,
             'target_domain' => $site->domain,
         ]);
+
+        $imageReplacementPaths = $this->storeAiImageReplacements($site, $imageReplacements);
+        foreach ($imageReplacementPaths as $replacement) {
+            $fieldEdits[] = [
+                'file' => $replacement['file'],
+                'path' => $replacement['path'],
+                'value' => $replacement['src'],
+            ];
+        }
 
         $config = $this->aiConfigs->findForUser($userId);
         Log::info('site.create.ai.config.loaded', [
@@ -830,6 +850,77 @@ class SiteController extends Controller
             'block_updated_files' => (int) ($blockResult['updated_files'] ?? 0),
             'block_updated_paths' => $blockUpdatedPaths,
         ];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $imageReplacements
+     * @return array<int, array{file:string,path:string,src:string,stored_path:string}>
+     */
+    private function storeAiImageReplacements(Site $site, array $imageReplacements): array
+    {
+        if ($imageReplacements === []) {
+            return [];
+        }
+
+        $templatesRoot = (string) config(
+            'services.ai_agent.templates_root',
+            storage_path('import-deploy/md/test/raw_html')
+        );
+        $domainDir = rtrim($templatesRoot, '/') . '/' . $site->domain;
+        if (!is_dir($domainDir)) {
+            throw new RuntimeException("Cloned template directory not found: {$domainDir}");
+        }
+
+        $stored = [];
+        foreach ($imageReplacements as $replacement) {
+            if (!is_array($replacement)) {
+                continue;
+            }
+
+            $file = basename((string) ($replacement['file'] ?? ''));
+            $path = trim((string) ($replacement['path'] ?? ''));
+            $src = $this->normalizeTemplateAssetPath((string) ($replacement['src'] ?? ''));
+            $dataUrl = (string) ($replacement['data_url'] ?? '');
+
+            if ($file === '' || $path === '' || $src === '') {
+                continue;
+            }
+
+            if (!preg_match('/^data:(image\/[A-Za-z0-9.+-]+);base64,([A-Za-z0-9+\/=]+)$/', $dataUrl, $matches)) {
+                continue;
+            }
+
+            $binary = base64_decode($matches[2], true);
+            if ($binary === false || $binary === '') {
+                continue;
+            }
+
+            $targetPath = $domainDir . '/' . $src;
+            File::ensureDirectoryExists(dirname($targetPath));
+            File::put($targetPath, $binary);
+
+            $stored[] = [
+                'file' => $file,
+                'path' => $path,
+                'src' => str_starts_with((string) ($replacement['src'] ?? ''), '/') ? '/' . $src : $src,
+                'stored_path' => $targetPath,
+            ];
+        }
+
+        return $stored;
+    }
+
+    private function normalizeTemplateAssetPath(string $path): string
+    {
+        $path = trim(str_replace('\\', '/', $path));
+        $path = ltrim($path, '/');
+        $path = preg_replace('#/+#', '/', $path) ?? '';
+
+        if ($path === '' || str_contains($path, '..') || str_starts_with($path, '~')) {
+            return '';
+        }
+
+        return $path;
     }
 
     /**

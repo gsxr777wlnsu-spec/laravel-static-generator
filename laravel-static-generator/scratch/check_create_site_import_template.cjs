@@ -59,6 +59,53 @@ function substituteImportVariablesForJsonLd(value, variables) {
     return output;
 }
 
+function buildAlternateHref(canonicalUrl, lang, isDefaultLang = false) {
+    const canonical = String(canonicalUrl || '').trim();
+    const normalizedLang = String(lang || '').trim();
+
+    if (canonical === '' || normalizedLang === '') {
+        return '';
+    }
+
+    if (isDefaultLang) {
+        return canonical;
+    }
+
+    return `${canonical.replace(/\/+$/, '')}/${normalizedLang}/`;
+}
+
+function appendAlternateLangBlocks(blocks, alternateLangs, canonicalUrl) {
+    const langs = Array.from(new Set((alternateLangs || [])
+        .map((lang) => String(lang || '').trim())
+        .filter((lang) => lang !== '')));
+
+    if (langs.length < 2) {
+        return;
+    }
+
+    langs.forEach((lang, index) => {
+        const href = buildAlternateHref(canonicalUrl, lang, index === 0);
+        if (href === '') {
+            return;
+        }
+
+        [
+            ['rel', 'alternate'],
+            ['href', href],
+            ['hreflang', lang],
+        ].forEach(([field, value]) => {
+            blocks.push({
+                type: 'FIELD',
+                values: {
+                    file: 'index-raw_html.md',
+                    path: `pages.0.og_data.head_links.${index}.${field}`,
+                    value,
+                },
+            });
+        });
+    });
+}
+
 function collectImportVariableTokens(value) {
     const matches = String(value ?? '').match(/\{([A-Za-z0-9_:-]+)\}/g) || [];
     return matches.map((token) => token.slice(1, -1));
@@ -68,6 +115,7 @@ function parseCreateSiteImportTemplate(rawText) {
     const lines = String(rawText || '').replaceAll('\r\n', '\n').replaceAll('\r', '\n').split('\n');
     const blocks = [];
     const variables = {};
+    const variableValues = {};
     const variableDeclarationCounts = {};
     const variableUsage = {};
     const warnings = [];
@@ -108,6 +156,8 @@ function parseCreateSiteImportTemplate(rawText) {
             if (variable) {
                 variableDeclarationCounts[variable.name] = (variableDeclarationCounts[variable.name] || 0) + 1;
                 variables[variable.name] = substituteImportVariables(variable.value, variables);
+                variableValues[variable.name] = variableValues[variable.name] || [];
+                variableValues[variable.name].push(variables[variable.name]);
                 registerVariableUsage(variable.value);
             }
 
@@ -138,8 +188,20 @@ function parseCreateSiteImportTemplate(rawText) {
 
     pushCurrent();
 
+    const hasCanonicalUrl = Object.prototype.hasOwnProperty.call(variables, 'canonical_url') && String(variables.canonical_url || '').trim() !== '';
+
+    if (!hasCanonicalUrl) {
+        warnings.push('Variable {canonical_url} is required.');
+    }
+
+    if (Array.isArray(variableValues.alternate_lang) && variableValues.alternate_lang.length > 0) {
+        if (hasCanonicalUrl) {
+            appendAlternateLangBlocks(blocks, variableValues.alternate_lang, variables.canonical_url);
+        }
+    }
+
     Object.entries(variableDeclarationCounts).forEach(([name, count]) => {
-        if (count > 1) {
+        if (count > 1 && name !== 'alternate_lang') {
             warnings.push(`Variable {${name}} is declared ${count} times. Last value wins.`);
         }
     });
@@ -151,7 +213,7 @@ function parseCreateSiteImportTemplate(rawText) {
     });
 
     Object.keys(variables).forEach((name) => {
-        if (!variableUsage[name]) {
+        if (!variableUsage[name] && name !== 'alternate_lang') {
             warnings.push(`Variable {${name}} is declared but not used anywhere in the import file.`);
         }
     });
@@ -170,7 +232,9 @@ const parsed = parseCreateSiteImportTemplate(rawText);
 const wantedPaths = [
     'pages.0.locale',
     'pages.0.canonical',
+    'pages.0.og_data.head_links.0.rel',
     'pages.0.og_data.head_links.0.href',
+    'pages.0.og_data.head_links.0.hreflang',
     'pages.0.og_data.head_links.1.rel',
     'pages.0.og_data.head_links.1.href',
     'pages.0.og_data.head_links.1.hreflang',
@@ -189,8 +253,7 @@ console.log(JSON.stringify({
     variables: {
         site: parsed.variables.site,
         canonical_url: parsed.variables.canonical_url,
-        alt_en_url: parsed.variables.alt_en_url,
-        alt_es_url: parsed.variables.alt_es_url,
+        alternate_lang: parsed.variables.alternate_lang,
         html_lang: parsed.variables.html_lang,
     },
     ai_field_edits_preview: valuesByPath,

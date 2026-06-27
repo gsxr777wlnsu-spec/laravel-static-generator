@@ -20,6 +20,8 @@
 {site_name} = Aviator Game
 # {site} is used in domain, output_path, canonical, contact and other URL/domain fields.
 {site} = test.ratel.im
+# Required. Used for canonical and generated alternate links when two or more alternate_lang variables are declared.
+{canonical_url} = https://{site}/
 # {promt_lang} is used in AI prompts.
 {promt_lang} = English
 # {meta_description_total} is used in SEO prompt length instructions.
@@ -153,7 +155,7 @@ send_current_value = true
 
 value:
 ```text
-https://{site}/
+{canonical_url}
 ```
 
 prompt:

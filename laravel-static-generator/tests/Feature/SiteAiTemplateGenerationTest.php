@@ -168,6 +168,7 @@ class SiteAiTemplateGenerationTest extends TestCase
             fn ($field) => is_array($field)
                 && (($field['target_type'] ?? null) === 'attr')
                 && (($field['tag'] ?? null) === 'img')
+                && (($field['attribute'] ?? null) === 'alt')
                 && (($field['value'] ?? null) === '')
         );
 
@@ -203,6 +204,59 @@ class SiteAiTemplateGenerationTest extends TestCase
         $rawHtml = (string) data_get($updated, 'pages.0.sections.0.raw_html');
 
         $this->assertStringContainsString('alt="Aviator hero image"', $rawHtml);
+    }
+
+    public function test_site_creation_can_replace_raw_html_image_file_and_src(): void
+    {
+        $user = User::factory()->create();
+
+        $sourceFile = $this->templatesRoot . '/test.com/index-raw_html.md';
+        $fixture = Yaml::parseFile($sourceFile);
+        $fixture['pages'][0]['sections'][0]['raw_html'] = '<section class="hero"><img class="hero__image" src="/assets/images/hero/old.webp" width="560" height="582" alt="Aviator"><h1>Old Heading</h1></section>';
+        file_put_contents($sourceFile, "---\n" . Yaml::dump($fixture, 8, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK));
+
+        $catalog = app(AiAgentService::class)->listTemplateFields('test.com');
+        $indexFile = collect($catalog)->firstWhere('file', 'index-raw_html.md');
+        $sectionFields = $indexFile['section_fields'] ?? [];
+        $srcField = collect(is_array($sectionFields) ? $sectionFields : [])->first(
+            fn ($field) => is_array($field)
+                && (($field['target_type'] ?? null) === 'attr')
+                && (($field['tag'] ?? null) === 'img')
+                && (($field['attribute'] ?? null) === 'src')
+        );
+
+        $this->assertIsArray($srcField);
+
+        $payload = [
+            'name' => 'Manual Image Site',
+            'domain' => 'manual-image-site.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/manual-image-site.example',
+            'status' => 'draft',
+            'locale' => 'en',
+            'default_locale' => 'en',
+            'ai_clone_templates' => true,
+            'ai_source_domain' => 'test.com',
+            'ai_field_prompts' => [],
+            'ai_image_replacements' => [[
+                'file' => 'index-raw_html.md',
+                'path' => $srcField['path'],
+                'src' => '/assets/images/hero/replacement.png',
+                'filename' => 'replacement.png',
+                'data_url' => 'data:image/png;base64,' . base64_encode('replacement-image'),
+            ]],
+        ];
+
+        $response = $this->actingAs($user)->postJson('/api/sites', $payload);
+        $response->assertStatus(201);
+        $response->assertJsonPath('ai_generation.manual_updated_fields', 1);
+
+        $targetFile = $this->templatesRoot . '/manual-image-site.example/index-raw_html.md';
+        $updated = Yaml::parseFile($targetFile);
+        $rawHtml = (string) data_get($updated, 'pages.0.sections.0.raw_html');
+
+        $this->assertStringContainsString('src="/assets/images/hero/replacement.png"', $rawHtml);
+        $this->assertFileExists($this->templatesRoot . '/manual-image-site.example/assets/images/hero/replacement.png');
     }
 
     public function test_site_creation_applies_ai_prompts_to_md_fields(): void
