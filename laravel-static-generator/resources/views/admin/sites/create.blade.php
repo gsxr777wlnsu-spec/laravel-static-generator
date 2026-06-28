@@ -169,9 +169,9 @@
                                              data-file="{{ $fileItem['file'] }}"
                                              data-path="{{ $field['path'] }}">
                                             <div class="mb-2 text-xs font-medium text-gray-700 dark:text-gray-300">
-                                                Page field: {{ $field['field'] }} ({{ $field['length'] }} chars)
+                                                Page field: {{ $field['field'] }} (<span class="ai-field-length">{{ $field['length'] }}</span> chars)
                                             </div>
-                                            <textarea rows="{{ $field['input_rows'] ?? 2 }}" class="ai-manual-input mb-2 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                            <textarea rows="{{ $field['input_rows'] ?? 2 }}" data-default-rows="{{ $field['input_rows'] ?? 2 }}" class="ai-manual-input mb-2 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                                       placeholder="Edit field value manually">{{ $field['value'] ?? '' }}</textarea>
                                             <textarea rows="2" class="ai-prompt-input block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                                       placeholder="Instruction for AI to rewrite this field"></textarea>
@@ -188,10 +188,10 @@
                                              data-path="{{ $field['path'] }}"
                                              data-prompt-path="{{ $field['prompt_path'] ?? $field['path'] }}">
                                             <div class="mb-2 text-xs font-medium text-gray-700 dark:text-gray-300">
-                                                {{ $field['field'] }} ({{ $field['length'] }} chars)
+                                                {{ $field['field'] }} (<span class="ai-field-length">{{ $field['length'] }}</span> chars)
                                             </div>
                                             @if(array_key_exists('value', $field))
-                                                <textarea rows="2" class="ai-manual-input mb-2 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                                <textarea rows="2" data-default-rows="2" class="ai-manual-input mb-2 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                                           placeholder="Edit field value manually">{{ $field['value'] ?? '' }}</textarea>
                                             @else
                                                 <div class="mb-2 text-xs text-gray-500 dark:text-gray-400">
@@ -543,6 +543,188 @@ function findPromptRow(file, path) {
         .find((row) => row.dataset.file === file && row.dataset.path === path) || null;
 }
 
+function getPromptRowValue(path) {
+    const row = findPromptRow('index-raw_html.md', path);
+    return row?.querySelector('.ai-manual-input')?.value ?? '';
+}
+
+function setPromptRowValue(path, value) {
+    const row = findPromptRow('index-raw_html.md', path);
+    const input = row?.querySelector('.ai-manual-input');
+    if (!row || !input) {
+        return false;
+    }
+
+    input.value = String(value ?? '');
+    updatePromptRowLength(row, input.value);
+    resizeManualInputRows(input, input.value);
+    return true;
+}
+
+function normalizeJsonLdUrl(value, origin) {
+    const rawValue = String(value ?? '').trim();
+    const rawOrigin = String(origin ?? '').replace(/\/+$/, '');
+    if (rawValue === '' || rawOrigin === '') {
+        return rawValue;
+    }
+
+    if (rawValue.startsWith('//')) {
+        return `https:${rawValue}`;
+    }
+
+    if (rawValue.startsWith('/')) {
+        return `${rawOrigin}${rawValue}`;
+    }
+
+    try {
+        const url = new URL(rawValue);
+        return `${rawOrigin}${url.pathname}${url.search}${url.hash}`;
+    } catch (error) {
+        return rawValue;
+    }
+}
+
+function siteOriginFromCanonical(canonical, domain) {
+    const rawCanonical = String(canonical ?? '').trim();
+    if (rawCanonical !== '') {
+        try {
+            return new URL(rawCanonical).origin;
+        } catch (error) {
+            // Fall through to domain.
+        }
+    }
+
+    const rawDomain = String(domain ?? '').trim();
+    return rawDomain === '' ? '' : `https://${rawDomain.replace(/^https?:\/\//i, '').replace(/\/+$/, '')}`;
+}
+
+function currentHeadState() {
+    const canonical = getPromptRowValue('pages.0.canonical');
+    const formName = String(siteCreateForm?.elements?.name?.value || '').trim();
+    const formDomain = String(siteCreateForm?.elements?.domain?.value || '').trim();
+    const metaTitle = getPromptRowValue('pages.0.meta_title') || getPromptRowValue('pages.0.title') || formName;
+    const metaDescription = getPromptRowValue('pages.0.meta_description');
+    const locale = getPromptRowValue('pages.0.locale') || String(siteCreateForm?.elements?.locale?.value || '').trim();
+    const origin = siteOriginFromCanonical(canonical, formDomain);
+
+    return {
+        name: formName,
+        domain: formDomain,
+        canonical,
+        origin,
+        metaTitle,
+        metaDescription,
+        locale,
+        robots: getPromptRowValue('pages.0.og_data.head_meta.0.content'),
+        ogLocale: getPromptRowValue('pages.0.og_data.head_meta.2.content') || locale,
+        ogTitle: getPromptRowValue('pages.0.og_data.head_meta.3.content') || metaTitle,
+        ogDescription: getPromptRowValue('pages.0.og_data.head_meta.4.content') || metaDescription,
+        publishedTime: getPromptRowValue('pages.0.og_data.head_meta.5.content'),
+        modifiedTime: getPromptRowValue('pages.0.og_data.head_meta.6.content'),
+    };
+}
+
+function syncJsonLdNode(node, state) {
+    if (Array.isArray(node)) {
+        return node.map((item) => syncJsonLdNode(item, state));
+    }
+
+    if (!node || typeof node !== 'object') {
+        return node;
+    }
+
+    const next = { ...node };
+    const type = String(next['@type'] || '');
+
+    if (typeof next['@id'] === 'string') {
+        next['@id'] = normalizeJsonLdUrl(next['@id'], state.origin);
+    }
+    if (typeof next.url === 'string') {
+        next.url = normalizeJsonLdUrl(next.url, state.origin);
+    }
+    if (typeof next.image === 'string') {
+        next.image = normalizeJsonLdUrl(next.image, state.origin);
+    }
+    if (next.logo && typeof next.logo === 'object' && typeof next.logo.url === 'string') {
+        next.logo = { ...next.logo, url: normalizeJsonLdUrl(next.logo.url, state.origin) };
+    }
+
+    if (type === 'WebPage') {
+        if (state.canonical !== '') {
+            next.url = state.canonical;
+        }
+        if (state.metaTitle !== '') {
+            next.name = state.metaTitle;
+        }
+        if (state.metaDescription !== '') {
+            next.description = state.metaDescription;
+        }
+        if (state.locale !== '') {
+            next.inLanguage = state.locale;
+        }
+        if (state.publishedTime !== '') {
+            next.datePublished = state.publishedTime;
+        }
+        if (state.modifiedTime !== '') {
+            next.dateModified = state.modifiedTime;
+        }
+    }
+
+    if (type === 'VideoGame') {
+        if (state.canonical !== '') {
+            next.url = state.canonical;
+        }
+        if (state.metaTitle !== '') {
+            next.name = state.metaTitle;
+        }
+        if (state.metaDescription !== '') {
+            next.description = state.metaDescription;
+        }
+    }
+
+    if (type === 'Organization') {
+        if (state.origin !== '') {
+            next.url = `${state.origin}/`;
+        }
+        if (state.name !== '') {
+            next.name = state.name;
+        } else if (state.domain !== '') {
+            next.name = state.domain;
+        }
+    }
+
+    if (next.mainEntity) {
+        next.mainEntity = syncJsonLdNode(next.mainEntity, state);
+    }
+    if (next['@graph']) {
+        next['@graph'] = syncJsonLdNode(next['@graph'], state);
+    }
+    if (next.itemListElement) {
+        next.itemListElement = syncJsonLdNode(next.itemListElement, state);
+    }
+
+    return next;
+}
+
+function syncPrimaryJsonLdFromHeadFields() {
+    const path = 'pages.0.og_data.head_extra.__script__.0';
+    const currentValue = getPromptRowValue(path);
+    if (String(currentValue).trim() === '') {
+        return false;
+    }
+
+    let parsed = null;
+    try {
+        parsed = JSON.parse(currentValue);
+    } catch (error) {
+        return false;
+    }
+
+    const state = currentHeadState();
+    const synced = syncJsonLdNode(parsed, state);
+    return setPromptRowValue(path, JSON.stringify(synced, null, 2));
+}
+
 function setImportedFormValue(name, value) {
     if (name === 'ai_clone_templates') {
         const checkbox = document.getElementById('ai_clone_templates');
@@ -657,6 +839,8 @@ function resetCreateSiteImportState() {
 
         if (manualInput) {
             manualInput.value = manualInput.defaultValue ?? '';
+            updatePromptRowLength(row, manualInput.value);
+            resizeManualInputRows(manualInput, manualInput.value);
         }
 
         if (promptInput) {
@@ -696,6 +880,186 @@ function buildReplacementImageSrc(currentSrc, fileName) {
     return `${normalizedSrc.slice(0, slashIndex + 1)}${cleanFileName}`;
 }
 
+function updatePromptRowLength(row, value) {
+    const lengthNode = row?.querySelector('.ai-field-length');
+    if (lengthNode) {
+        lengthNode.textContent = String(String(value ?? '').length);
+    }
+}
+
+function resizeManualInputRows(input, value) {
+    const defaultRows = Number(input?.dataset?.defaultRows || input?.getAttribute('rows') || 2);
+    const lineCount = String(value ?? '').split('\n').length;
+    input.rows = Math.min(Math.max(defaultRows, lineCount), 60);
+}
+
+function openPromptRowDetails(row) {
+    let details = row?.closest('details') || null;
+    while (details) {
+        details.open = true;
+        details = details.parentElement?.closest('details') || null;
+    }
+}
+
+function editableJsonLdValue(path, value) {
+    const rawValue = String(value ?? '');
+    if (!String(path || '').includes('.og_data.head_extra.__script__.')) {
+        return rawValue;
+    }
+
+    const match = rawValue.match(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
+    return match ? match[1].trim() : rawValue;
+}
+
+function hiddenJsonLdScriptPath(path) {
+    const match = String(path || '').match(/\.og_data\.head_extra\.__script__\.(\d+)$/);
+    return match ? Number(match[1]) > 0 : false;
+}
+
+function primaryJsonLdScriptPath(path) {
+    return String(path || '') === 'pages.0.og_data.head_extra.__script__.0';
+}
+
+function primaryModifiedTimeMetaPath() {
+    return 'pages.0.og_data.head_meta.6.content';
+}
+
+function currentUtcIsoTimestamp() {
+    return new Date().toISOString().replace(/\.\d{3}Z$/, '+00:00');
+}
+
+let modifiedTimeSyncState = {
+    autoManaged: true,
+    lastImportedValue: '',
+    isApplyingProgrammaticSync: false,
+};
+
+function withModifiedTimeSyncGuard(callback) {
+    modifiedTimeSyncState.isApplyingProgrammaticSync = true;
+    try {
+        return callback();
+    } finally {
+        modifiedTimeSyncState.isApplyingProgrammaticSync = false;
+    }
+}
+
+function extractJsonLdModifiedTime(value) {
+    const rawValue = String(value ?? '').trim();
+    if (rawValue === '') {
+        return '';
+    }
+
+    let parsed = null;
+    try {
+        parsed = JSON.parse(rawValue);
+    } catch (error) {
+        return '';
+    }
+
+    const queue = [parsed];
+    while (queue.length > 0) {
+        const node = queue.shift();
+
+        if (Array.isArray(node)) {
+            queue.push(...node);
+            continue;
+        }
+
+        if (!node || typeof node !== 'object') {
+            continue;
+        }
+
+        if (String(node['@type'] || '') === 'WebPage' && typeof node.dateModified === 'string') {
+            return node.dateModified.trim();
+        }
+
+        if (node.mainEntity) {
+            queue.push(node.mainEntity);
+        }
+        if (node['@graph']) {
+            queue.push(node['@graph']);
+        }
+        if (node.itemListElement) {
+            queue.push(node.itemListElement);
+        }
+    }
+
+    return '';
+}
+
+function setModifiedTimeSyncMode(autoManaged, importedValue = '') {
+    modifiedTimeSyncState.autoManaged = autoManaged;
+    modifiedTimeSyncState.lastImportedValue = importedValue;
+}
+
+function setModifiedTimeEverywhere(value, options = {}) {
+    const normalizedValue = String(value ?? '').trim();
+    const {
+        autoManaged = false,
+        syncJsonLd = true,
+    } = options;
+
+    return withModifiedTimeSyncGuard(() => {
+        setPromptRowValue(primaryModifiedTimeMetaPath(), normalizedValue);
+
+        if (syncJsonLd) {
+            syncPrimaryJsonLdFromHeadFields();
+        }
+
+        setModifiedTimeSyncMode(autoManaged, normalizedValue);
+        return true;
+    });
+}
+
+function syncModifiedTimeFromJsonLd(options = {}) {
+    const jsonLdValue = getPromptRowValue('pages.0.og_data.head_extra.__script__.0');
+    const extractedValue = extractJsonLdModifiedTime(jsonLdValue);
+    const {
+        autoManaged = false,
+    } = options;
+
+    return withModifiedTimeSyncGuard(() => {
+        setPromptRowValue(primaryModifiedTimeMetaPath(), extractedValue);
+        setModifiedTimeSyncMode(autoManaged, extractedValue);
+        return extractedValue;
+    });
+}
+
+function applyImportedModifiedTime(preferredSource = null) {
+    const importedMetaValue = getPromptRowValue(primaryModifiedTimeMetaPath()).trim();
+    const importedJsonLdValue = extractJsonLdModifiedTime(getPromptRowValue('pages.0.og_data.head_extra.__script__.0'));
+
+    if (preferredSource === 'jsonld' && importedJsonLdValue !== '') {
+        syncModifiedTimeFromJsonLd({ autoManaged: false });
+        return;
+    }
+
+    if (preferredSource === 'meta' && importedMetaValue !== '') {
+        setModifiedTimeEverywhere(importedMetaValue, { autoManaged: false });
+        return;
+    }
+
+    if (importedJsonLdValue !== '') {
+        syncModifiedTimeFromJsonLd({ autoManaged: false });
+        return;
+    }
+
+    if (importedMetaValue !== '') {
+        setModifiedTimeEverywhere(importedMetaValue, { autoManaged: false });
+        return;
+    }
+
+    setModifiedTimeEverywhere(currentUtcIsoTimestamp(), { autoManaged: true });
+}
+
+function refreshAutoManagedModifiedTime() {
+    if (!modifiedTimeSyncState.autoManaged) {
+        return false;
+    }
+
+    return setModifiedTimeEverywhere(currentUtcIsoTimestamp(), { autoManaged: true });
+}
+
 function queueImageReplacement(row, file, dataUrl, nextSrc) {
     const key = `${row.dataset.file || ''}::${row.dataset.path || ''}`;
     const existingIndex = pendingImageReplacements.findIndex((item) => `${item.file}::${item.path}` === key);
@@ -718,6 +1082,7 @@ function queueImageReplacement(row, file, dataUrl, nextSrc) {
 function applyCreateSiteImportTemplate(rawText) {
     const parsedImport = parseCreateSiteImportTemplate(rawText);
     const blocks = parsedImport.blocks || [];
+    let importedModifiedTimeSource = null;
 
     resetCreateSiteImportState();
     resetPendingBlockOperations();
@@ -747,6 +1112,12 @@ function applyCreateSiteImportTemplate(rawText) {
                     ? String(values.value ?? '')
                     : null;
 
+                if (hiddenJsonLdScriptPath(values.path || '')) {
+                    stats.skipped += 1;
+                    stats.warnings.push(`Skipped hidden JSON-LD script field: ${values.path}`);
+                    return;
+                }
+
                 if (values.file && values.path && importedValue !== null) {
                     importedHiddenFieldEdits.push({
                         file: values.file,
@@ -764,7 +1135,19 @@ function applyCreateSiteImportTemplate(rawText) {
             const promptInput = row.querySelector('.ai-prompt-input');
             const sendCurrentValueCheckbox = row.querySelector('.ai-send-current-value-checkbox');
             if (manualInput && Object.prototype.hasOwnProperty.call(values, 'value')) {
-                manualInput.value = values.value;
+                const fieldPath = values.path || row.dataset.path || '';
+                const nextValue = editableJsonLdValue(fieldPath, values.value);
+                if (!(primaryJsonLdScriptPath(fieldPath) && String(nextValue).trim() === '')) {
+                    manualInput.value = nextValue;
+                    updatePromptRowLength(row, manualInput.value);
+                    resizeManualInputRows(manualInput, manualInput.value);
+
+                    if (fieldPath === primaryModifiedTimeMetaPath() && String(nextValue).trim() !== '') {
+                        importedModifiedTimeSource = 'meta';
+                    } else if (primaryJsonLdScriptPath(fieldPath) && extractJsonLdModifiedTime(nextValue) !== '') {
+                        importedModifiedTimeSource = 'jsonld';
+                    }
+                }
             }
             if (promptInput && Object.prototype.hasOwnProperty.call(values, 'prompt')) {
                 promptInput.value = values.prompt;
@@ -794,6 +1177,7 @@ function applyCreateSiteImportTemplate(rawText) {
     });
 
     renderBlockOperations();
+    applyImportedModifiedTime(importedModifiedTimeSource);
 
     return stats;
 }
@@ -1287,6 +1671,29 @@ document.addEventListener('change', function (event) {
 });
 
 document.addEventListener('input', function (event) {
+    const manualInput = event.target.closest('.ai-manual-input');
+    if (manualInput) {
+        const row = manualInput.closest('.ai-prompt-row');
+        if (row) {
+            updatePromptRowLength(row, manualInput.value);
+            resizeManualInputRows(manualInput, manualInput.value);
+
+            if (modifiedTimeSyncState.isApplyingProgrammaticSync) {
+                return;
+            }
+
+            const rowPath = String(row.dataset.path || '');
+            if (rowPath === primaryModifiedTimeMetaPath()) {
+                syncPrimaryJsonLdFromHeadFields();
+                setModifiedTimeSyncMode(false, manualInput.value.trim());
+            } else if (primaryJsonLdScriptPath(rowPath)) {
+                syncModifiedTimeFromJsonLd({ autoManaged: false });
+            } else if (!rowPath.includes('.og_data.head_extra.__script__.')) {
+                syncPrimaryJsonLdFromHeadFields();
+            }
+        }
+    }
+
     const editor = event.target.closest('.ai-queued-block-editor');
     if (!editor) {
         return;
@@ -1712,6 +2119,8 @@ siteCreateForm.addEventListener('submit', async function(e) {
         data.ai_clone_templates = document.getElementById('ai_clone_templates')?.checked === true;
         data.ai_source_domain = String(document.getElementById('ai_source_domain')?.value || '').trim();
         data.debug_request_id = debugRequestId;
+        refreshAutoManagedModifiedTime();
+        syncPrimaryJsonLdFromHeadFields();
         data.ai_field_prompts = Array.from(document.querySelectorAll('.ai-prompt-row'))
             .reduce((acc, row) => {
                 const promptInput = row.querySelector('.ai-prompt-input');

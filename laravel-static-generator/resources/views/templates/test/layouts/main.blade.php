@@ -11,8 +11,15 @@
             $metaTitle = trim((string) ($page->meta_title ?? $page->title ?? ''));
             $metaDescription = trim((string) ($page->meta_description ?? ''));
             $canonical = trim((string) ($page->canonical ?? url($page->slug)));
+            $isHomePage = in_array(trim((string) ($page->slug ?? ''), '/'), ['', 'index'], true);
             $defaultLocale = trim((string) ($page->locale ?? 'en'));
             $ogLocale = str_replace('-', '_', $defaultLocale);
+            $pagePublishedTime = $page->created_at ? $page->created_at->toAtomString() : now()->toAtomString();
+            $pageModifiedTime = $page->updated_at ? $page->updated_at->toAtomString() : now()->toAtomString();
+            $canonicalParts = $canonical !== '' ? parse_url($canonical) : [];
+            $canonicalOrigin = is_array($canonicalParts) && isset($canonicalParts['scheme'], $canonicalParts['host'])
+                ? $canonicalParts['scheme'] . '://' . $canonicalParts['host'] . (isset($canonicalParts['port']) ? ':' . $canonicalParts['port'] : '')
+                : 'https://' . $domain;
             $metaKey = static function (array $meta): ?string {
                 $property = strtolower(trim((string) ($meta['property'] ?? '')));
                 if ($property !== '') {
@@ -41,8 +48,8 @@
                 'property:og:description' => $metaDescription,
                 'property:og:url' => $canonical,
                 'property:og:site_name' => $domain,
-                'property:article:published_time' => '2020-12-07T18:05:01+00:00',
-                'property:article:modified_time' => '2026-04-20T10:43:59+00:00',
+                'property:article:published_time' => $pagePublishedTime,
+                'property:article:modified_time' => $pageModifiedTime,
                 'name:twitter:card' => 'summary_large_image',
             ];
             $extraHeadMeta = [];
@@ -71,6 +78,7 @@
 
                 $extraHeadMeta[] = $normalizedMeta;
             }
+            $schemaModifiedTime = trim((string) ($standardMeta['property:article:modified_time'] ?? $pageModifiedTime));
             $alternateLinks = [];
             $extraLinks = [];
             foreach ($headLinkItems as $link) {
@@ -189,6 +197,129 @@
                 ];
             }
 
+            $normalizeSchemaUrl = static function (?string $value) use ($canonicalOrigin): string {
+                $value = trim((string) $value);
+                if ($value === '') {
+                    return $value;
+                }
+
+                $value = str_replace('https://{site}', $canonicalOrigin, $value);
+                $value = str_replace('http://{site}', $canonicalOrigin, $value);
+
+                if (str_starts_with($value, '//')) {
+                    return 'https:' . $value;
+                }
+
+                if (str_starts_with($value, '/')) {
+                    return rtrim($canonicalOrigin, '/') . $value;
+                }
+
+                $parts = parse_url($value);
+                if (!is_array($parts) || !isset($parts['scheme'], $parts['host'])) {
+                    return $value;
+                }
+
+                $path = $parts['path'] ?? '';
+                $query = isset($parts['query']) ? '?' . $parts['query'] : '';
+                $fragment = isset($parts['fragment']) ? '#' . $parts['fragment'] : '';
+
+                return rtrim($canonicalOrigin, '/') . $path . $query . $fragment;
+            };
+
+            $schemaGameName = '';
+            foreach ($jsonLdGraph as $node) {
+                if (!is_array($node)) {
+                    continue;
+                }
+
+                $mainEntity = $node['mainEntity'] ?? null;
+                if (is_array($mainEntity) && (($mainEntity['@type'] ?? null) === 'VideoGame')) {
+                    $schemaGameName = trim((string) ($mainEntity['name'] ?? ''));
+                    if ($schemaGameName !== '') {
+                        break;
+                    }
+                }
+            }
+            if ($schemaGameName === '') {
+                $titleParts = preg_split('/\s[-–—|:]\s/u', $metaTitle, 2);
+                $schemaGameName = trim((string) (($titleParts !== false ? $titleParts[0] : $metaTitle) ?? ''));
+            }
+
+            $applyDynamicSchemaFields = static function (array $node) use (&$applyDynamicSchemaFields, $normalizeSchemaUrl, $canonical, $canonicalOrigin, $metaTitle, $metaDescription, $defaultLocale, $pagePublishedTime, $schemaModifiedTime, $domain, $site, $schemaGameName, $isHomePage): array {
+                $type = $node['@type'] ?? null;
+
+                if (isset($node['@id']) && is_string($node['@id'])) {
+                    $node['@id'] = $normalizeSchemaUrl($node['@id']);
+                }
+
+                if (isset($node['url']) && is_string($node['url'])) {
+                    $node['url'] = $normalizeSchemaUrl($node['url']);
+                }
+
+                if (isset($node['image']) && is_string($node['image'])) {
+                    $node['image'] = $normalizeSchemaUrl($node['image']);
+                }
+
+                if (isset($node['logo']) && is_array($node['logo']) && isset($node['logo']['url']) && is_string($node['logo']['url'])) {
+                    $node['logo']['url'] = $normalizeSchemaUrl($node['logo']['url']);
+                }
+
+                if ($type === 'WebPage') {
+                    $node['url'] = $canonical;
+                    $node['name'] = $metaTitle;
+                    $node['description'] = $metaDescription;
+                    $node['inLanguage'] = $defaultLocale;
+                    $node['datePublished'] = $pagePublishedTime;
+                    $node['dateModified'] = $schemaModifiedTime;
+                }
+
+                if ($type === 'VideoGame') {
+                    if ($isHomePage) {
+                        $node['url'] = $canonical;
+                    }
+                    if ($schemaGameName !== '') {
+                        $node['name'] = $schemaGameName;
+                    }
+                    if ($metaDescription !== '') {
+                        $node['description'] = $metaDescription;
+                    }
+                }
+
+                if ($type === 'Organization') {
+                    $node['url'] = $canonicalOrigin . '/';
+                    $siteName = trim((string) ($site->name ?? ''));
+                    if ($siteName !== '') {
+                        $node['name'] = $siteName;
+                    } elseif ($domain !== '') {
+                        $node['name'] = $domain;
+                    }
+                }
+
+                if (isset($node['mainEntity']) && is_array($node['mainEntity'])) {
+                    $node['mainEntity'] = $applyDynamicSchemaFields($node['mainEntity']);
+                }
+
+                return $node;
+            };
+
+            $jsonLdGraph = array_map(static fn (array $node): array => $applyDynamicSchemaFields($node), $jsonLdGraph);
+
+            $singleGraphTypes = ['FAQPage' => true, 'HowTo' => true];
+            $seenGraphTypes = [];
+            for ($i = count($jsonLdGraph) - 1; $i >= 0; $i--) {
+                $type = $jsonLdGraph[$i]['@type'] ?? null;
+                if (!is_string($type) || !isset($singleGraphTypes[$type])) {
+                    continue;
+                }
+
+                if (isset($seenGraphTypes[$type])) {
+                    unset($jsonLdGraph[$i]);
+                    continue;
+                }
+
+                $seenGraphTypes[$type] = true;
+            }
+
             $jsonLdPayload = json_encode([
                 '@context' => 'https://schema.org',
                 '@graph' => array_values($jsonLdGraph),
@@ -258,12 +389,6 @@ foreach ($extraLinks as $link) {
     echo '        <link ' . implode(' ', $linkAttributes) . '>' . PHP_EOL;
 }
 @endphp
-        <style>
-            img[width][height] {
-                max-width: 100%;
-                object-fit: contain;
-            }
-        </style>
         <link rel="stylesheet" href="/assets/css/style.css">
         <link rel="icon" type="image/png" href="/assets/images/favicon/favicon-96x96.png" sizes="96x96">
         <link rel="icon" type="image/svg+xml" href="/assets/images/favicon/favicon.svg">

@@ -139,39 +139,14 @@ class ImportService
 
     private function copyAssetsFromEtalon(int $newSiteId): void
     {
-        $sourcePath = storage_path("generated/site" . self::ETALON_SITE_ID . "/assets");
-        $targetPath = storage_path("generated/site{$newSiteId}/assets");
-
-        if (!is_dir($sourcePath)) {
+        $sourcePath = $this->resolveImportAssetsSourcePath();
+        if ($sourcePath === null) {
             return;
         }
 
-        if (!is_dir($targetPath)) {
-            mkdir($targetPath, 0755, true);
-        }
-
-        $files = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($sourcePath, \RecursiveDirectoryIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::SELF_FIRST
-        );
-
-        foreach ($files as $file) {
-            $targetFile = $targetPath . DIRECTORY_SEPARATOR . $files->getSubPathname();
-            
-            if ($file->isDir()) {
-                if (!is_dir($targetFile)) {
-                    mkdir($targetFile, 0755, true);
-                }
-            } else {
-                $dir = dirname($targetFile);
-                if (!is_dir($dir)) {
-                    mkdir($dir, 0755, true);
-                }
-                copy($file->getPathname(), $targetFile);
-            }
-        }
-
-        $this->ensureMainScriptInAssets($targetPath);
+        $targetPath = "{$newSiteId}/assets";
+        $this->copyStorageDirectory('generated', $sourcePath, 'sites', $targetPath);
+        $this->ensureMainScriptInAssets(Storage::disk('sites')->path($targetPath));
     }
 
     private function ensureMainScriptInAssets(string $assetsPath): void
@@ -184,6 +159,59 @@ class ImportService
         }
 
         copy($appScriptPath, $mainScriptPath);
+    }
+
+    private function resolveImportAssetsSourcePath(): ?string
+    {
+        $generatedDisk = Storage::disk('generated');
+        $etalonPath = 'site' . self::ETALON_SITE_ID . '/assets';
+
+        if ($this->hasCompleteAssetSet($generatedDisk, $etalonPath)) {
+            return $etalonPath;
+        }
+
+        $candidates = [];
+        foreach ($generatedDisk->directories('preview') as $previewDir) {
+            $assetsPath = "{$previewDir}/assets";
+            if (!$this->hasCompleteAssetSet($generatedDisk, $assetsPath)) {
+                continue;
+            }
+
+            $modifiedAt = 0;
+            try {
+                $modifiedAt = $generatedDisk->lastModified("{$assetsPath}/css/style.css");
+            } catch (\Throwable) {
+                // Keep zero timestamp and still allow the candidate.
+            }
+
+            $candidates[] = [
+                'path' => $assetsPath,
+                'modified_at' => $modifiedAt,
+            ];
+        }
+
+        if ($candidates === []) {
+            return null;
+        }
+
+        usort(
+            $candidates,
+            fn (array $left, array $right): int => $right['modified_at'] <=> $left['modified_at']
+        );
+
+        return $candidates[0]['path'];
+    }
+
+    private function hasCompleteAssetSet($disk, string $assetsPath): bool
+    {
+        $normalizedPath = trim($assetsPath, '/');
+
+        if (!$disk->exists("{$normalizedPath}/css/style.css")) {
+            return false;
+        }
+
+        return $disk->exists("{$normalizedPath}/js/main.js")
+            || $disk->exists("{$normalizedPath}/js/app.js");
     }
 
     private function copyTemplatesToSite(int $siteId): void
@@ -725,6 +753,10 @@ class ImportService
 
         $order = 0;
         foreach ($sectionsData as $sectionData) {
+            if (isset($sectionData['raw_html']) && is_string($sectionData['raw_html'])) {
+                $sectionData['raw_html'] = $this->replaceRawHtmlPlaceholders($sectionData['raw_html'], $sectionData);
+            }
+
             $module = $sectionData['module'] ?? ($sectionData['module_key'] ?? 'module');
             
             // Save ALL fields from YAML in content JSON (not just standard fields)
@@ -758,6 +790,24 @@ class ImportService
                 'content' => $contentFields,
             ]);
         }
+    }
+
+    private function replaceRawHtmlPlaceholders(string $rawHtml, array $sectionData): string
+    {
+        return preg_replace_callback(
+            '/\[\[([A-Za-z0-9_.-]+)\]\]/',
+            function (array $matches) use ($sectionData): string {
+                $key = $matches[1];
+                $value = $sectionData[$key] ?? null;
+
+                if (is_scalar($value)) {
+                    return (string) $value;
+                }
+
+                return $matches[0];
+            },
+            $rawHtml
+        ) ?? $rawHtml;
     }
 
     private function generateRawHtmlFromModuleView(Site $site, Page $page, array $sectionData): ?string

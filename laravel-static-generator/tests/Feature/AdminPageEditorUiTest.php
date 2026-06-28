@@ -93,6 +93,15 @@ class AdminPageEditorUiTest extends TestCase
                 'meta_keywords' => 'old,keywords',
                 'canonical' => 'https://test.com/',
                 'locale' => 'en',
+                'og_data' => [
+                    'head_extra' => implode("\n", [
+                        '<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Old Meta","description":"Old Description"}</script>',
+                        '<script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Hidden Organization"}</script>',
+                        '<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","name":"Hidden FAQ"}</script>',
+                        '<script type="application/ld+json">{"@context":"https://schema.org","@type":"HowTo","name":"Hidden HowTo"}</script>',
+                        '<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","name":"Hidden Breadcrumb"}</script>',
+                    ]),
+                ],
                 'sections' => [[
                     'module' => 'hero',
                     'module_key' => 'hero',
@@ -118,6 +127,12 @@ class AdminPageEditorUiTest extends TestCase
         $response->assertSee('SECTION HEAD');
         $response->assertSee('SECTION HERO');
         $response->assertSee('HEAD META');
+        $response->assertSee('Head JSON-LD script block');
+        $response->assertDontSee('Head JSON-LD script block #1');
+        $response->assertDontSee('Head JSON-LD script block #2');
+        $response->assertDontSee('Head JSON-LD script block #3');
+        $response->assertDontSee('Head JSON-LD script block #4');
+        $response->assertDontSee('Head JSON-LD script block #5');
         $response->assertSee('Queue Add LI');
         $response->assertSee('Add standard block');
         $response->assertSee('Bulleted list');

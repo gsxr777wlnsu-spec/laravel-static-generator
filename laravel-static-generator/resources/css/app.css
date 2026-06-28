@@ -23,3 +23,13 @@
         @apply border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white;
     }
 }
+
+@layer components {
+    .ai-section-title {
+        font-size: 30px;
+    }
+
+    .ai-block-title {
+        font-size: 22px;
+    }
+}

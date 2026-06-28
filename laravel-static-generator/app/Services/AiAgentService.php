@@ -375,16 +375,20 @@ class AiAgentService
 
         $headExtra = Arr::get($page, 'og_data.head_extra');
         if (is_string($headExtra)) {
-            foreach ($this->extractHeadExtraScriptBlocks($headExtra) as $scriptIndex => $scriptBlock) {
+            $scriptBlocks = $this->extractHeadExtraScriptBlocks($headExtra);
+            foreach ($scriptBlocks as $scriptIndex => $scriptBlock) {
                 if ($scriptIndex > 0) {
                     continue;
                 }
 
                 $path = "pages.{$pageIndex}.og_data.head_extra.__script__.{$scriptIndex}";
+                $payload = $scriptIndex === 0
+                    ? ($this->buildPrimaryJsonLdGraphPayload($scriptBlocks) ?? $this->extractJsonLdScriptPayload($scriptBlock))
+                    : $this->extractJsonLdScriptPayload($scriptBlock);
                 $fields[] = $this->buildPageField(
                     path: $path,
-                    label: 'Head JSON-LD script block #' . ($scriptIndex + 1),
-                    value: $scriptBlock,
+                    label: 'Head JSON-LD script block',
+                    value: $payload,
                     rows: 14
                 );
             }
@@ -1000,6 +1004,22 @@ class AiAgentService
                 $updatedPaths[] = $item['path'];
             }
 
+            if ($fileUpdates > 0 && $fileName === self::RAW_HTML_TEXT_SCOPE_FILE) {
+                $faqPageSynced = $this->syncFaqPageJsonLdFromRawHtmlSection($data, $updatedPaths);
+                if ($faqPageSynced) {
+                    $fileUpdates++;
+                    $updatedFields++;
+                    $updatedPaths[] = 'pages.0.og_data.head_extra.__script__.3';
+                }
+
+                $howToSynced = $this->syncHowToJsonLdFromRawHtmlSection($data, $updatedPaths);
+                if ($howToSynced) {
+                    $fileUpdates++;
+                    $updatedFields++;
+                    $updatedPaths[] = 'pages.0.og_data.head_extra.__script__.4';
+                }
+            }
+
             if ($fileUpdates > 0) {
                 $updatedFiles++;
                 $this->writeYamlDocument($filePath, $data);
@@ -1205,7 +1225,7 @@ class AiAgentService
             $systemMessage .= ' Preserve valid HTML structure. Do not remove required tags.';
         }
         if ($isJsonLdScriptField) {
-            $systemMessage .= ' Preserve a full <script type="application/ld+json">...</script> block. Keep valid JSON-LD.';
+            $systemMessage .= ' Keep valid JSON-LD. Do not wrap the response in <script> tags.';
         }
         if ($isMetaTitleField) {
             $systemMessage .= ' For meta_title fields: produce a specific SEO title, max 60 characters, without placeholder text or meta-commentary.';
@@ -3087,7 +3107,14 @@ class AiAgentService
             return null;
         }
 
-        $value = trim((string) $blocks[$scriptIndex]);
+        if ($scriptIndex === 0) {
+            $combinedPayload = $this->buildPrimaryJsonLdGraphPayload($blocks);
+            if ($combinedPayload !== null) {
+                return $combinedPayload;
+            }
+        }
+
+        $value = $this->extractJsonLdScriptPayload((string) $blocks[$scriptIndex]);
         return $value === '' ? null : $value;
     }
 
@@ -3105,7 +3132,123 @@ class AiAgentService
             return implode("\n", array_values($blocks));
         }
 
-        $blocks[$scriptIndex] = $normalizedNewValue;
+        if ($scriptIndex === 0 && $this->isJsonLdGraphPayload($normalizedNewValue)) {
+            return $this->normalizeJsonLdScriptBlock($normalizedNewValue);
+        }
+
+        $blocks[$scriptIndex] = $this->normalizeJsonLdScriptBlock($normalizedNewValue);
+
+        return implode("\n", $blocks);
+    }
+
+    /**
+     * @param  array<int, string>  $blocks
+     */
+    private function buildPrimaryJsonLdGraphPayload(array $blocks): ?string
+    {
+        if (count($blocks) < 2) {
+            return null;
+        }
+
+        $graph = [];
+
+        foreach ($blocks as $block) {
+            $payload = $this->extractJsonLdScriptPayload((string) $block);
+            if ($payload === '') {
+                return null;
+            }
+
+            $decoded = json_decode($payload, true);
+            if (!is_array($decoded)) {
+                return null;
+            }
+
+            if (isset($decoded['@graph']) && is_array($decoded['@graph'])) {
+                foreach ($decoded['@graph'] as $graphNode) {
+                    if (is_array($graphNode)) {
+                        $graph[] = $graphNode;
+                    }
+                }
+
+                continue;
+            }
+
+            $graph[] = $decoded;
+        }
+
+        if ($graph === []) {
+            return null;
+        }
+
+        return json_encode([
+            '@context' => 'https://schema.org',
+            '@graph' => $graph,
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: null;
+    }
+
+    private function isJsonLdGraphPayload(string $payload): bool
+    {
+        $decoded = json_decode($payload, true);
+
+        return is_array($decoded) && isset($decoded['@graph']) && is_array($decoded['@graph']);
+    }
+
+    private function extractJsonLdScriptPayload(string $scriptBlock): string
+    {
+        if (preg_match('/<script\b[^>]*type=["\']application\/ld\+json["\'][^>]*>([\s\S]*?)<\/script>/i', $scriptBlock, $matches) !== 1) {
+            return trim($scriptBlock);
+        }
+
+        return trim((string) ($matches[1] ?? ''));
+    }
+
+    private function normalizeJsonLdScriptBlock(string $value): string
+    {
+        if (preg_match('/<script\b[^>]*type=["\']application\/ld\+json["\'][^>]*>[\s\S]*?<\/script>/i', $value) === 1) {
+            return $value;
+        }
+
+        return '<script type="application/ld+json">' . "\n" . $value . "\n" . '</script>';
+    }
+
+    private function applyHeadExtraJsonLdSchemaValue(
+        string $headExtra,
+        int $preferredScriptIndex,
+        string $schemaType,
+        string $newValue
+    ): ?string {
+        $blocks = $this->extractHeadExtraScriptBlocks($headExtra);
+        $matchingIndexes = [];
+
+        foreach ($blocks as $index => $block) {
+            $scriptBody = preg_replace('/^<script\b[^>]*>|<\/script>$/i', '', trim($block));
+            if (!is_string($scriptBody)) {
+                continue;
+            }
+
+            $decoded = json_decode(trim($scriptBody), true);
+            if (is_array($decoded) && (($decoded['@type'] ?? null) === $schemaType)) {
+                $matchingIndexes[] = $index;
+            }
+        }
+
+        if ($matchingIndexes !== []) {
+            $targetIndex = array_pop($matchingIndexes);
+            foreach ($matchingIndexes as $duplicateIndex) {
+                unset($blocks[$duplicateIndex]);
+            }
+
+            $blocks[$targetIndex] = trim($newValue);
+
+            return implode("\n", $blocks);
+        }
+
+        $updatedHeadExtra = $this->applyHeadExtraScriptVirtualValue($headExtra, $preferredScriptIndex, $newValue);
+        if ($updatedHeadExtra !== null) {
+            return $updatedHeadExtra;
+        }
+
+        $blocks[] = trim($newValue);
 
         return implode("\n", $blocks);
     }
@@ -3208,7 +3351,7 @@ class AiAgentService
         }
 
         $newValue = $this->buildFaqPageJsonLdScript($pairs);
-        $updatedHeadExtra = $this->applyHeadExtraScriptVirtualValue($headExtra, $faqScriptIndex, $newValue);
+        $updatedHeadExtra = $this->applyHeadExtraJsonLdSchemaValue($headExtra, $faqScriptIndex, 'FAQPage', $newValue);
         if ($updatedHeadExtra === null || $updatedHeadExtra === $headExtra) {
             return false;
         }
@@ -3293,7 +3436,7 @@ class AiAgentService
 
         $stepsSectionChanged = false;
         foreach ($updatedPaths as $path) {
-            if (str_starts_with($path, $stepsSectionPath . '.__text__.')) {
+            if (str_starts_with($path, $stepsSectionPath . '.')) {
                 $stepsSectionChanged = true;
                 break;
             }
@@ -3315,10 +3458,14 @@ class AiAgentService
         }
 
         $currentScript = $this->readHeadExtraScriptVirtualValue($headExtra, $howToScriptIndex);
-        $imageUrls = is_string($currentScript) ? $this->extractHowToStepImages($currentScript) : [];
+        $currentImageUrls = is_string($currentScript) ? $this->extractHowToStepImages($currentScript) : [];
+        $imageUrls = $this->extractHowToStepImagesFromRawHtml($rawHtml, $currentImageUrls);
+        if ($imageUrls === []) {
+            $imageUrls = $currentImageUrls;
+        }
 
         $newValue = $this->buildHowToJsonLdScript($howTo, $imageUrls);
-        $updatedHeadExtra = $this->applyHeadExtraScriptVirtualValue($headExtra, $howToScriptIndex, $newValue);
+        $updatedHeadExtra = $this->applyHeadExtraJsonLdSchemaValue($headExtra, $howToScriptIndex, 'HowTo', $newValue);
         if ($updatedHeadExtra === null || $updatedHeadExtra === $headExtra) {
             return false;
         }
@@ -3417,6 +3564,81 @@ class AiAgentService
     }
 
     /**
+     * @param array<int, string> $currentImageUrls
+     * @return array<int, string>
+     */
+    private function extractHowToStepImagesFromRawHtml(string $rawHtml, array $currentImageUrls = []): array
+    {
+        [$dom, $root, $xpath] = $this->parseHtmlFragment($rawHtml);
+        if (!$dom || !$root || !$xpath) {
+            return [];
+        }
+
+        $imageNodes = $xpath->query('.//img[@src]', $root);
+        if ($imageNodes === false) {
+            return [];
+        }
+
+        $images = [];
+        foreach ($imageNodes as $index => $node) {
+            if (!$node instanceof DOMElement) {
+                continue;
+            }
+
+            $src = trim((string) $node->getAttribute('src'));
+            if ($src === '') {
+                continue;
+            }
+
+            $images[] = $this->normalizeHowToStepImageUrl($src, $currentImageUrls[$index] ?? ($currentImageUrls[0] ?? null));
+        }
+
+        return $images;
+    }
+
+    private function normalizeHowToStepImageUrl(string $src, ?string $currentImageUrl = null): string
+    {
+        if (preg_match('/^https?:\/\//i', $src)) {
+            return $src;
+        }
+
+        if (str_starts_with($src, '//')) {
+            $scheme = is_string($currentImageUrl) && preg_match('/^(https?):\/\//i', $currentImageUrl, $matches)
+                ? strtolower($matches[1])
+                : 'https';
+
+            return $scheme . ':' . $src;
+        }
+
+        $baseUrl = $this->extractHowToImageBaseUrl($currentImageUrl) ?? 'https://{site}';
+
+        return rtrim($baseUrl, '/') . '/' . ltrim($src, '/');
+    }
+
+    private function extractHowToImageBaseUrl(?string $imageUrl): ?string
+    {
+        if (!is_string($imageUrl) || $imageUrl === '') {
+            return null;
+        }
+
+        if (preg_match('/^(https?:\/\/\{site\})(?:\/|$)/i', $imageUrl, $matches)) {
+            return $matches[1];
+        }
+
+        $parts = parse_url($imageUrl);
+        if (!is_array($parts) || !isset($parts['scheme'], $parts['host'])) {
+            return null;
+        }
+
+        $baseUrl = $parts['scheme'] . '://' . $parts['host'];
+        if (isset($parts['port'])) {
+            $baseUrl .= ':' . $parts['port'];
+        }
+
+        return $baseUrl;
+    }
+
+    /**
      * @param array{name:string,description:string,steps:array<int,array{name:string,text:string}>} $howTo
      * @param array<int, string> $imageUrls
      */
@@ -3488,6 +3710,9 @@ class AiAgentService
                 'target_key' => (string) ($target['key'] ?? $key),
                 'target_type' => (string) ($target['type'] ?? 'text'),
                 'attribute' => (string) ($target['attribute'] ?? ''),
+                'image_class' => (string) ($target['image_class'] ?? ''),
+                'image_alt' => (string) ($target['image_alt'] ?? ''),
+                'image_src' => (string) ($target['image_src'] ?? ''),
                 'tag' => (string) ($target['tag'] ?? 'text'),
                 'block_key' => (string) ($target['block_key'] ?? $key),
                 'block_type' => (string) ($target['block_type'] ?? 'text'),
@@ -3620,6 +3845,10 @@ class AiAgentService
                     continue;
                 }
 
+                $imageClass = trim((string) $node->getAttribute('class'));
+                $imageAlt = trim((string) $node->getAttribute('alt'));
+                $imageSrc = trim((string) $node->getAttribute('src'));
+
                 foreach (['src', 'class', 'width', 'height', 'alt'] as $attribute) {
                     $value = trim((string) $node->getAttribute($attribute));
 
@@ -3640,6 +3869,9 @@ class AiAgentService
                         'tag' => strtolower($node->tagName),
                         'attribute' => $attribute,
                         'value' => $value,
+                        'image_class' => $imageClass,
+                        'image_alt' => $imageAlt,
+                        'image_src' => $imageSrc,
                         'group_key' => null,
                         'line_index' => null,
                         'block_key' => $blockKey,

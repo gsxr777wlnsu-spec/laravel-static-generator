@@ -8,9 +8,11 @@ use App\Models\Site;
 use App\Models\User;
 use App\Models\Section;
 use App\Services\AiAgentService;
+use App\Services\GitService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\Yaml\Yaml;
 use Tests\TestCase;
@@ -257,6 +259,231 @@ class SiteAiTemplateGenerationTest extends TestCase
 
         $this->assertStringContainsString('src="/assets/images/hero/replacement.png"', $rawHtml);
         $this->assertFileExists($this->templatesRoot . '/manual-image-site.example/assets/images/hero/replacement.png');
+
+        $site = Site::where('domain', 'manual-image-site.example')->firstOrFail();
+        $this->assertFileExists(storage_path("generated/site{$site->id}/assets/images/hero/replacement.png"));
+    }
+
+    public function test_site_creation_copies_replaced_images_for_main_formats(): void
+    {
+        $user = User::factory()->create();
+
+        $sourceFile = $this->templatesRoot . '/test.com/index-raw_html.md';
+        $fixture = Yaml::parseFile($sourceFile);
+        $fixture['pages'][0]['sections'][0]['raw_html'] = implode('', [
+            '<section class="hero">',
+            '<img src="/assets/images/source/old.webp" alt="webp">',
+            '<img src="/assets/images/source/old.avif" alt="avif">',
+            '<img src="/assets/images/source/old.svg" alt="svg">',
+            '<img src="/assets/images/source/old.jpeg" alt="jpeg">',
+            '<img src="/assets/images/source/old.png" alt="png">',
+            '</section>',
+        ]);
+        file_put_contents($sourceFile, "---\n" . Yaml::dump($fixture, 8, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK));
+
+        $catalog = app(AiAgentService::class)->listTemplateFields('test.com');
+        $indexFile = collect($catalog)->firstWhere('file', 'index-raw_html.md');
+        $sectionFields = collect($indexFile['section_fields'] ?? []);
+        $srcFieldsByValue = $sectionFields
+            ->filter(fn ($field) => is_array($field)
+                && (($field['target_type'] ?? null) === 'attr')
+                && (($field['tag'] ?? null) === 'img')
+                && (($field['attribute'] ?? null) === 'src'))
+            ->keyBy('value');
+
+        $formats = [
+            [
+                'old_src' => '/assets/images/source/old.webp',
+                'new_src' => '/assets/images/formats/replacement.webp',
+                'filename' => 'replacement.webp',
+                'mime' => 'image/webp',
+                'contents' => 'webp-image',
+            ],
+            [
+                'old_src' => '/assets/images/source/old.avif',
+                'new_src' => '/assets/images/formats/replacement.avif',
+                'filename' => 'replacement.avif',
+                'mime' => 'image/avif',
+                'contents' => 'avif-image',
+            ],
+            [
+                'old_src' => '/assets/images/source/old.svg',
+                'new_src' => '/assets/images/formats/replacement.svg',
+                'filename' => 'replacement.svg',
+                'mime' => 'image/svg+xml',
+                'contents' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"></svg>',
+            ],
+            [
+                'old_src' => '/assets/images/source/old.jpeg',
+                'new_src' => '/assets/images/formats/replacement.jpeg',
+                'filename' => 'replacement.jpeg',
+                'mime' => 'image/jpeg',
+                'contents' => 'jpeg-image',
+            ],
+            [
+                'old_src' => '/assets/images/source/old.png',
+                'new_src' => '/assets/images/formats/replacement.png',
+                'filename' => 'replacement.png',
+                'mime' => 'image/png',
+                'contents' => 'png-image',
+            ],
+        ];
+
+        $payload = [
+            'name' => 'Manual Image Formats Site',
+            'domain' => 'manual-image-formats.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/manual-image-formats.example',
+            'status' => 'draft',
+            'locale' => 'en',
+            'default_locale' => 'en',
+            'ai_clone_templates' => true,
+            'ai_source_domain' => 'test.com',
+            'ai_field_prompts' => [],
+            'ai_image_replacements' => array_map(function (array $format) use ($srcFieldsByValue) {
+                $field = $srcFieldsByValue->get($format['old_src']);
+
+                $this->assertIsArray($field);
+
+                return [
+                    'file' => 'index-raw_html.md',
+                    'path' => $field['path'],
+                    'src' => $format['new_src'],
+                    'filename' => $format['filename'],
+                    'data_url' => $format['mime'] . ';base64,' . base64_encode($format['contents']),
+                ];
+            }, $formats),
+        ];
+
+        foreach ($payload['ai_image_replacements'] as &$replacement) {
+            $replacement['data_url'] = 'data:' . $replacement['data_url'];
+        }
+        unset($replacement);
+
+        $response = $this->actingAs($user)->postJson('/api/sites', $payload);
+        $response->assertStatus(201);
+        $response->assertJsonPath('ai_generation.manual_updated_fields', count($formats));
+
+        $targetFile = $this->templatesRoot . '/manual-image-formats.example/index-raw_html.md';
+        $updated = Yaml::parseFile($targetFile);
+        $rawHtml = (string) data_get($updated, 'pages.0.sections.0.raw_html');
+
+        $site = Site::where('domain', 'manual-image-formats.example')->firstOrFail();
+
+        foreach ($formats as $format) {
+            $this->assertStringContainsString('src="' . $format['new_src'] . '"', $rawHtml);
+
+            $clonedPath = $this->templatesRoot . '/manual-image-formats.example' . $format['new_src'];
+            $generatedPath = storage_path('generated/site' . $site->id . $format['new_src']);
+
+            $this->assertFileExists($clonedPath);
+            $this->assertSame($format['contents'], File::get($clonedPath));
+
+            $this->assertFileExists($generatedPath);
+            $this->assertSame($format['contents'], File::get($generatedPath));
+        }
+    }
+
+    public function test_create_site_import_template_image_paths_work_in_preview_and_production(): void
+    {
+        $this->useTemporaryGeneratedDisk();
+
+        $sourceDomainDir = storage_path('import-deploy/md/test/raw_html/test.com');
+        $this->assertDirectoryExists($sourceDomainDir);
+
+        File::deleteDirectory($this->templatesRoot . '/test.com');
+        File::copyDirectory($sourceDomainDir, $this->templatesRoot . '/test.com');
+
+        $rtpImageField = $this->importTemplateFieldByLabelAndValue(
+            'rtp :: img src',
+            '/assets/images/phone-aviator.webp'
+        );
+
+        Site::create([
+            'name' => 'Fallback Assets Source',
+            'domain' => 'fallback-assets-source.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/fallback-assets-source',
+            'status' => 'active',
+            'locale' => 'en',
+            'default_locale' => 'en',
+        ]);
+
+        Storage::disk('generated')->put('site1/assets/css/style.css', 'body{color:#111;}');
+        Storage::disk('generated')->put('site1/assets/js/app.js', 'console.log("fallback");');
+
+        $user = User::factory()->create();
+        $replacementSrc = '/assets/images/rtp/imported-phone.png';
+        $replacementContents = 'imported-rtp-image';
+
+        $response = $this->actingAs($user)->postJson('/api/sites', [
+            'name' => 'Import Template Image Site',
+            'domain' => 'import-template-image.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/import-template-image.example',
+            'status' => 'active',
+            'locale' => 'en',
+            'default_locale' => 'en',
+            'ai_clone_templates' => true,
+            'ai_source_domain' => 'test.com',
+            'ai_field_prompts' => [],
+            'ai_image_replacements' => [[
+                'file' => 'index-raw_html.md',
+                'path' => $rtpImageField['path'],
+                'src' => $replacementSrc,
+                'filename' => 'imported-phone.png',
+                'data_url' => 'data:image/png;base64,' . base64_encode($replacementContents),
+            ]],
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('ai_generation.manual_updated_fields', 1);
+
+        $site = Site::where('domain', 'import-template-image.example')->firstOrFail();
+        $page = Page::where('site_id', $site->id)->where('slug', 'index')->firstOrFail();
+        $section = Section::where('page_id', $page->id)->where('module', 'rtp')->firstOrFail();
+
+        $this->assertStringContainsString('src="' . $replacementSrc . '"', (string) $section->raw_html);
+        $this->assertFileExists($this->templatesRoot . '/import-template-image.example' . $replacementSrc);
+        Storage::disk('generated')->assertExists("site{$site->id}/assets/images/rtp/imported-phone.png");
+        $this->assertSame(
+            $replacementContents,
+            Storage::disk('generated')->get("site{$site->id}/assets/images/rtp/imported-phone.png")
+        );
+
+        $previewTokenResponse = $this->actingAs($user)->postJson("/api/pages/{$page->id}/preview-token");
+        $previewTokenResponse->assertOk();
+
+        preg_match('#^/api/preview/([^/]+)/#', (string) $previewTokenResponse->json('preview_url'), $matches);
+        $this->assertArrayHasKey(1, $matches);
+        $previewToken = $matches[1];
+
+        $previewHtml = Storage::disk('generated')->get("preview/{$previewToken}/index.html");
+        $this->assertStringContainsString('src="assets/images/rtp/imported-phone.png"', $previewHtml);
+        $this->assertStringNotContainsString($replacementSrc, $previewHtml);
+        Storage::disk('generated')->assertExists("preview/{$previewToken}/assets/images/rtp/imported-phone.png");
+        $this->assertSame(
+            $replacementContents,
+            Storage::disk('generated')->get("preview/{$previewToken}/assets/images/rtp/imported-phone.png")
+        );
+
+        $mockGitService = \Mockery::mock(GitService::class);
+        $mockGitService->shouldReceive('setRepositoryPath')->andReturnSelf();
+        $mockGitService->shouldReceive('commit')->andReturnNull();
+        $this->app->instance(GitService::class, $mockGitService);
+
+        $generateResponse = $this->actingAs($user)->postJson("/api/sites/{$site->id}/generate");
+        $generateResponse->assertOk();
+        $this->assertTrue((bool) $generateResponse->json('success'));
+
+        $productionHtml = Storage::disk('generated')->get("site{$site->id}/index.html");
+        $this->assertStringContainsString('src="' . $replacementSrc . '"', $productionHtml);
+        $this->assertStringNotContainsString('/api/preview/', $productionHtml);
+        Storage::disk('generated')->assertExists("site{$site->id}/assets/images/rtp/imported-phone.png");
+        $this->assertSame(
+            $replacementContents,
+            Storage::disk('generated')->get("site{$site->id}/assets/images/rtp/imported-phone.png")
+        );
     }
 
     public function test_site_creation_applies_ai_prompts_to_md_fields(): void
@@ -643,6 +870,160 @@ class SiteAiTemplateGenerationTest extends TestCase
         $this->assertSame('New step title', $schema['step'][0]['name'] ?? null);
         $this->assertSame('New step text.', $schema['step'][0]['text'] ?? null);
         $this->assertSame('https://{site}/assets/images/steps/step.webp', $schema['step'][0]['image'] ?? null);
+    }
+
+    public function test_how_to_json_ld_syncs_from_visible_steps_after_manual_image_edit(): void
+    {
+        $user = User::factory()->create();
+
+        $sourceFile = $this->templatesRoot . '/test.com/index-raw_html.md';
+        $source = Yaml::parseFile($sourceFile);
+        $source['pages'][0]['og_data']['head_extra'] = implode("\n", [
+            '<script type="application/ld+json">{"@type":"BreadcrumbList"}</script>',
+            '<script type="application/ld+json">{"@type":"WebSite"}</script>',
+            '<script type="application/ld+json">{"@type":"Organization"}</script>',
+            '<script type="application/ld+json">{"@type":"FAQPage","mainEntity":[]}</script>',
+            '<script type="application/ld+json">{"@context":"https://schema.org","@type":"HowTo","name":"Old steps title","description":"Old steps description.","step":[{"@type":"HowToStep","position":1,"name":"Old step title","text":"Old step text.","image":"https://{site}/assets/images/steps/old-step.webp"}]}</script>',
+        ]);
+        $source['pages'][0]['sections'] = array_pad($source['pages'][0]['sections'], 11, [
+            'module' => 'placeholder',
+            'raw_html' => '<section></section>',
+            'render_mode' => 'raw_html',
+        ]);
+        $source['pages'][0]['sections'][10] = [
+            'module' => 'steps',
+            'module_key' => 'steps',
+            'raw_html' => '<section class="steps"><h2>Old steps title</h2><p>Old steps description.</p><div class="steps__list"><div class="steps__card"><img class="steps__card-image" src="/assets/images/steps/old-step.webp" alt="Old step"><span>Step 1</span><div>Old step title</div><p>Old step text.</p></div></div></section>',
+            'render_mode' => 'raw_html',
+        ];
+        file_put_contents($sourceFile, "---\n" . Yaml::dump($source, 8, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK));
+
+        $catalog = app(AiAgentService::class)->listTemplateFields('test.com');
+        $indexFile = collect($catalog)->firstWhere('file', 'index-raw_html.md');
+        $sectionFields = collect($indexFile['section_fields'] ?? []);
+        $srcField = $sectionFields->first(fn ($field) => is_array($field)
+            && (($field['target_type'] ?? null) === 'attr')
+            && (($field['attribute'] ?? null) === 'src')
+            && (($field['value'] ?? null) === '/assets/images/steps/old-step.webp'));
+        $stepTitleField = $sectionFields->first(fn ($field) => is_array($field) && (($field['value'] ?? null) === 'Old step title'));
+
+        $this->assertIsArray($srcField);
+        $this->assertIsArray($stepTitleField);
+
+        $payload = [
+            'name' => 'HowTo Manual Sync Site',
+            'domain' => 'how-to-manual-sync.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/how-to-manual-sync.example',
+            'status' => 'draft',
+            'locale' => 'en',
+            'default_locale' => 'en',
+            'ai_clone_templates' => true,
+            'ai_source_domain' => 'test.com',
+            'ai_field_prompts' => [],
+            'ai_field_edits' => [
+                ['file' => 'index-raw_html.md', 'path' => (string) $srcField['path'], 'value' => '/assets/images/steps/new-step.webp'],
+                ['file' => 'index-raw_html.md', 'path' => (string) $stepTitleField['path'], 'value' => 'New step title'],
+            ],
+        ];
+
+        $response = $this->actingAs($user)->postJson('/api/sites', $payload);
+        $response->assertCreated();
+        $response->assertJsonPath('ai_generation.manual_updated_fields', 3);
+
+        $updated = Yaml::parseFile($this->templatesRoot . '/how-to-manual-sync.example/index-raw_html.md');
+        $headExtra = (string) data_get($updated, 'pages.0.og_data.head_extra');
+
+        preg_match_all('/<script\b[^>]*>.*?<\/script>/is', $headExtra, $matches);
+        $howToScript = $matches[0][4] ?? '';
+        $json = trim((string) preg_replace('/^<script\b[^>]*>|<\/script>$/i', '', $howToScript));
+        $schema = json_decode($json, true);
+
+        $this->assertSame('HowTo', $schema['@type'] ?? null);
+        $this->assertSame('New step title', $schema['step'][0]['name'] ?? null);
+        $this->assertSame('https://{site}/assets/images/steps/new-step.webp', $schema['step'][0]['image'] ?? null);
+    }
+
+    public function test_faq_and_how_to_json_ld_are_created_when_missing_from_head_extra(): void
+    {
+        $user = User::factory()->create();
+
+        $sourceFile = $this->templatesRoot . '/test.com/index-raw_html.md';
+        $source = Yaml::parseFile($sourceFile);
+        $source['pages'][0]['og_data']['head_extra'] = '<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","name":"Page"}]}</script>';
+        $source['pages'][0]['sections'] = array_pad($source['pages'][0]['sections'], 18, [
+            'module' => 'placeholder',
+            'raw_html' => '<section></section>',
+            'render_mode' => 'raw_html',
+        ]);
+        $source['pages'][0]['sections'][10] = [
+            'module' => 'steps',
+            'module_key' => 'steps',
+            'raw_html' => '<section class="steps"><h2>Old steps title</h2><p>Old steps description.</p><div class="steps__list"><div class="steps__card"><img src="/assets/images/steps/old-step.webp" alt="Old step"><span>Step 1</span><div>Old step title</div><p>Old step text.</p></div></div></section>',
+            'render_mode' => 'raw_html',
+        ];
+        $source['pages'][0]['sections'][17] = [
+            'module' => 'faq',
+            'module_key' => 'faq',
+            'raw_html' => '<section class="faq"><h2>FAQ</h2><p>Intro text.</p><div><span>Old question?</span><p>Old answer.</p></div></section>',
+            'render_mode' => 'raw_html',
+        ];
+        file_put_contents($sourceFile, "---\n" . Yaml::dump($source, 8, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK));
+
+        $catalog = app(AiAgentService::class)->listTemplateFields('test.com');
+        $indexFile = collect($catalog)->firstWhere('file', 'index-raw_html.md');
+        $sectionFields = collect($indexFile['section_fields'] ?? []);
+        $questionField = $sectionFields->first(fn ($field) => is_array($field) && (($field['value'] ?? null) === 'Old question?'));
+        $answerField = $sectionFields->first(fn ($field) => is_array($field) && (($field['value'] ?? null) === 'Old answer.'));
+        $stepTitleField = $sectionFields->first(fn ($field) => is_array($field) && (($field['value'] ?? null) === 'Old step title'));
+        $stepTextField = $sectionFields->first(fn ($field) => is_array($field) && (($field['value'] ?? null) === 'Old step text.'));
+
+        $this->assertIsArray($questionField);
+        $this->assertIsArray($answerField);
+        $this->assertIsArray($stepTitleField);
+        $this->assertIsArray($stepTextField);
+
+        $payload = [
+            'name' => 'Missing JsonLd Sync Site',
+            'domain' => 'missing-jsonld-sync.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/missing-jsonld-sync.example',
+            'status' => 'draft',
+            'locale' => 'en',
+            'default_locale' => 'en',
+            'ai_clone_templates' => true,
+            'ai_source_domain' => 'test.com',
+            'ai_field_prompts' => [],
+            'ai_field_edits' => [
+                ['file' => 'index-raw_html.md', 'path' => (string) $questionField['path'], 'value' => 'New question?'],
+                ['file' => 'index-raw_html.md', 'path' => (string) $answerField['path'], 'value' => 'New answer.'],
+                ['file' => 'index-raw_html.md', 'path' => (string) $stepTitleField['path'], 'value' => 'New step title'],
+                ['file' => 'index-raw_html.md', 'path' => (string) $stepTextField['path'], 'value' => 'New step text.'],
+            ],
+        ];
+
+        $response = $this->actingAs($user)->postJson('/api/sites', $payload);
+        $response->assertCreated();
+
+        $updated = Yaml::parseFile($this->templatesRoot . '/missing-jsonld-sync.example/index-raw_html.md');
+        $headExtra = (string) data_get($updated, 'pages.0.og_data.head_extra');
+        preg_match_all('/<script\b[^>]*>.*?<\/script>/is', $headExtra, $matches);
+
+        $schemas = [];
+        foreach ($matches[0] ?? [] as $script) {
+            $json = trim((string) preg_replace('/^<script\b[^>]*>|<\/script>$/i', '', $script));
+            $decoded = json_decode($json, true);
+            if (is_array($decoded) && isset($decoded['@type'])) {
+                $schemas[$decoded['@type']] = $decoded;
+            }
+        }
+
+        $this->assertArrayHasKey('FAQPage', $schemas);
+        $this->assertArrayHasKey('HowTo', $schemas);
+        $this->assertSame('New question?', $schemas['FAQPage']['mainEntity'][0]['name'] ?? null);
+        $this->assertSame('New answer.', $schemas['FAQPage']['mainEntity'][0]['acceptedAnswer']['text'] ?? null);
+        $this->assertSame('New step title', $schemas['HowTo']['step'][0]['name'] ?? null);
+        $this->assertSame('New step text.', $schemas['HowTo']['step'][0]['text'] ?? null);
     }
 
     public function test_site_creation_strips_outer_quotes_for_text_fields(): void
@@ -1577,6 +1958,152 @@ HTML,
         }
     }
 
+    public function test_head_json_ld_field_is_edited_as_json_payload_and_saved_as_script(): void
+    {
+        $fixture = [
+            'domain' => 'test.com',
+            'pages' => [[
+                'slug' => 'index',
+                'title' => 'Index',
+                'template_key' => 'index',
+                'status' => 'published',
+                'og_data' => [
+                    'head_extra' => <<<'HTML'
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "name": "Old JSON-LD Name"
+    }
+  ]
+}
+</script>
+HTML,
+                ],
+                'sections' => [],
+            ]],
+        ];
+
+        File::put(
+            $this->templatesRoot . '/test.com/index-raw_html.md',
+            "---\n" . Yaml::dump($fixture, 8, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK)
+        );
+
+        $catalog = app(AiAgentService::class)->listTemplateFields('test.com');
+        $indexFile = collect($catalog)->firstWhere('file', 'index-raw_html.md');
+        $jsonLdField = collect($indexFile['page_fields'] ?? [])
+            ->firstWhere('path', 'pages.0.og_data.head_extra.__script__.0');
+
+        $this->assertIsArray($jsonLdField);
+        $this->assertStringContainsString('"@graph"', (string) ($jsonLdField['value'] ?? ''));
+        $this->assertStringNotContainsString('<script', (string) ($jsonLdField['value'] ?? ''));
+        $this->assertStringNotContainsString('</script>', (string) ($jsonLdField['value'] ?? ''));
+
+        $newJson = <<<'JSON'
+{
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  "name": "New JSON-LD Name"
+}
+JSON;
+
+        $result = app(AiAgentService::class)->applyFieldEditsToDomain('test.com', [[
+            'file' => 'index-raw_html.md',
+            'path' => 'pages.0.og_data.head_extra.__script__.0',
+            'value' => $newJson,
+        ]]);
+
+        $this->assertSame(1, $result['updated_fields']);
+
+        $updated = Yaml::parseFile($this->templatesRoot . '/test.com/index-raw_html.md');
+        $headExtra = (string) data_get($updated, 'pages.0.og_data.head_extra');
+
+        $this->assertStringContainsString('<script type="application/ld+json">', $headExtra);
+        $this->assertStringContainsString('"name": "New JSON-LD Name"', $headExtra);
+        $this->assertStringContainsString('</script>', $headExtra);
+    }
+
+    public function test_primary_head_json_ld_field_combines_multiple_scripts_into_graph_payload(): void
+    {
+        $fixture = [
+            'domain' => 'test.com',
+            'pages' => [[
+                'slug' => 'index',
+                'title' => 'Index',
+                'template_key' => 'index',
+                'status' => 'published',
+                'og_data' => [
+                    'head_extra' => <<<'HTML'
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  "name": "Old WebPage Name"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "Old Organization Name"
+}
+</script>
+HTML,
+                ],
+                'sections' => [],
+            ]],
+        ];
+
+        File::put(
+            $this->templatesRoot . '/test.com/index-raw_html.md',
+            "---\n" . Yaml::dump($fixture, 8, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK)
+        );
+
+        $catalog = app(AiAgentService::class)->listTemplateFields('test.com');
+        $indexFile = collect($catalog)->firstWhere('file', 'index-raw_html.md');
+        $jsonLdField = collect($indexFile['page_fields'] ?? [])
+            ->firstWhere('path', 'pages.0.og_data.head_extra.__script__.0');
+
+        $this->assertIsArray($jsonLdField);
+        $this->assertStringContainsString('"@graph"', (string) ($jsonLdField['value'] ?? ''));
+        $this->assertStringContainsString('"@type": "WebPage"', (string) ($jsonLdField['value'] ?? ''));
+        $this->assertStringContainsString('"@type": "Organization"', (string) ($jsonLdField['value'] ?? ''));
+
+        $newJson = <<<'JSON'
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "name": "New WebPage Name"
+    },
+    {
+      "@type": "Organization",
+      "name": "New Organization Name"
+    }
+  ]
+}
+JSON;
+
+        $result = app(AiAgentService::class)->applyFieldEditsToDomain('test.com', [[
+            'file' => 'index-raw_html.md',
+            'path' => 'pages.0.og_data.head_extra.__script__.0',
+            'value' => $newJson,
+        ]]);
+
+        $this->assertSame(1, $result['updated_fields']);
+
+        $updated = Yaml::parseFile($this->templatesRoot . '/test.com/index-raw_html.md');
+        $headExtra = (string) data_get($updated, 'pages.0.og_data.head_extra');
+
+        $this->assertSame(1, substr_count($headExtra, '<script type="application/ld+json">'));
+        $this->assertStringContainsString('"@graph"', $headExtra);
+        $this->assertStringContainsString('"name": "New WebPage Name"', $headExtra);
+        $this->assertStringContainsString('"name": "New Organization Name"', $headExtra);
+    }
+
     public function test_site_creation_can_create_new_head_meta_and_link_entries_by_missing_index(): void
     {
         $user = User::factory()->create();
@@ -1665,5 +2192,54 @@ HTML,
 
         $this->assertSame('', $page->meta_keywords);
         $this->assertSame('', data_get($page->og_data, 'head_meta.1.content'));
+    }
+
+    /**
+     * @return array{path:string,value:string}
+     */
+    private function importTemplateFieldByLabelAndValue(string $label, string $value): array
+    {
+        $template = File::get(base_path('index-raw-html-import-template-test.txt'));
+        $blocks = preg_split('/\n(?=\[FIELD\]\n)/', $template) ?: [];
+
+        foreach ($blocks as $block) {
+            if (!str_contains($block, "label = {$label}")) {
+                continue;
+            }
+
+            if (!preg_match('/^path\s*=\s*(.+)$/m', $block, $pathMatch)) {
+                continue;
+            }
+
+            if (!preg_match('/value:\s*```text\s*\R?(.*?)\R?```/s', $block, $valueMatch)) {
+                continue;
+            }
+
+            $fieldValue = trim((string) $valueMatch[1]);
+            if ($fieldValue !== $value) {
+                continue;
+            }
+
+            return [
+                'path' => trim((string) $pathMatch[1]),
+                'value' => $fieldValue,
+            ];
+        }
+
+        $this->fail("Import template field was not found: {$label} = {$value}");
+    }
+
+    private function useTemporaryGeneratedDisk(): void
+    {
+        $root = '/tmp/laravel-static-generator-tests/generated-' . Str::uuid();
+        File::ensureDirectoryExists($root);
+
+        config()->set('filesystems.disks.generated.root', $root);
+        Storage::forgetDisk('generated');
+
+        $compiledViewsPath = '/tmp/laravel-static-generator-tests/views-' . Str::uuid();
+        File::ensureDirectoryExists($compiledViewsPath);
+        config()->set('view.compiled', $compiledViewsPath);
+        app()->forgetInstance('blade.compiler');
     }
 }

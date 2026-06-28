@@ -429,20 +429,21 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
 
     public function generatePreview(Page $page): array
     {
-        $html = $this->generatePage($page);
-        
-        // Rewrite asset paths to be relative for preview serving
-        $html = $this->rewriteAssetPathsForPreview($html);
-        
         $previewToken = Str::random(32);
-        
         $previewDir = "preview/{$previewToken}";
-        
-        $filename = $page->slug === 'index' || $page->slug === '' 
-            ? 'index.html' 
-            : $page->slug . '.html';
-        
-        Storage::disk('generated')->put("{$previewDir}/{$filename}", $html);
+
+        $previewPages = $this->pageRepository->getActiveBySite($page->site)->keyBy('id');
+        $previewPages->put($page->id, $page);
+
+        foreach ($previewPages->values() as $previewPage) {
+            $html = $this->generatePage($previewPage);
+            $html = $this->rewriteAssetPathsForPreview($html);
+
+            Storage::disk('generated')->put(
+                "{$previewDir}/{$this->pageFilename($previewPage)}",
+                $html
+            );
+        }
         
         // Copy assets from the site's generated directory to preview directory
         $this->copyAssetsToPreview($page->site_id, $previewToken);
@@ -458,7 +459,7 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         
         return [
             'token' => $previewToken,
-            'url' => "/api/preview/{$previewToken}/{$filename}",
+            'url' => "/api/preview/{$previewToken}/{$this->pageFilename($page)}",
             'expires_at' => now()->addMinutes(30)->toDateTimeString(),
         ];
     }
@@ -467,24 +468,24 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
     {
         $html = preg_replace('/(href|src)=(["\'])\/assets\/([^"\']*)\2/', '$1=$2assets/$3$2', $html);
         $html = preg_replace('/(href|src)=(["\'])\/js\/([^"\']*)\2/', '$1=$2js/$3$2', $html);
+        $html = preg_replace('/href=(["\'])\/#([^"\']*)\1/', 'href=$1index.html#$2$1', $html);
+        $html = preg_replace('/href=(["\'])\/\1/', 'href=$1index.html$1', $html);
         
         return $html;
     }
 
+    private function pageFilename(Page $page): string
+    {
+        return $page->slug === 'index' || $page->slug === ''
+            ? 'index.html'
+            : $page->slug . '.html';
+    }
+
     private function copyAssetsToPreview(int $siteId, string $previewToken): void
     {
-        $generatedDisk = Storage::disk('generated');
-        $sourceAssetPath = "site{$siteId}/assets";
+        $sourceAssetPath = $this->resolveGeneratedAssetsSourcePath($siteId, $previewToken);
 
-        if (!$generatedDisk->exists($sourceAssetPath)) {
-            $sourceAssetPath = 'site1/assets';
-        }
-
-        if (!$generatedDisk->exists($sourceAssetPath)) {
-            $sourceAssetPath = $this->findLatestPreviewAssetsPath($previewToken);
-        }
-
-        if ($sourceAssetPath === null || !$generatedDisk->exists($sourceAssetPath)) {
+        if ($sourceAssetPath === null) {
             \Illuminate\Support\Facades\Log::warning('Preview assets source was not found', [
                 'site_id' => $siteId,
                 'preview_token' => $previewToken,
@@ -494,6 +495,10 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
 
         $previewAssetsPath = "preview/{$previewToken}/assets";
         $this->copyStorageDirectory('generated', $sourceAssetPath, 'generated', $previewAssetsPath);
+        $siteAssetsPath = "site{$siteId}/assets";
+        if ($sourceAssetPath !== $siteAssetsPath) {
+            $this->copyGeneratedAssetOverlay($siteAssetsPath, $previewAssetsPath);
+        }
         $this->ensureMainScriptAlias('generated', $previewAssetsPath);
         $this->rewritePreviewCssAssetPaths($previewAssetsPath, $previewToken);
     }
@@ -537,26 +542,106 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         $targetPath = "site{$siteId}/assets";
 
         $sourceFromSitesDisk = "{$siteId}/assets";
-        if (Storage::disk('sites')->exists($sourceFromSitesDisk)) {
+        if ($this->hasCompleteAssets('sites', $sourceFromSitesDisk)) {
+            Storage::disk('generated')->deleteDirectory($targetPath);
             $this->copyStorageDirectory('sites', $sourceFromSitesDisk, 'generated', $targetPath);
             $this->ensureMainScriptAlias('generated', $targetPath);
             return;
         }
 
-        $fallbackPath = 'site1/assets';
-        if ($fallbackPath === $targetPath || !Storage::disk('generated')->exists($fallbackPath)) {
-            $fallbackPath = $this->findLatestPreviewAssetsPath();
-        }
-
-        if ($fallbackPath === null || $fallbackPath === $targetPath || !Storage::disk('generated')->exists($fallbackPath)) {
+        $fallbackPath = $this->resolveGeneratedAssetsSourcePath($siteId);
+        if ($fallbackPath === null) {
             \Illuminate\Support\Facades\Log::warning('Generated site assets source was not found', [
                 'site_id' => $siteId,
             ]);
             return;
         }
 
+        if ($fallbackPath === $targetPath) {
+            $this->ensureMainScriptAlias('generated', $targetPath);
+            return;
+        }
+
+        $assetOverlay = $this->readGeneratedAssetOverlay($targetPath);
+
+        Storage::disk('generated')->deleteDirectory($targetPath);
         $this->copyStorageDirectory('generated', $fallbackPath, 'generated', $targetPath);
+        $this->writeGeneratedAssetOverlay($targetPath, $assetOverlay);
         $this->ensureMainScriptAlias('generated', $targetPath);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function readGeneratedAssetOverlay(string $assetsPath): array
+    {
+        $disk = Storage::disk('generated');
+        $normalizedAssetsPath = trim($assetsPath, '/');
+        $overlay = [];
+
+        if (!$disk->exists($normalizedAssetsPath)) {
+            return $overlay;
+        }
+
+        foreach ($disk->allFiles($normalizedAssetsPath) as $file) {
+            $relativePath = ltrim((string) Str::of($file)->after($normalizedAssetsPath), '/');
+            if ($relativePath === '' || Str::startsWith($relativePath, ['css/', 'js/'])) {
+                continue;
+            }
+
+            $overlay[$relativePath] = $disk->get($file);
+        }
+
+        return $overlay;
+    }
+
+    /**
+     * @param  array<string, string>  $overlay
+     */
+    private function writeGeneratedAssetOverlay(string $assetsPath, array $overlay): void
+    {
+        $disk = Storage::disk('generated');
+        $normalizedAssetsPath = trim($assetsPath, '/');
+
+        foreach ($overlay as $relativePath => $contents) {
+            $disk->put("{$normalizedAssetsPath}/{$relativePath}", $contents);
+        }
+    }
+
+    private function copyGeneratedAssetOverlay(string $sourceAssetsPath, string $targetAssetsPath): void
+    {
+        $this->writeGeneratedAssetOverlay(
+            $targetAssetsPath,
+            $this->readGeneratedAssetOverlay($sourceAssetsPath)
+        );
+    }
+
+    private function resolveGeneratedAssetsSourcePath(int $siteId, ?string $excludePreviewToken = null): ?string
+    {
+        $siteAssetsPath = "site{$siteId}/assets";
+        if ($this->hasCompleteAssets('generated', $siteAssetsPath)) {
+            return $siteAssetsPath;
+        }
+
+        $etalonPath = 'site1/assets';
+        if ($etalonPath !== $siteAssetsPath && $this->hasCompleteAssets('generated', $etalonPath)) {
+            return $etalonPath;
+        }
+
+        return $this->findLatestPreviewAssetsPath($excludePreviewToken);
+    }
+
+    private function hasCompleteAssets(string $diskName, string $assetsPath): bool
+    {
+        $disk = Storage::disk($diskName);
+        $normalizedPath = trim($assetsPath, '/');
+
+        if (!$disk->exists("{$normalizedPath}/css/style.css")) {
+            return false;
+        }
+
+        return $disk->exists("{$normalizedPath}/js/main.js")
+            || $disk->exists("{$normalizedPath}/js/app.js");
     }
 
     private function findLatestPreviewAssetsPath(?string $excludeToken = null): ?string

@@ -57,6 +57,14 @@ class PublishingCycleTest extends TestCase
             'locale' => 'en',
         ]);
 
+        Page::create([
+            'site_id' => $site->id,
+            'slug' => 'terms-and-conditions',
+            'title' => 'Terms And Conditions',
+            'status' => 'published',
+            'locale' => 'en',
+        ]);
+
         Section::create([
             'page_id' => $page->id,
             'type' => 'text',
@@ -107,8 +115,12 @@ class PublishingCycleTest extends TestCase
         preg_match('#^/api/preview/([^/]+)/#', (string) $previewUrl, $matches);
         $this->assertArrayHasKey(1, $matches);
         $previewToken = $matches[1];
+        Storage::disk('generated')->assertExists("preview/{$previewToken}/terms-and-conditions.html");
         Storage::disk('generated')->assertExists("preview/{$previewToken}/assets/js/main.js");
         Storage::disk('generated')->assertExists("preview/{$previewToken}/assets/css/style.css");
+        $previewHtml = Storage::disk('generated')->get("preview/{$previewToken}/index.html");
+        $this->assertStringContainsString('href="index.html#where-to-play"', $previewHtml);
+        $this->assertStringContainsString('href="terms-and-conditions.html"', $previewHtml);
         $previewCss = Storage::disk('generated')->get("preview/{$previewToken}/assets/css/style.css");
         $this->assertStringContainsString("/api/preview/{$previewToken}/assets/images/hero/hero-background.webp", $previewCss);
         $this->assertStringNotContainsString('url("/assets/', $previewCss);
@@ -122,6 +134,69 @@ class PublishingCycleTest extends TestCase
         $previewResponse->assertOk();
         $previewResponse->assertSee('Home Page');
         $previewResponse->assertSee('Welcome');
+    }
+
+    public function test_generate_falls_back_to_complete_generated_assets_when_site_assets_are_incomplete(): void
+    {
+        $this->useTemporaryGeneratedDisk();
+        $this->useTemporarySitesDisk();
+
+        $site = Site::create([
+            'name' => 'Fallback Asset Site',
+            'domain' => 'fallback-assets.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/fallback-assets',
+            'status' => 'active',
+            'locale' => 'en',
+            'default_locale' => 'en',
+        ]);
+
+        $page = Page::create([
+            'site_id' => $site->id,
+            'slug' => 'index',
+            'title' => 'Fallback Assets',
+            'status' => 'published',
+            'locale' => 'en',
+        ]);
+
+        Section::create([
+            'page_id' => $page->id,
+            'type' => 'text',
+            'order' => 1,
+            'content' => [
+                'heading' => 'Fallback',
+                'content' => '<p>Fallback asset content</p>',
+                'module' => 'hero-main',
+                'id' => 'hero-main',
+                'class' => 'hero-section reusable-block',
+            ],
+        ]);
+
+        Storage::disk('sites')->put("{$site->id}/assets/images/upload/placeholder.txt", 'incomplete');
+        Storage::disk('generated')->put('site1/assets/css/style.css', '.fallback{color:#222;}');
+        Storage::disk('generated')->put('site1/assets/js/app.js', 'console.log("fallback source");');
+        Storage::disk('generated')->put('site1/assets/images/favicon/site.webmanifest', '{"name":"Fallback Assets"}');
+
+        $mockGitService = \Mockery::mock(GitService::class);
+        $mockGitService->shouldReceive('setRepositoryPath')->andReturnSelf();
+        $mockGitService->shouldReceive('commit')->andReturnNull();
+        $this->app->instance(GitService::class, $mockGitService);
+
+        $generateResponse = $this->actingAs($this->admin)->postJson("/api/sites/{$site->id}/generate");
+        $generateResponse->assertOk();
+        $this->assertTrue((bool) $generateResponse->json('success'));
+
+        Storage::disk('generated')->assertExists("site{$site->id}/assets/css/style.css");
+        Storage::disk('generated')->assertExists("site{$site->id}/assets/js/main.js");
+        Storage::disk('generated')->assertExists("site{$site->id}/assets/images/favicon/site.webmanifest");
+        $this->assertSame(
+            '.fallback{color:#222;}',
+            Storage::disk('generated')->get("site{$site->id}/assets/css/style.css")
+        );
+        $this->assertSame(
+            'console.log("fallback source");',
+            Storage::disk('generated')->get("site{$site->id}/assets/js/main.js")
+        );
     }
 
     public function test_sitemap_module_is_dynamic_and_uses_latest_pages(): void

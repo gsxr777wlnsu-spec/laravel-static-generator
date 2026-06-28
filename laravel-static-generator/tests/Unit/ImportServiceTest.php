@@ -21,15 +21,22 @@ class ImportServiceTest extends TestCase
         parent::setUp();
         $this->service = app(ImportService::class);
 
-        $root = '/tmp/laravel-static-generator-tests/generated-' . Str::uuid();
-        File::ensureDirectoryExists($root);
-        config()->set('filesystems.disks.generated.root', $root);
+        $generatedRoot = '/tmp/laravel-static-generator-tests/generated-' . Str::uuid();
+        File::ensureDirectoryExists($generatedRoot);
+        config()->set('filesystems.disks.generated.root', $generatedRoot);
         Storage::forgetDisk('generated');
+
+        $sitesRoot = '/tmp/laravel-static-generator-tests/sites-' . Str::uuid();
+        File::ensureDirectoryExists($sitesRoot);
+        config()->set('filesystems.disks.sites.root', $sitesRoot);
+        Storage::forgetDisk('sites');
     }
 
     public function test_import_creates_site_from_yaml(): void
     {
-        Storage::disk('generated')->makeDirectory('site1/assets/images/logo');
+        Storage::disk('generated')->put('site1/assets/css/style.css', 'body{color:#111;}');
+        Storage::disk('generated')->put('site1/assets/js/app.js', 'console.log("etalon");');
+        Storage::disk('generated')->put('site1/assets/images/logo/logo.svg', '<svg></svg>');
 
         $data = [
             'domain' => 'test-import.com',
@@ -61,6 +68,29 @@ class ImportServiceTest extends TestCase
         $this->assertCount(1, $result['pages']);
         $this->assertEquals('contact-us', $result['pages'][0]->slug);
         $this->assertEquals('Contact Us', $result['pages'][0]->title);
+        Storage::disk('sites')->assertExists($result['site']->id . '/assets/css/style.css');
+        Storage::disk('sites')->assertExists($result['site']->id . '/assets/js/app.js');
+        Storage::disk('sites')->assertExists($result['site']->id . '/assets/js/main.js');
+        Storage::disk('sites')->assertExists($result['site']->id . '/assets/images/logo/logo.svg');
+    }
+
+    public function test_import_uses_latest_preview_assets_when_etalon_is_incomplete(): void
+    {
+        Storage::disk('generated')->makeDirectory('site1/assets/images/logo');
+        Storage::disk('generated')->put('preview/token-a/assets/css/style.css', 'body{background:#fff;}');
+        Storage::disk('generated')->put('preview/token-a/assets/js/app.js', 'console.log("preview");');
+        Storage::disk('generated')->put('preview/token-a/assets/images/logo/logo.svg', '<svg>preview</svg>');
+
+        $result = $this->service->importSite([
+            'domain' => 'preview-import.com',
+            'template' => 'base',
+            'pages' => [],
+        ]);
+
+        Storage::disk('sites')->assertExists($result['site']->id . '/assets/css/style.css');
+        Storage::disk('sites')->assertExists($result['site']->id . '/assets/js/app.js');
+        Storage::disk('sites')->assertExists($result['site']->id . '/assets/js/main.js');
+        Storage::disk('sites')->assertExists($result['site']->id . '/assets/images/logo/logo.svg');
     }
 
     public function test_import_updates_existing_site(): void
@@ -92,6 +122,40 @@ class ImportServiceTest extends TestCase
 
         $this->assertEquals('existing.com', $result['site']->domain);
         $this->assertEquals(1, $result['pages_count']);
+    }
+
+    public function test_import_replaces_raw_html_placeholders_from_section_fields(): void
+    {
+        $result = $this->service->importSite([
+            'domain' => 'raw-html-placeholders.com',
+            'template' => 'test',
+            'pages' => [
+                [
+                    'slug' => 'authors',
+                    'title' => 'Authors',
+                    'template_key' => 'authors',
+                    'status' => 'published',
+                    'sections' => [
+                        [
+                            'module' => 'hero',
+                            'module_key' => 'hero',
+                            'author_name' => 'Rahul Kumar Gupta',
+                            'hero_image' => '/assets/images/kishor-singha-hero.webp',
+                            'hero_alt' => 'Rahul Kumar Gupta',
+                            'raw_html' => '<section><img src="[[hero_image]]" alt="[[hero_alt]]"><h1>[[author_name]]</h1><p>[[unknown]]</p></section>',
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $section = $result['pages'][0]->sections()->first();
+
+        $this->assertStringContainsString('src="/assets/images/kishor-singha-hero.webp"', $section->raw_html);
+        $this->assertStringContainsString('alt="Rahul Kumar Gupta"', $section->raw_html);
+        $this->assertStringContainsString('<h1>Rahul Kumar Gupta</h1>', $section->raw_html);
+        $this->assertStringContainsString('<p>[[unknown]]</p>', $section->raw_html);
+        $this->assertSame($section->raw_html, $section->content['raw_html']);
     }
 
     public function test_import_ignores_universal_content_blocks(): void

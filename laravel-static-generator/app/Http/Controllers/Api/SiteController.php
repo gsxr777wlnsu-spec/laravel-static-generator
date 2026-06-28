@@ -16,6 +16,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -959,10 +960,31 @@ class SiteController extends Controller
             $pagesCount += (int) ($result['pages_count'] ?? 0);
         }
 
+        $this->copyClonedTemplateAssetsToGeneratedSite($domainDir, $site->id);
+
         return [
             'files_count' => count($files),
             'pages_count' => $pagesCount,
         ];
+    }
+
+    private function copyClonedTemplateAssetsToGeneratedSite(string $domainDir, int $siteId): void
+    {
+        $sourceAssetsDir = rtrim($domainDir, '/') . '/assets';
+        if (!is_dir($sourceAssetsDir)) {
+            return;
+        }
+
+        $targetAssetsPath = "site{$siteId}/assets";
+        Storage::disk('generated')->makeDirectory($targetAssetsPath);
+
+        foreach (File::allFiles($sourceAssetsDir) as $file) {
+            $relativePath = ltrim(str_replace('\\', '/', $file->getRelativePathname()), '/');
+            Storage::disk('generated')->put(
+                "{$targetAssetsPath}/{$relativePath}",
+                File::get($file->getPathname())
+            );
+        }
     }
 
     /**
