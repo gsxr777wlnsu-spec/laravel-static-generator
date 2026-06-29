@@ -22,8 +22,6 @@
         : 'Aviator';
 @endphp
 <section class="hero" id="hero">
-    @include('templates.test.modules._hero_header')
-
     <div class="hero__inner">
         <div class="hero__content">
             <div class="hero__text">
@@ -43,6 +41,4 @@
         </div>
     </div>
 </section>
-
-@include('templates.test.modules._hero_mobile_menu')
 @endif

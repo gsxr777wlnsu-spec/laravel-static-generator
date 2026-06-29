@@ -924,13 +924,17 @@ function primaryModifiedTimeMetaPath() {
     return 'pages.0.og_data.head_meta.6.content';
 }
 
+function primaryPublishedTimeMetaPath() {
+    return 'pages.0.og_data.head_meta.5.content';
+}
+
 function currentUtcIsoTimestamp() {
     return new Date().toISOString().replace(/\.\d{3}Z$/, '+00:00');
 }
 
 let modifiedTimeSyncState = {
-    autoManaged: true,
-    lastImportedValue: '',
+    publishedAutoManaged: true,
+    modifiedAutoManaged: true,
     isApplyingProgrammaticSync: false,
 };
 
@@ -944,6 +948,14 @@ function withModifiedTimeSyncGuard(callback) {
 }
 
 function extractJsonLdModifiedTime(value) {
+    return extractJsonLdWebPageDate(value, 'dateModified');
+}
+
+function extractJsonLdPublishedTime(value) {
+    return extractJsonLdWebPageDate(value, 'datePublished');
+}
+
+function extractJsonLdWebPageDate(value, dateKey) {
     const rawValue = String(value ?? '').trim();
     if (rawValue === '') {
         return '';
@@ -969,8 +981,8 @@ function extractJsonLdModifiedTime(value) {
             continue;
         }
 
-        if (String(node['@type'] || '') === 'WebPage' && typeof node.dateModified === 'string') {
-            return node.dateModified.trim();
+        if (String(node['@type'] || '') === 'WebPage' && typeof node[dateKey] === 'string') {
+            return node[dateKey].trim();
         }
 
         if (node.mainEntity) {
@@ -987,12 +999,15 @@ function extractJsonLdModifiedTime(value) {
     return '';
 }
 
-function setModifiedTimeSyncMode(autoManaged, importedValue = '') {
-    modifiedTimeSyncState.autoManaged = autoManaged;
-    modifiedTimeSyncState.lastImportedValue = importedValue;
+function setPublishedTimeSyncMode(autoManaged) {
+    modifiedTimeSyncState.publishedAutoManaged = autoManaged;
 }
 
-function setModifiedTimeEverywhere(value, options = {}) {
+function setModifiedTimeSyncMode(autoManaged) {
+    modifiedTimeSyncState.modifiedAutoManaged = autoManaged;
+}
+
+function setDateEverywhere(metaPath, value, syncMode, options = {}) {
     const normalizedValue = String(value ?? '').trim();
     const {
         autoManaged = false,
@@ -1000,29 +1015,72 @@ function setModifiedTimeEverywhere(value, options = {}) {
     } = options;
 
     return withModifiedTimeSyncGuard(() => {
-        setPromptRowValue(primaryModifiedTimeMetaPath(), normalizedValue);
+        setPromptRowValue(metaPath, normalizedValue);
 
         if (syncJsonLd) {
             syncPrimaryJsonLdFromHeadFields();
         }
 
-        setModifiedTimeSyncMode(autoManaged, normalizedValue);
+        syncMode(autoManaged);
         return true;
     });
 }
 
-function syncModifiedTimeFromJsonLd(options = {}) {
+function setModifiedTimeEverywhere(value, options = {}) {
+    return setDateEverywhere(primaryModifiedTimeMetaPath(), value, setModifiedTimeSyncMode, options);
+}
+
+function setPublishedTimeEverywhere(value, options = {}) {
+    return setDateEverywhere(primaryPublishedTimeMetaPath(), value, setPublishedTimeSyncMode, options);
+}
+
+function syncDateFromJsonLd(metaPath, extractor, syncMode, options = {}) {
     const jsonLdValue = getPromptRowValue('pages.0.og_data.head_extra.__script__.0');
-    const extractedValue = extractJsonLdModifiedTime(jsonLdValue);
+    const extractedValue = extractor(jsonLdValue);
     const {
         autoManaged = false,
     } = options;
 
     return withModifiedTimeSyncGuard(() => {
-        setPromptRowValue(primaryModifiedTimeMetaPath(), extractedValue);
-        setModifiedTimeSyncMode(autoManaged, extractedValue);
+        setPromptRowValue(metaPath, extractedValue);
+        syncMode(autoManaged);
         return extractedValue;
     });
+}
+
+function syncModifiedTimeFromJsonLd(options = {}) {
+    return syncDateFromJsonLd(primaryModifiedTimeMetaPath(), extractJsonLdModifiedTime, setModifiedTimeSyncMode, options);
+}
+
+function syncPublishedTimeFromJsonLd(options = {}) {
+    return syncDateFromJsonLd(primaryPublishedTimeMetaPath(), extractJsonLdPublishedTime, setPublishedTimeSyncMode, options);
+}
+
+function applyImportedPublishedTime(preferredSource = null) {
+    const importedMetaValue = getPromptRowValue(primaryPublishedTimeMetaPath()).trim();
+    const importedJsonLdValue = extractJsonLdPublishedTime(getPromptRowValue('pages.0.og_data.head_extra.__script__.0'));
+
+    if (preferredSource === 'jsonld' && importedJsonLdValue !== '') {
+        syncPublishedTimeFromJsonLd({ autoManaged: false });
+        return;
+    }
+
+    if (preferredSource === 'meta' && importedMetaValue !== '') {
+        setPublishedTimeEverywhere(importedMetaValue, { autoManaged: false });
+        return;
+    }
+
+    if (importedJsonLdValue !== '') {
+        syncPublishedTimeFromJsonLd({ autoManaged: false });
+        return;
+    }
+
+    if (importedMetaValue !== '') {
+        setPublishedTimeEverywhere(importedMetaValue, { autoManaged: false });
+        return;
+    }
+
+    setPublishedTimeEverywhere(currentUtcIsoTimestamp(), { autoManaged: true });
 }
 
 function applyImportedModifiedTime(preferredSource = null) {
@@ -1052,12 +1110,25 @@ function applyImportedModifiedTime(preferredSource = null) {
     setModifiedTimeEverywhere(currentUtcIsoTimestamp(), { autoManaged: true });
 }
 
-function refreshAutoManagedModifiedTime() {
-    if (!modifiedTimeSyncState.autoManaged) {
+function refreshAutoManagedDates() {
+    if (!modifiedTimeSyncState.publishedAutoManaged && !modifiedTimeSyncState.modifiedAutoManaged) {
         return false;
     }
 
-    return setModifiedTimeEverywhere(currentUtcIsoTimestamp(), { autoManaged: true });
+    const timestamp = currentUtcIsoTimestamp();
+
+    return withModifiedTimeSyncGuard(() => {
+        if (modifiedTimeSyncState.publishedAutoManaged) {
+            setPromptRowValue(primaryPublishedTimeMetaPath(), timestamp);
+        }
+
+        if (modifiedTimeSyncState.modifiedAutoManaged) {
+            setPromptRowValue(primaryModifiedTimeMetaPath(), timestamp);
+        }
+
+        syncPrimaryJsonLdFromHeadFields();
+        return true;
+    });
 }
 
 function queueImageReplacement(row, file, dataUrl, nextSrc) {
@@ -1082,6 +1153,7 @@ function queueImageReplacement(row, file, dataUrl, nextSrc) {
 function applyCreateSiteImportTemplate(rawText) {
     const parsedImport = parseCreateSiteImportTemplate(rawText);
     const blocks = parsedImport.blocks || [];
+    let importedPublishedTimeSource = null;
     let importedModifiedTimeSource = null;
 
     resetCreateSiteImportState();
@@ -1142,6 +1214,12 @@ function applyCreateSiteImportTemplate(rawText) {
                     updatePromptRowLength(row, manualInput.value);
                     resizeManualInputRows(manualInput, manualInput.value);
 
+                    if (fieldPath === primaryPublishedTimeMetaPath() && String(nextValue).trim() !== '') {
+                        importedPublishedTimeSource = 'meta';
+                    } else if (primaryJsonLdScriptPath(fieldPath) && extractJsonLdPublishedTime(nextValue) !== '') {
+                        importedPublishedTimeSource = 'jsonld';
+                    }
+
                     if (fieldPath === primaryModifiedTimeMetaPath() && String(nextValue).trim() !== '') {
                         importedModifiedTimeSource = 'meta';
                     } else if (primaryJsonLdScriptPath(fieldPath) && extractJsonLdModifiedTime(nextValue) !== '') {
@@ -1177,7 +1255,9 @@ function applyCreateSiteImportTemplate(rawText) {
     });
 
     renderBlockOperations();
+    applyImportedPublishedTime(importedPublishedTimeSource);
     applyImportedModifiedTime(importedModifiedTimeSource);
+    syncPrimaryJsonLdFromHeadFields();
 
     return stats;
 }
@@ -1683,10 +1763,14 @@ document.addEventListener('input', function (event) {
             }
 
             const rowPath = String(row.dataset.path || '');
-            if (rowPath === primaryModifiedTimeMetaPath()) {
+            if (rowPath === primaryPublishedTimeMetaPath()) {
                 syncPrimaryJsonLdFromHeadFields();
-                setModifiedTimeSyncMode(false, manualInput.value.trim());
+                setPublishedTimeSyncMode(false);
+            } else if (rowPath === primaryModifiedTimeMetaPath()) {
+                syncPrimaryJsonLdFromHeadFields();
+                setModifiedTimeSyncMode(false);
             } else if (primaryJsonLdScriptPath(rowPath)) {
+                syncPublishedTimeFromJsonLd({ autoManaged: false });
                 syncModifiedTimeFromJsonLd({ autoManaged: false });
             } else if (!rowPath.includes('.og_data.head_extra.__script__.')) {
                 syncPrimaryJsonLdFromHeadFields();
@@ -2119,7 +2203,7 @@ siteCreateForm.addEventListener('submit', async function(e) {
         data.ai_clone_templates = document.getElementById('ai_clone_templates')?.checked === true;
         data.ai_source_domain = String(document.getElementById('ai_source_domain')?.value || '').trim();
         data.debug_request_id = debugRequestId;
-        refreshAutoManagedModifiedTime();
+        refreshAutoManagedDates();
         syncPrimaryJsonLdFromHeadFields();
         data.ai_field_prompts = Array.from(document.querySelectorAll('.ai-prompt-row'))
             .reduce((acc, row) => {

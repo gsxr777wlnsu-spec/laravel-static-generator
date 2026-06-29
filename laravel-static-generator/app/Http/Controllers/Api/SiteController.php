@@ -12,6 +12,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Site;
 use App\Services\AiAgentService;
 use App\Services\ImportService;
+use App\Support\SiteLayoutContent;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
@@ -31,7 +32,8 @@ class SiteController extends Controller
         private AuditLogServiceInterface $audit,
         private AiAgentService $aiAgentService,
         private AiAgentConfigRepositoryInterface $aiConfigs,
-        private ImportService $importService
+        private ImportService $importService,
+        private SiteLayoutContent $layoutContent
     ) {}
 
     public function index(): JsonResponse
@@ -356,6 +358,9 @@ class SiteController extends Controller
             'status' => 'sometimes|in:active,inactive,draft',
             'locale' => 'sometimes|string|max:10',
             'default_locale' => 'sometimes|string|max:10',
+            'menu_html' => 'nullable|string',
+            'mobile_menu_html' => 'nullable|string',
+            'footer_html' => 'nullable|string',
             'sftp_host' => 'nullable|string',
             'sftp_port' => 'nullable|integer',
             'sftp_username' => 'nullable|string',
@@ -371,6 +376,18 @@ class SiteController extends Controller
 
         $oldValues = $site->toArray();
         $data = $validator->validated();
+
+        if (array_key_exists('menu_html', $data)) {
+            $data['menu_html'] = $this->layoutContent->normalizeMenuInner($data['menu_html']);
+        }
+
+        if (array_key_exists('mobile_menu_html', $data)) {
+            $data['mobile_menu_html'] = $this->layoutContent->normalizeMobileMenuHtml($data['mobile_menu_html']);
+        }
+
+        if (array_key_exists('footer_html', $data)) {
+            $data['footer_html'] = $this->layoutContent->normalizeFooterInner($data['footer_html']);
+        }
         
         if (!empty($data['sftp_password'])) {
             $data['sftp_password'] = encrypt($data['sftp_password']);

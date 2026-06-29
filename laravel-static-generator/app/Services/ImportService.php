@@ -6,6 +6,7 @@ use App\Contracts\SiteRepositoryInterface;
 use App\Models\Site;
 use App\Models\Page;
 use App\Models\Section;
+use App\Support\SiteLayoutContent;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Yaml\Yaml;
 
@@ -14,7 +15,8 @@ class ImportService
     private const ETALON_SITE_ID = 1;
 
     public function __construct(
-        private SiteRepositoryInterface $sites
+        private SiteRepositoryInterface $sites,
+        private SiteLayoutContent $layoutContent
     ) {}
 
     public function importFromMdFile(string $filePath, ?int $siteId = null, bool $allowSftpUpdates = true): array
@@ -85,6 +87,10 @@ class ImportService
             }
         }
 
+        if (is_array($pages) && $pages !== []) {
+            $this->syncSharedLayoutContent($site, $pages);
+        }
+
         $importedPages = [];
 
         $hasSftpUpdates = false;
@@ -135,6 +141,89 @@ class ImportService
             'pages' => $importedPages,
             'pages_count' => count($importedPages),
         ];
+    }
+
+    private function syncSharedLayoutContent(Site $site, array $pages): void
+    {
+        $menuHtml = null;
+        $mobileMenuHtml = null;
+        $footerHtml = null;
+
+        foreach ($pages as $page) {
+            if (!is_array($page)) {
+                continue;
+            }
+
+            $sections = $page['sections'] ?? null;
+            if (!is_array($sections)) {
+                continue;
+            }
+
+            foreach ($sections as $section) {
+                if (!is_array($section)) {
+                    continue;
+                }
+
+                $rawHtml = trim((string) ($section['raw_html'] ?? ''));
+                $module = strtolower(trim((string) ($section['module'] ?? $section['module_key'] ?? '')));
+
+                if ($rawHtml !== '') {
+                    if (
+                        $menuHtml === null
+                        && (str_contains($rawHtml, 'header__inner') || str_contains($rawHtml, '<header'))
+                    ) {
+                        $candidate = $this->layoutContent->normalizeMenuInner($rawHtml);
+                        if ($candidate !== '') {
+                            $menuHtml = $candidate;
+                        }
+                    }
+
+                    if (
+                        $mobileMenuHtml === null
+                        && ($module === 'mobile-menu' || str_contains($rawHtml, 'mobile-menu'))
+                    ) {
+                        $candidate = $this->layoutContent->normalizeMobileMenuHtml($rawHtml);
+                        if ($candidate !== '') {
+                            $mobileMenuHtml = $candidate;
+                        }
+                    }
+
+                    if (
+                        $footerHtml === null
+                        && (
+                            $module === 'footer'
+                            || str_contains($rawHtml, '<footer')
+                            || str_contains($rawHtml, 'class="footer')
+                            || str_contains($rawHtml, "class='footer")
+                        )
+                    ) {
+                        $candidate = $this->layoutContent->normalizeFooterInner($rawHtml);
+                        if ($candidate !== '') {
+                            $footerHtml = $candidate;
+                        }
+                    }
+                }
+            }
+        }
+
+        $updates = [];
+
+        if ($menuHtml !== null) {
+            $updates['menu_html'] = $menuHtml;
+        }
+
+        if ($mobileMenuHtml !== null) {
+            $updates['mobile_menu_html'] = $mobileMenuHtml;
+        }
+
+        if ($footerHtml !== null) {
+            $updates['footer_html'] = $footerHtml;
+        }
+
+        if ($updates !== []) {
+            $site->update($updates);
+            $site->refresh();
+        }
     }
 
     private function copyAssetsFromEtalon(int $newSiteId): void

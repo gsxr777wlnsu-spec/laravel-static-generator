@@ -26,6 +26,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth'])->group(function () 
     Route::prefix('sites/{siteId}/pages')->name('pages.')->group(function () {
         Route::get('/', [PageController::class, 'index'])->name('index');
         Route::get('/create', [PageController::class, 'create'])->name('create');
+        Route::get('/shared/{part}', [PageController::class, 'editShared'])->name('shared.edit');
         Route::get('/{id}/edit', [PageController::class, 'edit'])->name('edit');
     });
 

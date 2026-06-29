@@ -62,7 +62,8 @@ class HtmlHeadRenderingTest extends TestCase
     {
       "@type": "WebPage",
       "url": "https://cleopatraslot.ca/",
-      "name": "Cleopatra Slot in Canada - 150 Free Spins, Free Demo & Casino Review"
+      "name": "Cleopatra Slot in Canada - 150 Free Spins, Free Demo & Casino Review",
+      "datePublished": "2017-01-01T00:00:00+00:00"
     }
   ]
 }
@@ -95,6 +96,7 @@ HTML,
         $this->assertStringContainsString('<meta property="article:modified_time" content="2026-04-20T10:43:59+00:00">', $html);
         $this->assertStringNotContainsString('hreflang="x-default"', $html);
         $this->assertStringContainsString('"@graph"', $html);
+        $this->assertStringContainsString('"datePublished": "2020-12-07T18:05:01+00:00"', $html);
         $this->assertStringContainsString('"dateModified": "2026-04-20T10:43:59+00:00"', $html);
         $this->assertSame(1, substr_count($html, '<meta property="og:type" content="website">'));
         $this->assertSame(1, preg_match_all('/<meta property="og:title" content="[^"]*">/', $html));
@@ -224,6 +226,18 @@ HTML,
         "@type": "ImageObject",
         "url": "https://old.example/assets/images/favicon/apple-touch-icon.png"
       }
+    },
+    {
+      "@type": "HowTo",
+      "name": "How to play",
+      "step": [
+        {
+          "@type": "HowToStep",
+          "position": 1,
+          "name": "Choose a casino",
+          "image": "https://{site}/assets/images/steps/ganesha-slot-foreword-min.png"
+        }
+      ]
     }
   ]
 }
@@ -251,6 +265,7 @@ HTML,
         $webPage = collect($graph)->firstWhere('@type', 'WebPage');
         $videoGame = collect($graph)->firstWhere('@type', 'VideoGame');
         $organization = collect($graph)->firstWhere('@type', 'Organization');
+        $howTo = collect($graph)->firstWhere('@type', 'HowTo');
 
         $this->assertSame('https://cleopatraslot.ca/#webpage', $webPage['@id'] ?? null);
         $this->assertSame('https://cleopatraslot.ca/', $webPage['url'] ?? null);
@@ -275,6 +290,7 @@ HTML,
         $this->assertSame('Cleopatra Slot', $organization['name'] ?? null);
         $this->assertSame('https://cleopatraslot.ca/', $organization['url'] ?? null);
         $this->assertSame('https://cleopatraslot.ca/assets/images/favicon/apple-touch-icon.png', $organization['logo']['url'] ?? null);
+        $this->assertSame('https://cleopatraslot.ca/assets/images/steps/ganesha-slot-foreword-min.png', $howTo['step'][0]['image'] ?? null);
 
         Carbon::setTestNow();
     }

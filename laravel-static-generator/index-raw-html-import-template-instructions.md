@@ -1,47 +1,44 @@
 # Инструкция для заполнения index-raw-html-import-template.txt
 
-Эта инструкция нужна для файла `index-raw-html-import-template.txt`, который лежит в корне проекта. Файл можно импортировать на странице `/admin/sites/create` через кнопку `Import`.
+Эта инструкция относится к файлу `index-raw-html-import-template.txt` в корне проекта. Файл импортируется на странице `/admin/sites/create` через кнопку `Import`.
 
-## 1. Общая логика
+Цель шаблона: создать сайт из `index-raw_html.md`, сохранить исходную HTML-структуру секций, вынести общие блоки `Menu`, `Mobile Menu`, `Footer` в отдельное хранение сайта и дать возможность безопасно редактировать текст/изображения в админке после импорта.
 
-Файл импорта состоит из трёх типов блоков:
+## 1. Как импортировать
+
+1. Откройте `/admin/sites/create`.
+2. Нажмите `Import` в верхней части формы.
+3. Выберите заполненный `index-raw-html-import-template.txt`.
+4. Проверьте заполненные поля, секции и операции.
+5. Нажмите `Create Site`.
+
+Важно: `Import` только заполняет форму. Сайт создаётся после `Create Site`.
+
+## 2. Типы блоков в файле
 
 ```txt
 [FORM]
 ```
 
-Основные настройки сайта: имя, домен, путь генерации, SFTP, источник шаблонов.
+Настройки сайта: имя, домен, шаблон, путь генерации, SFTP, источник шаблонов.
 
 ```txt
 [FIELD]
 ```
 
-Обычные поля страницы `index-raw_html.md`: title, meta description, тексты секций, alt, JSON-LD и так далее.
+Поля страницы `index-raw_html.md`: title, meta, тексты, атрибуты изображений, JSON-LD, HTML-секции.
 
 ```txt
 [OPERATION]
 ```
 
-Операции со структурой: добавить блок, удалить блок, добавить пункт списка, добавить строку таблицы, добавить секцию.
+Операции со структурой: добавить текстовый блок, список, строку таблицы, карточку, секцию или удалить элемент.
 
-## 2. Как импортировать
+## 3. Переменные
 
-1. Откройте `/admin/sites/create`.
-2. Нажмите кнопку `Import` в самом верху формы.
-3. Выберите заполненный файл `index-raw-html-import-template.txt`.
-4. Проверьте, что поля на странице заполнились.
-5. Нажмите `Create Site`.
-
-Важно: кнопка `Import` не создаёт сайт. Она только заполняет форму.
-
-## 3. Переменные в начале файла
-
-В самом верху файла, до первого блока `[FORM]`, `[FIELD]` или `[OPERATION]`, можно объявлять общие переменные.
-
-Формат:
+Переменные объявляются в начале файла, до первого `[FORM]`, `[FIELD]` или `[OPERATION]`.
 
 ```txt
-# Комментарий
 {site} = test.ratel.im
 {site_name} = Play Aviator Game
 {promt_lang} = английском
@@ -50,17 +47,15 @@
 
 Правила:
 
-- переменные объявляются только в начале файла;
-- имя переменной пишется в фигурных скобках на английском прописными и если состоит из нескольких слов то разделяется нижним подчеркиванием;
-- значение переменной пишется после = и пробела и может иметь любые буквенные и цифровые значения;
-- одну и ту же переменную можно использовать сколько угодно раз;
-- переменные работают и в обычных полях, и в `prompt`, и в операциях добавления блоков;
-- внутри JSON-LD блоков `<script type="application/ld+json">` переменные автоматически JSON-экранируются;
-- если переменная не объявлена, текст вида `{site}` останется как есть, а при импорте будет предупреждение;
-- если переменная объявлена, но нигде не используется, при импорте будет предупреждение;
-- если одна и та же переменная объявлена несколько раз, при импорте будет предупреждение, а использоваться будет последнее значение.
+- имя переменной пишется в фигурных скобках;
+- используйте латиницу и нижнее подчёркивание: `{site_name}`;
+- значение пишется после `=`;
+- переменные можно использовать в `value`, `prompt`, `items`, `rows` и операциях;
+- внутри `<script type="application/ld+json">` значения JSON-экранируются автоматически;
+- необъявленная переменная останется в тексте как есть и даст warning при импорте;
+- объявленная, но неиспользованная переменная тоже даст warning.
 
-Пример использования в ручном значении:
+Пример:
 
 ````txt
 value:
@@ -69,86 +64,7 @@ https://{site}/
 ```
 ````
 
-Пример использования в AI промте:
-
-````txt
-prompt:
-```text
-напиши сео оптимизированное описание на {meta_description_total} символов на {promt_lang} языке для сайта {site_name} {site}
-```
-````
-
-Параметр `send_current_value` внутри `[FIELD]`:
-
-````txt
-[FIELD]
-file = index-raw_html.md
-section = HEAD
-label = meta_title
-path = pages.0.meta_title
-send_current_value = false
-
-value:
-```text
-Aviator Game
-```
-
-prompt:
-```text
-Generate a completely new SEO title without relying on the current value.
-```
-````
-
-Логика:
-
-- `send_current_value = true` — в запрос к AI добавляется `Current value: ...`
-- `send_current_value = false` — текущее значение в запрос к AI не отправляется
-- если параметр не указан, используется `true`
-
-## 4. Что можно менять
-
-Можно менять эти значения:
-
-```txt
-name =
-domain =
-output_path =
-status =
-locale =
-sftp_host =
-sftp_username =
-sftp_password =
-sftp_remote_path =
-send_current_value =
-value:
-prompt:
-enabled =
-tag =
-class =
-items:
-rows:
-```
-
-## 5. Что лучше не менять
-
-Не меняйте эти значения без необходимости:
-
-```txt
-file = index-raw_html.md
-path = pages.0.title
-prompt_path = ...
-section_path = ...
-target_key = ...
-block_key = ...
-container_key = ...
-anchor_key = ...
-```
-
-Это технические id. По ним Laravel понимает, какое поле или блок нужно изменить.
-
-## 6. Заполнение Site Information
-
-В начале файла есть блок `[FORM]`.
+## 4. Блок [FORM]
 
 Пример:
 
@@ -172,17 +88,62 @@ ai_clone_templates = true
 ai_source_domain = test.com
 ````
 
-Если сайт создаётся только локально, SFTP поля можно оставить пустыми.
+Если сайт создаётся локально, SFTP-поля можно оставить пустыми.
 
-## 7. Как изменить поле вручную
+`ai_source_domain` важен для импорта шаблонов и медиа. Обычно это домен исходного шаблона, например `test.com`.
 
-Каждое поле выглядит примерно так:
+## 5. Что можно менять
+
+Обычно безопасно менять:
+
+```txt
+name =
+domain =
+output_path =
+status =
+locale =
+sftp_host =
+sftp_username =
+sftp_password =
+sftp_remote_path =
+send_current_value =
+value:
+prompt:
+enabled =
+tag =
+class =
+items:
+rows:
+icon_src =
+icon_alt =
+```
+
+## 6. Что нельзя менять без необходимости
+
+Не меняйте технические ключи, если не понимаете последствия:
+
+```txt
+file = index-raw_html.md
+path = pages.0.title
+prompt_path = ...
+section_path = ...
+target_key = ...
+block_key = ...
+container_key = ...
+anchor_key = ...
+```
+
+По этим значениям Laravel находит конкретный текст, атрибут, список или блок внутри raw HTML.
+
+## 7. Поля [FIELD]
+
+Типичный блок:
 
 ````txt
 [FIELD]
 file = index-raw_html.md
 section = HEAD
-label = title (12 chars)
+label = title
 path = pages.0.title
 
 value:
@@ -196,53 +157,251 @@ prompt:
 ```
 ````
 
-Для ручной замены текста меняйте только текст внутри `value`.
+Если `prompt` пустой, AI не меняет поле. Для ручной замены меняйте только текст внутри `value`.
+
+## 8. send_current_value
+
+```txt
+send_current_value = true
+```
+
+В AI-запрос добавится текущее значение поля.
+
+```txt
+send_current_value = false
+```
+
+Текущее значение не отправится в AI-запрос. Используйте это, когда нужно сгенерировать полностью новый текст без опоры на старый.
+
+Если параметр не указан, используется `true`.
+
+## 9. Raw HTML секций
+
+Основной контент импортируется как `raw_html`. Это значит, что система должна сохранить исходную HTML-структуру: классы, вложенность, `id`, `aria-*`, `data-*`, списки, таблицы, карточки.
+
+Хорошо:
+
+```html
+<section class="hero" id="hero">
+    <div class="hero__inner">
+        <div class="hero__content">
+            <h1 class="hero__title">Aviator Game</h1>
+        </div>
+        <div class="hero__media">
+            <img class="hero__image" src="/assets/images/hero/aviator.webp" width="560" height="582" alt="Aviator">
+        </div>
+    </div>
+</section>
+```
+
+Плохо:
+
+```html
+<section class="hero">
+    <p>Aviator Game</p>
+    <img src="/assets/images/hero/aviator.webp">
+</section>
+```
+
+Плоский HTML может визуально отображаться, но стили сайта завязаны на BEM-классы и вложенность.
+
+## 10. Menu / Mobile Menu / Footer
+
+После выноса общих блоков в админке верхнее меню, мобильное меню и футер хранятся отдельно от страниц:
+
+- `menu_html` для `Menu`;
+- `mobile_menu_html` для `Mobile Menu`;
+- `footer_html` для `Footer`.
+
+При импорте Laravel сам ищет эти блоки внутри raw HTML страниц:
+
+- `Menu`: HTML с `<header>` или `header__inner`;
+- `Mobile Menu`: HTML с `mobile-menu` или module `mobile-menu`;
+- `Footer`: HTML с `<footer>` или классами `footer...`.
+
+Найденные блоки нормализуются и сохраняются в сайт. Потом они рендерятся на всех страницах через общие layout-блоки.
+
+## 11. Правильная структура Menu
+
+Для верхнего меню лучше передавать внутренность `<header>`, то есть блок `header__inner`. Можно передать и целый `<header>`, импорт сам извлечёт внутренность.
+
+Рекомендуемый формат:
+
+```html
+<div class="header__inner">
+    <div class="header__logo">
+        <a class="header__logo-wrapper" href="index.html" aria-label="To the main page">
+            <img src="/assets/images/logo/logo.webp" width="141" height="41" alt="Aviator">
+        </a>
+    </div>
+
+    <nav class="header__nav menu" aria-label="Main navigation">
+        <ul class="menu__list">
+            <li class="menu__item">
+                <a class="menu__link" href="app.html">App</a>
+            </li>
+        </ul>
+        <a class="btn__cta" href="#play-now">Play now!</a>
+    </nav>
+</div>
+```
+
+Не сохраняйте меню как простой список без обёрток:
+
+```html
+<img src="/assets/images/logo/logo.webp">
+<ul>
+    <li><a class="menu__link" href="app.html">App</a></li>
+</ul>
+```
+
+Такой HTML ломает стили, потому что нет `header__inner`, `header__logo`, `header__nav`, `menu__list`, `menu__item`.
+
+## 12. Правильная структура Mobile Menu
+
+Для мобильного меню нужен целый блок с классом `mobile-menu`.
+
+Пример:
+
+```html
+<div class="mobile-menu" data-mobile-menu>
+    <div class="mobile-menu__overlay" data-mobile-menu-close></div>
+    <div class="mobile-menu__panel">
+        <nav class="mobile-menu__nav" aria-label="Mobile navigation">
+            <ul class="mobile-menu__list">
+                <li class="mobile-menu__item">
+                    <a class="mobile-menu__link" href="app.html">App</a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+</div>
+```
+
+Важно сохранить:
+
+- корневой класс `mobile-menu`;
+- классы элементов `mobile-menu__...`;
+- `data-*` атрибуты, если они есть в исходном шаблоне.
+
+## 13. Правильная структура Footer
+
+Для футера можно передать целый `<footer>` или его внутренность. Импорт извлечёт внутренность `<footer>`.
+
+Рекомендуемый формат:
+
+```html
+<div class="footer__inner">
+    <div class="footer__main" aria-label="Footer navigation">
+        <nav class="footer__col footer__col--links" aria-label="Footer column 1">
+            <ul class="footer__links">
+                <li class="footer__link-item">
+                    <a class="footer__link" href="privacy-policy.html">Privacy Policy</a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+</div>
+```
+
+Не удаляйте `footer__inner` и внутренние классы `footer__...`.
+
+## 14. Изображения при импорте
+
+Используйте site-relative пути:
+
+```html
+<img src="/assets/images/hero/aviator.webp" alt="Aviator" width="560" height="582">
+```
+
+Допустимые форматы:
+
+- `.webp`
+- `.avif`
+- `.svg`
+- `.jpg`
+- `.jpeg`
+- `.png`
+
+Что происходит при создании сайта:
+
+- базовые assets копируются из эталонного сгенерированного сайта или последнего полного preview;
+- при ручной замене изображения через импорт/форму файл сохраняется в шаблонную директорию нового сайта и попадает в `generated/site{id}/assets/...`;
+- в preview путь `/assets/...` преобразуется в относительный `assets/...`;
+- в редакторе админки путь показывается через `/admin/sites/{id}/media/serve/...`, но при сохранении возвращается к `/assets/...`.
+
+## 15. Как заменить изображение в import-файле
+
+Если в шаблоне есть поле `img src`, меняйте значение `value` или соответствующую замену изображения на путь внутри `/assets/...`.
 
 Пример:
 
 ````txt
+[FIELD]
+file = index-raw_html.md
+section = HERO
+label = hero :: img src
+path = pages.0.sections.0.raw_html.__attr__.оставить_как_в_шаблоне.src
+
 value:
 ```text
-Aviator Casino Game
-```
-````
-
-Если `prompt` пустой, AI агент это поле не трогает.
-
-## 8. Как написать промт для AI агента
-
-Промт пишется внутри блока `prompt`.
-
-Пример:
-
-````txt
-value:
-```text
-Aviator Game
+/assets/images/hero/new-hero.webp
 ```
 
-prompt:
-```text
-Generate an SEO title in English up to 60 characters for a gambling website about Aviator Game.
-```
-````
-
-Если `prompt` заполнен, AI агент перепишет поле. Ручное значение в `value` остаётся исходным текстом для контекста.
-
-## 9. Как оставить поле без изменений
-
-Оставьте `prompt` пустым:
-
-````txt
 prompt:
 ```text
 
 ```
 ````
 
-Такое поле будет проигнорировано AI агентом.
+Правила:
 
-## 10. Как найти нужную секцию
+- не используйте абсолютный URL `http://a.ratel.im/admin/sites/.../media/serve/...` в import-файле;
+- не используйте путь с `/admin/sites/...`;
+- путь должен начинаться с `/assets/`;
+- если меняете `src`, проверьте `alt`, `title`, `width`, `height`, чтобы вёрстка не прыгала;
+- для hero-фото обязательно сохраняйте исходный класс, например `class="hero__image"`.
+
+## 16. Загрузка фото в новом редакторе
+
+После создания сайта фото можно заменить в админке:
+
+1. Откройте страницу редактирования модуля.
+2. В Visual-редакторе выберите изображение.
+3. Дважды кликните по изображению или используйте кнопку Image в toolbar.
+4. В media modal выберите файл или нажмите `Upload`.
+5. Выберите директорию, например `assets/images/hero` или `assets/images/casino`.
+6. Сохраните через `Save Module` или `Save Changes`.
+
+Новый редактор сохраняет сложный raw HTML безопасно:
+
+- для сложных секций он не пересобирает весь блок через TipTap;
+- замена изображения меняет только нужный `<img>`;
+- текстовые изменения переносятся обратно в исходную структуру;
+- временный атрибут `data-raw-image-index` нужен только внутри редактора и не должен попадать в итоговый HTML.
+
+Если редактируете `Menu`, `Mobile Menu` или `Footer`, используйте отдельные страницы:
+
+- `/admin/sites/{siteId}/pages/shared/menu`
+- `/admin/sites/{siteId}/pages/shared/mobile-menu`
+- `/admin/sites/{siteId}/pages/shared/footer`
+
+Эти страницы принудительно сохраняют исходную HTML-структуру. При проблемах с визуальным редактором откройте вкладку `Code`, восстановите нормальный HTML и нажмите Save.
+
+## 17. Preview и сохранение
+
+Кнопка `Preview` больше не пересохраняет все модули автоматически. Это сделано специально, чтобы случайно не разрушать raw HTML.
+
+Правильный порядок:
+
+1. Изменили модуль.
+2. Нажали `Save Module` или верхнюю `Save Changes`.
+3. Дождались статуса `saved at ...`.
+4. Нажали `Preview`.
+
+`Save Module` сохраняет один модуль. `Save Changes` сохраняет настройки страницы и все модули.
+
+## 18. Как найти нужную секцию
 
 В файле есть заголовки:
 
@@ -257,25 +416,21 @@ prompt:
 
 Ниже каждого заголовка идут поля этой секции.
 
-## 11. Как добавить новый параграф
+## 19. Как добавить новый параграф
 
-Новые блоки добавляются через `[OPERATION]`.
-
-По умолчанию все операции выключены:
+Новые блоки добавляются через `[OPERATION]`. По умолчанию операции выключены:
 
 ```txt
 enabled = false
 ```
 
-Чтобы операция выполнилась, поменяйте на:
+Чтобы операция выполнилась:
 
 ```txt
 enabled = true
 ```
 
-Если нужно добавить несколько новых блоков подряд друг за другом, можно оставить одинаковый исходный `anchor_key` у всех этих операций. Система сама привяжет второй блок к первому, третий ко второму и так далее, сохранив порядок строк в файле импорта.
-
-Пример добавления параграфа:
+Пример:
 
 ````txt
 [OPERATION]
@@ -301,17 +456,9 @@ Rewrite this paragraph in English for SEO. Keep it concise and natural.
 ```
 ````
 
-Что важно:
+Если нужно добавить несколько блоков подряд, можно оставить одинаковый `anchor_key`. Система вставит их по порядку строк в import-файле.
 
-- `action = add_text` означает добавить текстовый тег.
-- `tag = p` означает добавить `<p>`.
-- `class = review__description` означает класс нового тега.
-- `anchor_position = after` означает вставить после блока с `anchor_key`.
-- `value_prompt` можно оставить пустым, если AI не нужен.
-
-## 12. Как добавить заголовок h2, h3, h4, h5 или h6
-
-Пример добавления `h2`:
+## 20. Как добавить заголовок
 
 ````txt
 [OPERATION]
@@ -343,9 +490,9 @@ Generate a short SEO h2 heading in English for a casino section.
 class =
 ```
 
-Если класс пустой, система попробует взять стандартный класс такого же тега из этой секции. Если такого класса нет, тег добавится без класса.
+Если класс пустой, система попробует взять стандартный класс такого же тега из этой секции.
 
-## 12. Как правильно писать классы
+## 21. Классы
 
 Класс пишется без точки.
 
@@ -367,9 +514,7 @@ class = .casino__description
 class = text text--limited text--pt20
 ```
 
-## 13. Как добавить пункт списка li
-
-Пример:
+## 22. Как добавить пункт списка li
 
 ````txt
 [OPERATION]
@@ -395,9 +540,7 @@ Rewrite this list item in English for a casino benefits list.
 
 `container_key` указывает, в какой список добавить новый `<li>`.
 
-## 14. Как добавить карточку с иконкой
-
-Пример:
+## 23. Как добавить карточку с иконкой
 
 ````txt
 [OPERATION]
@@ -422,11 +565,11 @@ Rewrite this card feature in English. Make it short and benefit-focused.
 ```
 ````
 
-`icon_alt` тоже текстовое значение. Его можно заполнить вручную.
+`icon_src` тоже должен быть site-relative путём внутри `/assets/...`.
 
-## 15. Как добавить маркированный список ul
+## 24. Как добавить маркированный или нумерованный список
 
-Пример:
+Маркированный список:
 
 ````txt
 [OPERATION]
@@ -455,66 +598,22 @@ items:
 item_prompts:
 ```json
 [
-  "Rewrite this item in English for SEO.",
-  "Rewrite this item in English for SEO.",
-  "Rewrite this item in English for SEO."
+  "",
+  "",
+  ""
 ]
 ```
 ````
+
+Для нумерованного списка используйте:
+
+```txt
+list_tag = ol
+```
 
 Количество строк в `items` и `item_prompts` должно совпадать.
 
-Если AI не нужен:
-
-```json
-[
-  "",
-  "",
-  ""
-]
-```
-
-## 16. Как добавить нумерованный список ol
-
-Пример:
-
-````txt
-[OPERATION]
-enabled = true
-label = Add standard OL in SECTION STEPS
-file = index-raw_html.md
-section = STEPS
-section_path = pages.0.sections.10
-action = add_list_block
-anchor_key = оставить_как_в_шаблоне
-anchor_position = after
-list_tag = ol
-class = list list--ordered
-item_class = list__item
-aria_label = How to play ordered list
-
-items:
-```json
-[
-  "Choose a trusted casino with Aviator",
-  "Create an account and make a deposit",
-  "Place a bet and cash out at the right time"
-]
-```
-
-item_prompts:
-```json
-[
-  "",
-  "",
-  ""
-]
-```
-````
-
-## 17. Как добавить строку таблицы
-
-Пример:
+## 25. Как добавить строку таблицы
 
 ````txt
 [OPERATION]
@@ -532,25 +631,13 @@ col1:
 Multiplier
 ```
 
-col1_prompt:
-```text
-Rewrite this table cell label in English.
-```
-
 col2:
 ```text
 Shows the current payout growth before the plane flies away.
 ```
-
-col2_prompt:
-```text
-Rewrite this table cell description in English for SEO.
-```
 ````
 
-## 18. Как добавить целую таблицу
-
-Пример:
+## 26. Как добавить целую таблицу
 
 ````txt
 [OPERATION]
@@ -574,15 +661,6 @@ headers:
 ]
 ```
 
-header_prompts:
-```json
-[
-  "",
-  "",
-  ""
-]
-```
-
 rows:
 ```json
 [
@@ -591,22 +669,13 @@ rows:
   ["Bitcoin", "€20", "1-3 hours"]
 ]
 ```
-
-row_prompts:
-```json
-[
-  ["", "", ""],
-  ["", "", ""],
-  ["", "", ""]
-]
-```
 ````
 
 Количество колонок в каждой строке должно совпадать с количеством `headers`.
 
-## 19. Как удалить блок
+## 27. Как удалить блок
 
-Удаление обычного блока:
+Удалить обычный блок:
 
 ````txt
 [OPERATION]
@@ -619,7 +688,7 @@ action = remove_block
 target_key = оставить_как_в_шаблоне
 ````
 
-Удаление последнего пункта списка:
+Удалить последний пункт списка:
 
 ````txt
 [OPERATION]
@@ -632,7 +701,7 @@ action = remove_last_list_item
 container_key = оставить_как_в_шаблоне
 ````
 
-Удаление последней строки таблицы:
+Удалить последнюю строку таблицы:
 
 ````txt
 [OPERATION]
@@ -645,9 +714,7 @@ action = remove_last_table_row
 container_key = оставить_как_в_шаблоне
 ````
 
-## 20. Как добавить новую секцию
-
-Пример:
+## 28. Как добавить новую секцию
 
 ````txt
 [OPERATION]
@@ -660,7 +727,7 @@ action = add_section
 module = faq
 ````
 
-`module` должен быть существующим модулем проекта. Примеры:
+`module` должен быть существующим модулем проекта, например:
 
 ```txt
 hero
@@ -671,13 +738,13 @@ gameplay
 faq
 ```
 
-## 21. Минимальный пример для meta title
+## 29. Минимальный пример meta title
 
 ````txt
 [FIELD]
 file = index-raw_html.md
 section = HEAD
-label = meta_title (12 chars)
+label = meta_title
 path = pages.0.meta_title
 
 value:
@@ -691,15 +758,13 @@ Generate an SEO meta title in English up to 60 characters for an Aviator gamblin
 ```
 ````
 
-Результат: AI агент перепишет `meta_title`.
-
-## 22. Минимальный пример ручного изменения h1
+## 30. Минимальный пример ручного изменения h1
 
 ````txt
 [FIELD]
 file = index-raw_html.md
 section = HERO
-label = hero :: h1 text (34 chars)
+label = hero :: h1 text
 path = pages.0.sections.0.raw_html.__text__.оставить_как_в_шаблоне
 
 value:
@@ -713,16 +778,18 @@ prompt:
 ```
 ````
 
-Результат: h1 будет изменён вручную, AI агент не будет его переписывать.
+## 31. Быстрая памятка
 
-## 23. Быстрая памятка
-
-- Изменить текст вручную: редактируйте `value`.
-- Дать задачу AI: заполните `prompt`.
-- Оставить поле как есть: оставьте `prompt` пустым и не меняйте `value`.
-- Добавить блок: найдите `[OPERATION]`, поставьте `enabled = true`.
-- Удалить блок: используйте `action = remove_block` и `enabled = true`.
-- Добавить пункт списка: используйте `action = add_list_item`.
-- Добавить строку таблицы: используйте `action = add_table_row`.
-- Классы пишутся без точки: `class = casino__description`.
-- Технические id лучше не менять.
+- Импортируйте через `/admin/sites/create` -> `Import`, затем `Create Site`.
+- Для текста меняйте `value`.
+- Для AI заполните `prompt`.
+- Чтобы AI не менял поле, оставьте `prompt` пустым.
+- Для изображений используйте только `/assets/...`, не `/admin/sites/...`.
+- После импорта изображения в админке показываются через media serve, но сохраняются обратно как `/assets/...`.
+- `Menu`, `Mobile Menu`, `Footer` должны сохранять полную BEM-структуру.
+- Верхнее меню должно содержать `header__inner`.
+- Мобильное меню должно содержать корневой `mobile-menu`.
+- Футер должен сохранять `footer__inner` и `footer__...` классы.
+- После ручной правки в админке нажмите `Save Module`, `Save Changes` или `Save MENU/MOBILE-MENU/FOOTER`, дождитесь статуса `saved at ...`, затем открывайте `Preview`.
+- Классы пишутся без точки.
+- Технические id (`path`, `anchor_key`, `container_key`) лучше не менять.

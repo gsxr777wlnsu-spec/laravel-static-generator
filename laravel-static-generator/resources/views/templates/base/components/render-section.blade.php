@@ -71,6 +71,8 @@
         'section' => $section,
         'page' => $page,
         'site' => $site,
+        'renderSharedHeaderInContent' => $renderSharedHeaderInContent ?? false,
+        'siteMenuHtml' => $siteMenuHtml ?? null,
     ], $sectionContent))
 @else
     {{-- Fallback if no module/component exists for this section --}}

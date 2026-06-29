@@ -78,7 +78,13 @@
 
                 $extraHeadMeta[] = $normalizedMeta;
             }
+            $schemaPublishedTime = trim((string) ($standardMeta['property:article:published_time'] ?? $pagePublishedTime));
             $schemaModifiedTime = trim((string) ($standardMeta['property:article:modified_time'] ?? $pageModifiedTime));
+            $layoutContent = app(\App\Support\SiteLayoutContent::class);
+            $siteMenuHtml = $layoutContent->resolveMenuInner($site);
+            $siteMobileMenuHtml = $layoutContent->resolveMobileMenuHtml($site);
+            $siteFooterHtml = $layoutContent->resolveFooterInner($site);
+            $renderSharedHeaderInContent = $layoutContent->shouldRenderHeaderInsideFirstHero($page);
             $alternateLinks = [];
             $extraLinks = [];
             foreach ($headLinkItems as $link) {
@@ -226,6 +232,24 @@
                 return rtrim($canonicalOrigin, '/') . $path . $query . $fragment;
             };
 
+            $normalizeSchemaUrls = static function ($value, ?string $key = null) use (&$normalizeSchemaUrls, $normalizeSchemaUrl) {
+                $urlKeys = ['@id' => true, 'url' => true, 'image' => true, 'logo' => true, 'contentUrl' => true, 'thumbnailUrl' => true];
+
+                if (is_string($value)) {
+                    return isset($urlKeys[(string) $key]) ? $normalizeSchemaUrl($value) : $value;
+                }
+
+                if (!is_array($value)) {
+                    return $value;
+                }
+
+                foreach ($value as $childKey => $childValue) {
+                    $value[$childKey] = $normalizeSchemaUrls($childValue, is_string($childKey) ? $childKey : null);
+                }
+
+                return $value;
+            };
+
             $schemaGameName = '';
             foreach ($jsonLdGraph as $node) {
                 if (!is_array($node)) {
@@ -245,7 +269,8 @@
                 $schemaGameName = trim((string) (($titleParts !== false ? $titleParts[0] : $metaTitle) ?? ''));
             }
 
-            $applyDynamicSchemaFields = static function (array $node) use (&$applyDynamicSchemaFields, $normalizeSchemaUrl, $canonical, $canonicalOrigin, $metaTitle, $metaDescription, $defaultLocale, $pagePublishedTime, $schemaModifiedTime, $domain, $site, $schemaGameName, $isHomePage): array {
+            $applyDynamicSchemaFields = static function (array $node) use (&$applyDynamicSchemaFields, $normalizeSchemaUrls, $normalizeSchemaUrl, $canonical, $canonicalOrigin, $metaTitle, $metaDescription, $defaultLocale, $schemaPublishedTime, $schemaModifiedTime, $domain, $site, $schemaGameName, $isHomePage): array {
+                $node = $normalizeSchemaUrls($node);
                 $type = $node['@type'] ?? null;
 
                 if (isset($node['@id']) && is_string($node['@id'])) {
@@ -269,7 +294,7 @@
                     $node['name'] = $metaTitle;
                     $node['description'] = $metaDescription;
                     $node['inLanguage'] = $defaultLocale;
-                    $node['datePublished'] = $pagePublishedTime;
+                    $node['datePublished'] = $schemaPublishedTime;
                     $node['dateModified'] = $schemaModifiedTime;
                 }
 
@@ -403,73 +428,17 @@ foreach ($extraLinks as $link) {
 @endif
 </head>
 <body class="body" id="body">
+    @if(!$renderSharedHeaderInContent)
+        @include('templates.base.layouts.shared-header', ['siteMenuHtml' => $siteMenuHtml])
+    @endif
+
     <main class="main">
         @yield('content')
     </main>
 
-    @if(($page->template_key ?? '') !== 'blank')
-    <footer class="footer" id="footer">
-        <div class="footer__inner">
-            <div class="footer__main" aria-label="Footer navigation">
-                <div class="footer__col footer__col--brand">
-                    <div class="footer__logo">
-                        <a class="footer__logo-wrapper" href="/" aria-label="To the main page">
-                            <img src="/assets/images/logo/logo.webp" width="141" height="41" loading="lazy" alt="Aviator">
-                        </a>
-                    </div>
-                    <a class="btn__cta" href="#play-now">Play now!</a>
-                </div>
+    @include('templates.base.layouts.shared-mobile-menu', ['siteMobileMenuHtml' => $siteMobileMenuHtml])
 
-                <nav class="footer__col footer__col--links" aria-label="Footer column 1">
-                    <ul class="footer__links">
-                        <li class="footer__item"><a class="footer__link" href="/#where-to-play">Where to play</a></li>
-                        <li class="footer__item"><a class="footer__link" href="/#characteristics">Characteristics</a></li>
-                        <li class="footer__item"><a class="footer__link" href="/#review">Review</a></li>
-                        <li class="footer__item"><a class="footer__link" href="/#symbols">Symbols</a></li>
-                    </ul>
-                </nav>
-
-                <nav class="footer__col footer__col--links" aria-label="Footer column 2">
-                    <ul class="footer__links">
-                        <li class="footer__item"><a class="footer__link" href="/#gameplay">Gameplay</a></li>
-                        <li class="footer__item"><a class="footer__link" href="/#rtp">RTP</a></li>
-                        <li class="footer__item"><a class="footer__link" href="/#bonuses">Bonuses</a></li>
-                        <li class="footer__item"><a class="footer__link" href="/#conclusion">Conclusion</a></li>
-                    </ul>
-                </nav>
-
-                <nav class="footer__col footer__col--links" aria-label="Footer column 3">
-                    <ul class="footer__links">
-                        <li class="footer__item"><a class="footer__link" href="terms-and-conditions.html">Terms and Conditions</a></li>
-                        <li class="footer__item"><a class="footer__link" href="cookie-policy.html">Cookie Policy</a></li>
-                        <li class="footer__item"><a class="footer__link" href="privacy-policy.html">Privacy Policy</a></li>
-                        <li class="footer__item"><a class="footer__link" href="sitemap.html">Sitemap</a></li>
-                    </ul>
-                </nav>
-            </div>
-
-            <div class="footer__info" aria-label="Footer disclaimer">
-                <svg class="footer__age-icon" width="63" height="63" viewBox="0 0 34 34" role="img" aria-label="18+">
-                    <circle cx="17" cy="17" r="16" fill="none" stroke="var(--color-white)" stroke-width="2"></circle>
-                    <text x="17" y="22" text-anchor="middle" font-size="14" font-family="Inter, Arial, sans-serif" font-weight="700" fill="var(--color-white)">18+</text>
-                </svg>
-
-                <div class="footer__info-text">
-                    <span class="footer__info-copy">{{ $site->domain ?? 'site.com' }} is one of Spribe's independent affiliates. We are experts in presenting accurate, objective information about cutting-edge casino games and iGaming products. Please go over our terms and conditions and privacy policy. Please be aware that the activities of users on third-party sites are not under the control of our organization.</span>
-                </div>
-
-                <div class="footer__payments" aria-label="Payment systems">
-                    <img class="footer__payment" src="/assets/images/payment-systems/visa.webp" width="80" height="40" loading="lazy" alt="Visa">
-                    <img class="footer__payment" src="/assets/images/payment-systems/mc.webp" width="80" height="40" loading="lazy" alt="Mastercard">
-                    <img class="footer__payment" src="/assets/images/payment-systems/ae.webp" width="80" height="40" loading="lazy" alt="American Express">
-                    <img class="footer__payment" src="/assets/images/payment-systems/paypal.webp" width="80" height="40" loading="lazy" alt="PayPal">
-                </div>
-            </div>
-
-            <div class="footer__copyright" aria-label="Copyright">© Copyright 2024-{{ date('Y') }}</div>
-        </div>
-    </footer>
-@endif
+    @include('templates.base.layouts.shared-footer', ['siteFooterHtml' => $siteFooterHtml])
 
     @php
         $slugOrTemplate = (string) ($page->template_key ?? $page->slug ?? '');

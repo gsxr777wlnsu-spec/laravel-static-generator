@@ -24,15 +24,17 @@
         $promptNotice = !$showPrompt && (($field['prompt_path'] ?? '') !== ($field['path'] ?? ''));
         $tag = e((string) ($field['tag'] ?? ''));
         $attribute = e((string) ($field['attribute'] ?? ''));
+        $assetKind = strtolower((string) ($field['asset_kind'] ?? ''));
         $isImageSrc = strtolower((string) ($field['tag'] ?? '')) === 'img'
             && strtolower((string) ($field['attribute'] ?? '')) === 'src';
+        $isAssetUrl = $isImageSrc || $assetKind === 'background-image-url';
         $imageClass = trim((string) ($field['image_class'] ?? ''));
         $imageAlt = trim((string) ($field['image_alt'] ?? ''));
 
         $html = '<div class="ai-prompt-row rounded-md border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800" data-file="' . $file . '" data-path="' . $path . '" data-prompt-path="' . $promptPath . '" data-tag="' . $tag . '" data-attribute="' . $attribute . '">';
         $html .= '<div class="mb-2 text-xs font-medium text-gray-700 dark:text-gray-300">' . $label . ' (<span class="ai-field-length">' . $length . '</span> chars)</div>';
         $html .= '<textarea rows="' . $rows . '" data-default-rows="' . $rows . '" class="ai-manual-input mb-2 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white" placeholder="Edit field value manually">' . $value . '</textarea>';
-        if ($isImageSrc) {
+        if ($isAssetUrl) {
             $imageMeta = [];
             if ($imageClass !== '') {
                 $imageMeta[] = 'class: ' . e($imageClass);

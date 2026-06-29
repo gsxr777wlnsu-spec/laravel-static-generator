@@ -34,6 +34,8 @@ class AdminRoutesAuthTest extends TestCase
             '/admin/ai-agent',
             '/admin/sites',
             "/admin/sites/{$site->id}/pages",
+            "/admin/sites/{$site->id}/pages/shared/menu",
+            "/admin/sites/{$site->id}/pages/shared/mobile-menu",
             "/admin/sites/{$site->id}/pages/{$page->id}/edit",
             "/admin/sites/{$site->id}/media",
         ];
@@ -68,6 +70,16 @@ class AdminRoutesAuthTest extends TestCase
             ->get("/admin/sites/{$site->id}/pages")
             ->assertOk()
             ->assertSee("Pages for {$site->name}");
+
+        $this->actingAs($admin)
+            ->get("/admin/sites/{$site->id}/pages/shared/menu")
+            ->assertOk()
+            ->assertSee('MENU');
+
+        $this->actingAs($admin)
+            ->get("/admin/sites/{$site->id}/pages/shared/mobile-menu")
+            ->assertOk()
+            ->assertSee('MOBILE-MENU');
 
         $this->actingAs($admin)
             ->get("/admin/sites/{$site->id}/pages/{$page->id}/edit")

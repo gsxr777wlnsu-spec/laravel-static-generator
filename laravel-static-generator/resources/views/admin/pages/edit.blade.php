@@ -7,7 +7,6 @@
     <div class="sm:flex sm:items-center sm:justify-between">
         <div>
             <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Edit Page</h2>
-            <script src="https://cdn.tiny.cloud/1/ef27sb0c58mn3pqskiq67vhyz4flt3txoqm94bt0f6q4v5lx/tinymce/8/tinymce.min.js" referrerpolicy="origin" crossorigin="anonymous"></script>
             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Site: {{ $site->name }}</p>
         </div>
         <div class="mt-4 flex items-center gap-3 sm:mt-0">
@@ -102,9 +101,10 @@
                     </div>
 
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">OpenGraph Data (JSON)</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Head JSON</label>
                         <textarea name="og_data" rows="6"
                                   class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white font-mono text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">{{ $page->og_data ? json_encode($page->og_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : '' }}</textarea>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Editable object for <code>head_meta</code>, <code>head_links</code>, <code>head_extra</code>, <code>head_custom</code>.</p>
                     </div>
 
                     <div>
@@ -192,25 +192,71 @@
                         </div>
                     </div>
 
-                    <div class="mt-4" x-data="{ tab: 'visual' }">
+                    <div class="mt-4">
                         <div class="flex border-b border-gray-200 dark:border-gray-700 mb-4">
-                            <button type="button" @click="tab = 'visual'; initTinyMCE($el.closest('.section-item'))" 
-                                    :class="tab === 'visual' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
-                                    class="cursor-pointer py-2 px-4 border-b-2 font-medium text-sm focus:outline-none focus-visible:outline-none">
-                                Visual Editor
+                            <button type="button" data-editor-tab="visual"
+                                    class="cursor-pointer py-2 px-4 border-b-2 border-indigo-500 font-medium text-sm text-indigo-600 dark:text-indigo-400 focus:outline-none focus-visible:outline-none">
+                                Visual
                             </button>
-                            <button type="button" @click="tab = 'json'; syncFromTinyMCE($el.closest('.section-item'))" 
-                                    :class="tab === 'json' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                            <button type="button" data-editor-tab="code"
+                                    class="cursor-pointer py-2 px-4 border-b-2 font-medium text-sm focus:outline-none focus-visible:outline-none">
+                                Code
+                            </button>
+                            <button type="button" data-editor-tab="json"
                                     class="cursor-pointer py-2 px-4 border-b-2 font-medium text-sm focus:outline-none focus-visible:outline-none">
                                 JSON
                             </button>
                         </div>
 
-                        <div x-show="tab === 'visual'" class="wysiwyg-container">
-                            <textarea id="wysiwyg-{{ $section->id }}" class="wysiwyg-editor h-80 w-full"></textarea>
+                        <div data-editor-panel="visual" class="space-y-3">
+                            <div class="tiptap-toolbar"></div>
+                            <div class="tiptap-editor-layout">
+                                <div class="tiptap-editor-shell">
+                                    <div class="tiptap-editor min-h-80"></div>
+                                </div>
+                                <aside class="tiptap-image-sidebar hidden">
+                                    <div class="tiptap-image-sidebar-header">
+                                        <h4>Image</h4>
+                                        <p>Edit selected image attributes.</p>
+                                    </div>
+                                    <div class="space-y-3">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Alt</label>
+                                            <input type="text" class="tiptap-image-input mt-1 block w-full rounded-md shadow-sm sm:text-sm" data-image-attr="alt">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Title</label>
+                                            <input type="text" class="tiptap-image-input mt-1 block w-full rounded-md shadow-sm sm:text-sm" data-image-attr="title">
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Width</label>
+                                                <input type="number" min="1" class="tiptap-image-input mt-1 block w-full rounded-md shadow-sm sm:text-sm" data-image-attr="width">
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Height</label>
+                                                <input type="number" min="1" class="tiptap-image-input mt-1 block w-full rounded-md shadow-sm sm:text-sm" data-image-attr="height">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </aside>
+                                <aside class="tiptap-background-sidebar hidden">
+                                    <div class="tiptap-image-sidebar-header">
+                                        <h4>Backgrounds</h4>
+                                        <p>Edit background-image asset URLs from inline CSS.</p>
+                                    </div>
+                                    <div class="tiptap-background-fields space-y-3"></div>
+                                </aside>
+                            </div>
                         </div>
 
-                        <div x-show="tab === 'json'">
+                        <div data-editor-panel="code" class="hidden">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Module HTML</label>
+                            <textarea rows="12"
+                                      class="section-raw-html mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white font-mono text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"></textarea>
+                        </div>
+
+                        <div data-editor-panel="json" class="hidden">
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Module Content (JSON)</label>
                             <textarea rows="8"
                                       class="section-content mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white font-mono text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">{{ json_encode($section->content, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</textarea>
@@ -241,13 +287,32 @@
     </div>
 </div>
 
+<div id="page-editor-config" data-site-id="{{ $site->id }}" class="hidden"></div>
+@php
+    $pageEditorManifest = json_decode(file_get_contents(public_path('build/manifest.json')), true);
+    $pageEditorJsFile = $pageEditorManifest['resources/js/page-editor.js']['file'] ?? null;
+@endphp
+@if($pageEditorJsFile)
+    <script type="module" src="/build/{{ $pageEditorJsFile }}"></script>
+@endif
+
 <script>
 const moduleDefaults = @json($moduleDefaults ?? []);
 const editorAssetPrefix = '/admin/sites/{{ $site->id }}/media/serve/assets/';
+const editorAssetServePrefix = '/admin/sites/{{ $site->id }}/media/serve/';
 const canonicalSiteDomain = @json($site->domain);
 const currentSiteId = {{ $site->id }};
 let canonicalManuallyEdited = false;
 let pageActionInProgress = false;
+const ogDataField = document.querySelector('textarea[name="og_data"]');
+const initialHeadSyncState = (() => {
+    const ogData = parseLooseJsonObject(ogDataField?.value || '');
+
+    return {
+        metaPublishedTime: extractHeadMetaPublishedTime(ogData),
+        jsonPublishedTimes: extractJsonLdPublishedTimes(ogData?.head_extra),
+    };
+})();
 
 function getCsrfToken() {
     return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
@@ -334,15 +399,32 @@ function toEditorAssetUrls(html) {
         return html;
     }
 
-    const attrRewritten = html.replace(
-        /((?:src|href)\s*=\s*["'])\/assets\/([^"']+)(["'])/gi,
-        `$1${editorAssetPrefix}$2$3`
-    );
+    const escapedAssetPrefix = escapeRegExp(editorAssetPrefix);
+    const escapedServePrefix = escapeRegExp(editorAssetServePrefix);
+    const currentOrigin = escapeRegExp(window.location.origin);
 
-    return attrRewritten.replace(
-        /url\((['"]?)\/assets\/([^'")]+)\1\)/gi,
-        `url($1${editorAssetPrefix}$2$1)`
-    );
+    const normalizeEditorUrl = (value) => {
+        if (typeof value !== 'string' || value === '') {
+            return value;
+        }
+
+        if (/^\/assets\//i.test(value)) {
+            return value.replace(/^\/assets\//i, editorAssetPrefix);
+        }
+
+        return value
+            .replace(new RegExp(`^${currentOrigin}${escapedAssetPrefix}`, 'i'), editorAssetPrefix)
+            .replace(new RegExp(`^${currentOrigin}${escapedServePrefix}(?:\\d+\\/)?assets\\/`, 'i'), editorAssetPrefix)
+            .replace(new RegExp(`^${escapedServePrefix}(?:\\d+\\/)?assets\\/`, 'i'), editorAssetPrefix);
+    };
+
+    const attrRewritten = html.replace(/((?:src|href)\s*=\s*["'])([^"']+)(["'])/gi, (match, before, url, after) => {
+        return `${before}${normalizeEditorUrl(url)}${after}`;
+    });
+
+    return attrRewritten.replace(/url\((['"]?)([^'")]+)\1\)/gi, (match, quote, url) => {
+        return `url(${quote}${normalizeEditorUrl(url)}${quote})`;
+    });
 }
 
 function toStorageAssetUrls(html) {
@@ -351,11 +433,28 @@ function toStorageAssetUrls(html) {
     }
 
     const escapedEditorPrefix = escapeRegExp(editorAssetPrefix);
-    const attrPattern = new RegExp(`((?:src|href)\\s*=\\s*["'])${escapedEditorPrefix}([^"']+)(["'])`, 'gi');
-    const cssPattern = new RegExp(`url\\((['"]?)${escapedEditorPrefix}([^'")]+)\\1\\)`, 'gi');
+    const escapedServePrefix = escapeRegExp(editorAssetServePrefix);
+    const currentOrigin = escapeRegExp(window.location.origin);
 
-    const normalizedAttr = html.replace(attrPattern, '$1/assets/$2$3');
-    return normalizedAttr.replace(cssPattern, 'url($1/assets/$2$1)');
+    const normalizeStorageUrl = (value) => {
+        if (typeof value !== 'string' || value === '') {
+            return value;
+        }
+
+        return value
+            .replace(new RegExp(`^${currentOrigin}${escapedEditorPrefix}`, 'i'), '/assets/')
+            .replace(new RegExp(`^${escapedEditorPrefix}`, 'i'), '/assets/')
+            .replace(new RegExp(`^${currentOrigin}${escapedServePrefix}(?:\\d+\\/)?assets\\/`, 'i'), '/assets/')
+            .replace(new RegExp(`^${escapedServePrefix}(?:\\d+\\/)?assets\\/`, 'i'), '/assets/');
+    };
+
+    const normalizedAttr = html.replace(/((?:src|href)\s*=\s*["'])([^"']+)(["'])/gi, (match, before, url, after) => {
+        return `${before}${normalizeStorageUrl(url)}${after}`;
+    });
+
+    return normalizedAttr.replace(/url\((['"]?)([^'")]+)\1\)/gi, (match, quote, url) => {
+        return `url(${quote}${normalizeStorageUrl(url)}${quote})`;
+    });
 }
 
 function extensionByMime(mimeType) {
@@ -429,6 +528,7 @@ function renderPageEditStatus(message, tone = 'error') {
     statusText.textContent = message;
     return false;
 }
+window.renderPageEditStatus = renderPageEditStatus;
 
 function parseJsonField(value, label) {
     const trimmed = value.trim();
@@ -447,6 +547,220 @@ function parseJsonField(value, label) {
     }
 }
 
+function parseLooseJsonObject(value) {
+    const trimmed = String(value || '').trim();
+    if (trimmed === '') {
+        return null;
+    }
+
+    try {
+        const parsed = JSON.parse(trimmed);
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+    } catch (error) {
+        return null;
+    }
+}
+
+function normalizeHeadValue(value) {
+    return typeof value === 'string' ? value.trim() : '';
+}
+
+function extractHeadMetaPublishedTime(ogData) {
+    const headMeta = Array.isArray(ogData?.head_meta) ? ogData.head_meta : [];
+
+    for (const item of headMeta) {
+        if (!item || typeof item !== 'object') {
+            continue;
+        }
+
+        if (String(item.property || '').trim().toLowerCase() === 'article:published_time') {
+            return normalizeHeadValue(item.content);
+        }
+    }
+
+    return '';
+}
+
+function collectJsonLdPublishedTimes(node, values = []) {
+    if (Array.isArray(node)) {
+        node.forEach((item) => collectJsonLdPublishedTimes(item, values));
+        return values;
+    }
+
+    if (!node || typeof node !== 'object') {
+        return values;
+    }
+
+    if (String(node['@type'] || '') === 'WebPage' && typeof node.datePublished === 'string') {
+        values.push(node.datePublished.trim());
+    }
+
+    if (Array.isArray(node['@graph'])) {
+        collectJsonLdPublishedTimes(node['@graph'], values);
+    }
+
+    if (node.mainEntity) {
+        collectJsonLdPublishedTimes(node.mainEntity, values);
+    }
+
+    if (node.itemListElement) {
+        collectJsonLdPublishedTimes(node.itemListElement, values);
+    }
+
+    return values;
+}
+
+function extractJsonLdPublishedTimes(headExtra) {
+    if (typeof headExtra !== 'string' || headExtra.trim() === '') {
+        return [];
+    }
+
+    const values = [];
+    const scriptPattern = /<script\b[^>]*type=(["'])application\/ld\+json\1[^>]*>([\s\S]*?)<\/script>/gi;
+    let match = null;
+
+    while ((match = scriptPattern.exec(headExtra)) !== null) {
+        try {
+            const parsed = JSON.parse(String(match[2] || '').trim());
+            collectJsonLdPublishedTimes(parsed, values);
+        } catch (error) {
+            // Ignore malformed JSON-LD fragments during sync.
+        }
+    }
+
+    return values;
+}
+
+function setHeadMetaPublishedTime(ogData, value) {
+    const normalizedValue = normalizeHeadValue(value);
+    if (normalizedValue === '') {
+        return;
+    }
+
+    if (!Array.isArray(ogData.head_meta)) {
+        ogData.head_meta = [];
+    }
+
+    const existingItem = ogData.head_meta.find((item) => (
+        item
+        && typeof item === 'object'
+        && String(item.property || '').trim().toLowerCase() === 'article:published_time'
+    ));
+
+    if (existingItem) {
+        existingItem.content = normalizedValue;
+        return;
+    }
+
+    ogData.head_meta.push({
+        property: 'article:published_time',
+        content: normalizedValue,
+    });
+}
+
+function syncJsonLdPublishedTime(node, publishedTime) {
+    if (Array.isArray(node)) {
+        return node.map((item) => syncJsonLdPublishedTime(item, publishedTime));
+    }
+
+    if (!node || typeof node !== 'object') {
+        return node;
+    }
+
+    const next = { ...node };
+
+    if (String(next['@type'] || '') === 'WebPage' && publishedTime !== '') {
+        next.datePublished = publishedTime;
+    }
+
+    if (Array.isArray(next['@graph'])) {
+        next['@graph'] = next['@graph'].map((item) => syncJsonLdPublishedTime(item, publishedTime));
+    }
+
+    if (next.mainEntity) {
+        next.mainEntity = syncJsonLdPublishedTime(next.mainEntity, publishedTime);
+    }
+
+    if (next.itemListElement) {
+        next.itemListElement = syncJsonLdPublishedTime(next.itemListElement, publishedTime);
+    }
+
+    return next;
+}
+
+function syncHeadExtraPublishedTimes(headExtra, publishedTime) {
+    if (typeof headExtra !== 'string' || headExtra.trim() === '' || publishedTime === '') {
+        return headExtra;
+    }
+
+    const scriptPattern = /<script\b([^>]*)type=(["'])application\/ld\+json\2([^>]*)>([\s\S]*?)<\/script>/gi;
+
+    return headExtra.replace(scriptPattern, (fullMatch, beforeType, quote, afterType, body) => {
+        try {
+            const parsed = JSON.parse(String(body || '').trim());
+            const synced = syncJsonLdPublishedTime(parsed, publishedTime);
+            return `<script${beforeType}type=${quote}application/ld+json${quote}${afterType}>\n${JSON.stringify(synced, null, 2)}\n<\/script>`;
+        } catch (error) {
+            return fullMatch;
+        }
+    });
+}
+
+function syncPublishedTimeFields(ogData) {
+    if (!ogData || typeof ogData !== 'object' || Array.isArray(ogData)) {
+        return ogData;
+    }
+
+    const next = {
+        ...ogData,
+        head_meta: Array.isArray(ogData.head_meta)
+            ? ogData.head_meta.map((item) => (item && typeof item === 'object' ? { ...item } : item))
+            : [],
+    };
+
+    const currentMetaPublishedTime = extractHeadMetaPublishedTime(next);
+    const currentJsonPublishedTimes = extractJsonLdPublishedTimes(next.head_extra);
+    const firstJsonPublishedTime = currentJsonPublishedTimes.find((value) => normalizeHeadValue(value) !== '') || '';
+    const initialMetaPublishedTime = normalizeHeadValue(initialHeadSyncState.metaPublishedTime);
+    const metaChanged = normalizeHeadValue(currentMetaPublishedTime) !== initialMetaPublishedTime;
+    const jsonChanged = JSON.stringify(currentJsonPublishedTimes) !== JSON.stringify(initialHeadSyncState.jsonPublishedTimes || []);
+
+    let canonicalPublishedTime = normalizeHeadValue(currentMetaPublishedTime);
+
+    if (jsonChanged && !metaChanged && firstJsonPublishedTime !== '') {
+        canonicalPublishedTime = firstJsonPublishedTime;
+    } else if (canonicalPublishedTime === '' && firstJsonPublishedTime !== '') {
+        canonicalPublishedTime = firstJsonPublishedTime;
+    }
+
+    if (canonicalPublishedTime !== '') {
+        setHeadMetaPublishedTime(next, canonicalPublishedTime);
+        next.head_extra = syncHeadExtraPublishedTimes(next.head_extra, canonicalPublishedTime);
+    }
+
+    return next;
+}
+
+function applyPublishedTimeSyncToOgDataField() {
+    if (!ogDataField) {
+        return null;
+    }
+
+    const ogData = parseLooseJsonObject(ogDataField.value);
+    if (!ogData) {
+        return null;
+    }
+
+    const synced = syncPublishedTimeFields(ogData);
+    const serialized = JSON.stringify(synced, null, 4);
+
+    if (ogDataField.value !== serialized) {
+        ogDataField.value = serialized;
+    }
+
+    return synced;
+}
+
 function parseSectionJson(text, label) {
     const parsed = parseJsonField(text, label);
     if (parsed === null) {
@@ -458,9 +772,23 @@ function parseSectionJson(text, label) {
 
 async function saveSection(sectionId, container, options = {}) {
     const silent = options.silent === true;
+    const button = options.button || null;
+
+    if (typeof window.syncFromTipTap === 'function') {
+        window.syncFromTipTap(container);
+    }
+
+    if (!silent) {
+        setInlineButtonBusy(button, true);
+        renderPageEditStatus(`Saving module #${sectionId}…`, 'warning');
+    }
+
     const contentText = container.querySelector('.section-content').value;
     const content = parseSectionJson(contentText, 'Section content');
-    if (content === false) return false;
+    if (content === false) {
+        setInlineButtonBusy(button, false);
+        return false;
+    }
 
     const response = await fetch(`/api/sections/${sectionId}`, {
         method: 'PUT',
@@ -480,12 +808,14 @@ async function saveSection(sectionId, container, options = {}) {
         const message = result.errors ? JSON.stringify(result.errors) : (result.error || result.message || `Request failed with status ${response.status}`);
         if (!silent) {
             renderPageEditStatus('Error: ' + message, 'error');
+            setInlineButtonBusy(button, false);
         }
         return false;
     }
 
     if (!silent) {
-        renderPageEditStatus('Module updated.', 'success');
+        renderPageEditStatus(`Module #${sectionId} saved at ${currentSaveTime()}.`, 'success');
+        setInlineButtonBusy(button, false);
     }
     return true;
 }
@@ -646,30 +976,67 @@ async function clearAllModules() {
 }
 
 async function openPreview() {
-    const response = await fetch('/api/pages/{{ $page->id }}/preview-token', {
-        method: 'POST',
-        headers: {
-            'Accept': 'application/json',
-            'X-CSRF-TOKEN': getCsrfToken(),
-            'X-Requested-With': 'XMLHttpRequest',
-        },
-        credentials: 'same-origin',
-    });
-
-    const result = await readApiResponse(response);
-
-    if (!response.ok) {
-        const message = result.errors ? JSON.stringify(result.errors) : (result.error || result.message || `Request failed with status ${response.status}`);
-        renderPageEditStatus('Error: ' + message, 'error');
+    if (pageActionInProgress) {
         return;
     }
 
-    if (!result.preview_url) {
-        renderPageEditStatus('Error: Preview URL is missing in response.', 'error');
-        return;
+    pageActionInProgress = true;
+    setPageActionBusy(true);
+
+    const previewWindow = window.open('', '_blank');
+    if (previewWindow) {
+        previewWindow.opener = null;
+        previewWindow.document.write('<title>Preview</title><p style="font-family: sans-serif; padding: 16px;">Loading preview...</p>');
     }
 
-    window.open(result.preview_url, '_blank', 'noopener');
+    try {
+        const settingsSaved = await savePageSettings();
+        if (!settingsSaved) {
+            if (previewWindow) {
+                previewWindow.close();
+            }
+            return;
+        }
+
+        const response = await fetch('/api/pages/{{ $page->id }}/preview-token', {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': getCsrfToken(),
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            credentials: 'same-origin',
+        });
+
+        const result = await readApiResponse(response);
+
+        if (!response.ok) {
+            const message = result.errors ? JSON.stringify(result.errors) : (result.error || result.message || `Request failed with status ${response.status}`);
+            if (previewWindow) {
+                previewWindow.close();
+            }
+            renderPageEditStatus('Error: ' + message, 'error');
+            return;
+        }
+
+        if (!result.preview_url) {
+            if (previewWindow) {
+                previewWindow.close();
+            }
+            renderPageEditStatus('Error: Preview URL is missing in response.', 'error');
+            return;
+        }
+
+        if (previewWindow) {
+            previewWindow.location = result.preview_url;
+            return;
+        }
+
+        window.location.href = result.preview_url;
+    } finally {
+        pageActionInProgress = false;
+        setPageActionBusy(false);
+    }
 }
 
 async function applyTemplateToSections() {
@@ -729,11 +1096,36 @@ function setPageActionBusy(busy) {
     }
 }
 
+function setInlineButtonBusy(button, busy, busyText = 'Saving…') {
+    if (!button) {
+        return;
+    }
+
+    if (!button.dataset.defaultText) {
+        button.dataset.defaultText = button.textContent.trim();
+    }
+
+    button.disabled = busy;
+    button.textContent = busy ? busyText : button.dataset.defaultText;
+    button.classList.toggle('opacity-60', busy);
+    button.classList.toggle('cursor-not-allowed', busy);
+}
+
+function currentSaveTime() {
+    return new Date().toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+    });
+}
+
 async function savePageSettings() {
     const pageForm = document.getElementById('page-form');
     if (!pageForm) {
         return false;
     }
+
+    applyPublishedTimeSyncToOgDataField();
 
     const formData = new FormData(pageForm);
     const data = Object.fromEntries(formData);
@@ -749,9 +1141,9 @@ async function savePageSettings() {
     if (jsonLd === false) return false;
 
     // Sync all module editors before saving
-    document.querySelectorAll('.section-item').forEach(container => {
-        syncFromTinyMCE(container);
-    });
+    if (typeof window.syncAllTipTapEditors === 'function') {
+        window.syncAllTipTapEditors();
+    }
 
     delete data.og_data;
     delete data.json_ld;
@@ -781,6 +1173,10 @@ async function savePageSettings() {
 
     return true;
 }
+
+ogDataField?.addEventListener('change', () => {
+    applyPublishedTimeSyncToOgDataField();
+});
 
 async function saveAllSectionsSilently() {
     const containers = document.querySelectorAll('.section-item');
@@ -847,13 +1243,13 @@ async function handlePageSave(options = {}) {
             return;
         }
 
-        if (!deployAfterSave) {
-            renderPageEditStatus('Page updated successfully.', 'success');
+        const sectionsSaved = await saveAllSectionsSilently();
+        if (!sectionsSaved) {
             return;
         }
 
-        const sectionsSaved = await saveAllSectionsSilently();
-        if (!sectionsSaved) {
+        if (!deployAfterSave) {
+            renderPageEditStatus(`Page and modules saved at ${currentSaveTime()}.`, 'success');
             return;
         }
 
@@ -879,10 +1275,11 @@ document.getElementById('page-form')?.addEventListener('submit', async function 
 document.querySelectorAll('.section-item').forEach((container) => {
     const sectionId = container.dataset.sectionId;
 
-    container.querySelector('.save-section-btn')?.addEventListener('click', async () => {
+    container.querySelector('.save-section-btn')?.addEventListener('click', async (event) => {
         try {
-            await saveSection(sectionId, container);
+            await saveSection(sectionId, container, { button: event.currentTarget });
         } catch (error) {
+            setInlineButtonBusy(event.currentTarget, false);
             renderPageEditStatus('Error: ' + error.message, 'error');
         }
     });
@@ -893,249 +1290,6 @@ document.querySelectorAll('.section-item').forEach((container) => {
         } catch (error) {
             renderPageEditStatus('Error: ' + error.message, 'error');
         }
-    });
-});
-
-function initTinyMCE(container) {
-    const textarea = container.querySelector('.wysiwyg-editor');
-    if (!textarea || textarea.classList.contains('tinymce-initialized')) return;
-
-    const jsonTextarea = container.querySelector('.section-content');
-    let content = {};
-    try {
-        content = JSON.parse(jsonTextarea.value);
-    } catch (e) {}
-
-    const rawHtml = typeof content.raw_html === 'string' ? content.raw_html : '';
-    textarea.value = toEditorAssetUrls(rawHtml);
-
-    tinymce.init({
-        target: textarea,
-        plugins: [
-            'anchor', 'autolink', 'charmap', 'codesample', 'emoticons', 'link', 'lists', 'media', 'searchreplace', 'table', 'visualblocks', 'wordcount',
-            'checklist', 'mediaembed', 'casechange', 'formatpainter', 'pageembed', 'a11ychecker', 'tinymcespellchecker', 'permanentpen', 'powerpaste', 'advtable', 'advcode', 'advtemplate', 'tinymceai', 'mentions', 'tinycomments', 'tableofcontents', 'footnotes', 'mergetags', 'autocorrect', 'typography', 'inlinecss', 'markdown','importword', 'exportword', 'exportpdf', 'code', 'fullscreen', 'image'
-        ],
-        toolbar: 'undo redo | tinymceai-chat tinymceai-quickactions tinymceai-review | blocks fontfamily fontsize | bold italic underline strikethrough | link image media table mergetags | addcomment showcomments | spellcheckdialog a11ycheck typography | align lineheight | checklist numlist bullist indent outdent | emoticons charmap | removeformat | code fullscreen',
-        tinycomments_mode: 'embedded',
-        tinycomments_author: 'Admin',
-        mergetags_list: [
-            { value: 'First.Name', title: 'First Name' },
-            { value: 'Email', title: 'Email' },
-        ],
-        tinymceai_token_provider: async () => {
-            await fetch(`https://demo.api.tiny.cloud/1/ef27sb0c58mn3pqskiq67vhyz4flt3txoqm94bt0f6q4v5lx/auth/random`, { method: "POST", credentials: "include" });
-            return { token: await fetch(`https://demo.api.tiny.cloud/1/ef27sb0c58mn3pqskiq67vhyz4flt3txoqm94bt0f6q4v5lx/jwt/tinymceai`, { credentials: "include" }).then(r => r.text()) };
-        },
-        skin: document.documentElement.classList.contains('dark') ? 'oxide-dark' : 'oxide',
-        content_css: document.documentElement.classList.contains('dark') ? 'dark' : 'default',
-        height: 500,
-        verify_html: false,
-        relative_urls: false,
-        remove_script_host: true,
-        convert_urls: false,
-        schema: 'html5',
-        images_upload_url: '/api/media',
-        images_upload_handler: (blobInfo, progress) => new Promise((resolve, reject) => {
-            const blob = blobInfo.blob();
-            const fileName = normalizeUploadFilename(blobInfo.filename(), blob.type);
-            const formData = new FormData();
-            formData.append('file', blob, fileName);
-            formData.append('site_id', '{{ $site->id }}');
-            formData.append('alt', fileName);
-
-            fetch('/api/media', {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': getCsrfToken(),
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Accept': 'application/json'
-                },
-                body: formData
-            })
-            .then(response => response.json())
-            .then(result => {
-                if (result.errors) {
-                    reject(JSON.stringify(result.errors));
-                } else if (result.error) {
-                    reject(result.error);
-                } else {
-                    resolve(result.url);
-                }
-            })
-            .catch(error => {
-                reject('Upload failed: ' + error.message);
-            });
-        }),
-        file_picker_types: 'image',
-        file_picker_callback: (callback, value, meta) => {
-            if (meta.filetype === 'image') {
-                const dialog = tinymce.activeEditor.windowManager.open({
-                    title: 'Server Image Library',
-                    body: {
-                        type: 'panel',
-                        items: [
-                            {
-                                type: 'htmlpanel',
-                                html: `
-                                    <style>
-                                        .media-browser-container { padding: 15px; }
-                                        .media-browser-toolbar { margin-bottom: 15px; display: flex; justify-content: flex-end; }
-                                        .media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 12px; max-height: 400px; overflow-y: auto; padding-right: 5px; }
-                                        .media-item { position: relative; cursor: pointer; border-radius: 6px; overflow: hidden; background: #f8fafc; border: 2px solid transparent; transition: 0.2s; }
-                                        .media-item:hover { border-color: #3b82f6; transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
-                                        .media-item img { width: 100%; height: 100px; object-fit: cover; }
-                                        .media-item-name { font-size: 10px; padding: 4px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: rgba(255,255,255,0.9); }
-                                        .upload-btn { background: #3b82f6; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500; }
-                                        .upload-btn:hover { background: #2563eb; }
-                                        .upload-loading { font-size: 12px; color: #64748b; margin-right: 10px; display: none; align-items: center; }
-                                    </style>
-                                    <div class="media-browser-container">
-                                        <div class="media-browser-toolbar">
-                                            <div id="upload-status" class="upload-loading">Uploading...</div>
-                                            <button type="button" class="upload-btn cursor-pointer focus:outline-none focus-visible:outline-none" onclick="document.getElementById('picker-upload').click()">+ Upload New</button>
-                                            <input type="file" id="picker-upload" style="display:none" accept="image/*">
-                                        </div>
-                                        <div id="media-gallery" class="media-grid">Loading library...</div>
-                                    </div>
-                                `
-                            }
-                        ]
-                    },
-                    buttons: [{ type: 'cancel', text: 'Close' }]
-                });
-
-                const loadGallery = () => {
-                    fetch(`/api/media?site_id={{ $site->id }}`, {
-                        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-                    })
-                    .then(r => r.json())
-                    .then(media => {
-                        const container = document.getElementById('media-gallery');
-                        if (!container) return;
-                        
-                        if (!Array.isArray(media)) {
-                            container.innerHTML = `<p style="color:red">${media.error || 'Error loading library'}</p>`;
-                            return;
-                        }
-
-                        if (media.length === 0) {
-                            container.innerHTML = '<p style="grid-column: 1/-1; text-align:center; padding: 40px; color: #64748b;">No images found. Upload your first one!</p>';
-                            return;
-                        }
-
-                        container.innerHTML = '';
-                        media.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).forEach(item => {
-                            const fileName = item.path.split('/').pop();
-                            const div = document.createElement('div');
-                            div.className = 'media-item';
-                            div.innerHTML = `<img src="${item.url}" title="${item.alt}"><div class="media-item-name">${fileName}</div>`;
-                            div.onclick = () => {
-                                callback(item.url, { alt: item.alt });
-                                dialog.close();
-                            };
-                            container.appendChild(div);
-                        });
-                    });
-                };
-
-                // Initialize gallery
-                setTimeout(loadGallery, 100);
-
-                // Handle direct upload from picker
-                setTimeout(() => {
-                    const uploadInput = document.getElementById('picker-upload');
-                    if (uploadInput) {
-                        uploadInput.onchange = (e) => {
-                            const file = e.target.files[0];
-                            if (!file) return;
-
-                            const status = document.getElementById('upload-status');
-                            status.style.display = 'flex';
-
-                            const formData = new FormData();
-                            formData.append('file', file);
-                            formData.append('site_id', '{{ $site->id }}');
-                            formData.append('alt', file.name);
-
-                            fetch('/api/media', {
-                                method: 'POST',
-                                headers: { 'X-CSRF-TOKEN': getCsrfToken(), 'Accept': 'application/json' },
-                                body: formData
-                            })
-                            .then(r => r.json())
-                            .then(result => {
-                                status.style.display = 'none';
-                                if (result.error || result.errors) {
-                                    renderPageEditStatus('Upload failed: ' + (result.error || JSON.stringify(result.errors)), 'error');
-                                } else {
-                                    loadGallery();
-                                    renderPageEditStatus('Upload completed successfully.', 'success');
-                                }
-                            })
-                            .catch(err => {
-                                status.style.display = 'none';
-                                renderPageEditStatus('Upload failed: ' + err.message, 'error');
-                            });
-                        };
-                    }
-                }, 200);
-            }
-        },
-        valid_elements: '*[*]',
-        extended_valid_elements: '*[*]',
-        valid_children: '+body[style],+body[script],+div[style],+div[script],+*[style],+*[script]',
-        forced_root_block: '',
-        inline_styles: true,
-        entity_encoding: 'raw',
-        setup: function (editor) {
-            editor.on('change blur', function () {
-                syncFromTinyMCE(container);
-            });
-            // Strip junk attributes when displaying source code or getting content
-            editor.on('GetContent', function(e) {
-                if (e.content) {
-                    e.content = e.content.replace(/\s*bis_[a-z]+="[^"]*"/gi, '');
-                }
-            });
-        }
-    });
-
-    textarea.classList.add('tinymce-initialized');
-}
-
-function syncFromTinyMCE(container) {
-    const textarea = container.querySelector('.wysiwyg-editor');
-    if (!textarea) return;
-    
-    const editor = tinymce.get(textarea.id);
-    if (!editor) return;
-
-    const jsonTextarea = container.querySelector('.section-content');
-    if (!jsonTextarea) return;
-
-    try {
-        let content = JSON.parse(jsonTextarea.value);
-        const wasDirty = editor.isDirty();
-        let html = editor.getContent();
-        
-        // Clean up junk attributes injected by browser extensions (like bis_size)
-        html = html.replace(/\s*bis_[a-z]+="[^"]*"/gi, '');
-        html = toStorageAssetUrls(html);
-        
-        content.raw_html = html;
-        if (wasDirty) {
-            content.render_mode = 'raw_html';
-        }
-        jsonTextarea.value = JSON.stringify(content, null, 4);
-    } catch (e) {
-        console.error('Failed to sync TinyMCE to JSON:', e);
-    }
-}
-
-// Auto-init visual editors for existing modules
-document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.section-item').forEach(container => {
-        initTinyMCE(container);
     });
 });
 

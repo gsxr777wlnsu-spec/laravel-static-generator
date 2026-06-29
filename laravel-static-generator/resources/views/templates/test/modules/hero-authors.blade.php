@@ -1,8 +1,5 @@
 @if(($render_mode ?? null) === 'raw_html' && isset($raw_html) && is_string($raw_html) && trim($raw_html) !== '')
     {!! $raw_html !!}
-    @if(!str_contains($raw_html, 'data-mobile-menu'))
-        @include('templates.test.modules._hero_mobile_menu')
-    @endif
 @else
     @php
         $heroSectionClass = isset($class) && is_string($class) && trim($class) !== ''
@@ -18,6 +15,4 @@
         'class' => $heroSectionClass,
         'id' => $heroSectionId,
     ])
-
-    @include('templates.test.modules._hero_mobile_menu')
 @endif

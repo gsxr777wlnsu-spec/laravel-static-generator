@@ -87,6 +87,69 @@ class AdminMediaServeTest extends TestCase
         $response->assertContent($content);
     }
 
+    public function test_media_serve_falls_back_to_site_output_path_assets(): void
+    {
+        $admin = User::factory()->create();
+        $site = Site::create([
+            'name' => 'Output Path Site',
+            'domain' => 'output-path.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/output-path.example',
+            'status' => 'active',
+            'locale' => 'en',
+            'default_locale' => 'en',
+        ]);
+
+        Storage::disk('generated')->put('output-path.example/assets/svg/gift.svg', '<svg></svg>');
+
+        $this->actingAs($admin)
+            ->get("/admin/sites/{$site->id}/media/serve/assets/svg/gift.svg")
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/svg+xml');
+    }
+
+    public function test_media_serve_falls_back_to_preview_assets(): void
+    {
+        $admin = User::factory()->create();
+        $site = $this->createSite('preview-fallback.example');
+
+        Storage::disk('generated')->put('preview/token-123/assets/images/logo/logo.webp', 'preview-logo');
+
+        $this->actingAs($admin)
+            ->get("/admin/sites/{$site->id}/media/serve/assets/images/logo/logo.webp")
+            ->assertOk()
+            ->assertContent('preview-logo')
+            ->assertHeader('Content-Type', 'image/webp');
+    }
+
+    public function test_media_serve_uses_extension_mime_fallback_for_generated_webp_svg_and_avif(): void
+    {
+        $admin = User::factory()->create();
+        $site = $this->createSite('format-fallback.example');
+
+        Storage::disk('generated')->put("site{$site->id}/assets/images/logo/logo.webp", 'webp-binary');
+        Storage::disk('generated')->put(
+            "site{$site->id}/assets/images/logo/logo.svg",
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"></svg>'
+        );
+        Storage::disk('generated')->put("site{$site->id}/assets/images/logo/logo.avif", 'avif-binary');
+
+        $this->actingAs($admin)
+            ->get("/admin/sites/{$site->id}/media/serve/assets/images/logo/logo.webp")
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/webp');
+
+        $this->actingAs($admin)
+            ->get("/admin/sites/{$site->id}/media/serve/assets/images/logo/logo.svg")
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/svg+xml');
+
+        $this->actingAs($admin)
+            ->get("/admin/sites/{$site->id}/media/serve/assets/images/logo/logo.avif")
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/avif');
+    }
+
     public function test_media_serve_rejects_path_traversal_attempts(): void
     {
         $admin = User::factory()->create();

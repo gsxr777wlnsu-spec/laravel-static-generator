@@ -1,3 +1,9 @@
+@php
+    $layoutContent = app(\App\Support\SiteLayoutContent::class);
+    $renderSharedHeaderInContent = $renderSharedHeaderInContent ?? $layoutContent->shouldRenderHeaderInsideFirstHero($page);
+    $siteMenuHtml = $siteMenuHtml ?? $layoutContent->resolveMenuInner($site ?? null);
+    $sharedHeaderInjected = false;
+@endphp
 <div class="container">
     @foreach($page->sections as $section)
         @php
@@ -19,10 +25,24 @@
 
                 return e((string) $sectionContent[$key]);
             }, $resolvedRawHtml) ?? $resolvedRawHtml;
+            $layoutContent = app(\App\Support\SiteLayoutContent::class);
+            $resolvedRawHtml = $layoutContent->sanitizeSectionHtml($resolvedRawHtml);
+
+            $sectionContent['raw_html'] = $resolvedRawHtml;
+            $moduleKey = strtolower(trim((string) ($section->module ?? $sectionContent['module'] ?? $sectionContent['module_key'] ?? '')));
+            $injectSharedHeader = ($renderSharedHeaderInContent ?? false)
+                && !$sharedHeaderInjected
+                && !in_array($moduleKey, ['header', 'footer', 'menu', 'mobile-menu'], true);
+
+            if ($injectSharedHeader) {
+                $sharedHeaderInjected = true;
+            }
         @endphp
 
-        @if($renderMode === 'raw_html' && $resolvedRawHtml !== '')
-            {!! $resolvedRawHtml !!}
+        @if(in_array($moduleKey, ['header', 'footer', 'menu', 'mobile-menu'], true))
+            @continue
+        @elseif($renderMode === 'raw_html' && $resolvedRawHtml !== '')
+            {!! $injectSharedHeader ? $layoutContent->injectHeaderIntoFirstHero($resolvedRawHtml, $siteMenuHtml) : $resolvedRawHtml !!}
         @elseif($section->module && $section->module !== '')
             @php
                 $moduleView = 'templates.test.modules.' . $section->module;

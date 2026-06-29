@@ -73,6 +73,28 @@ class MediaManagerServiceTest extends TestCase
         Storage::disk('sites')->assertExists($captured['path']);
     }
 
+    public function test_upload_uses_requested_target_directory(): void
+    {
+        $captured = null;
+        $service = $this->makeService(function (array $data) use (&$captured): Media {
+            $captured = $data;
+
+            $media = new Media($data);
+            $media->id = 3;
+            return $media;
+        });
+
+        $file = UploadedFile::fake()->create('icon.svg', 8, 'image/svg+xml');
+        $site = new Site();
+        $site->id = 19;
+
+        $service->upload($file, $site, 'Icon', null, 'assets/svg');
+
+        $this->assertNotNull($captured);
+        $this->assertMatchesRegularExpression('/^19\/assets\/svg\/.+\.svg$/', $captured['path']);
+        Storage::disk('sites')->assertExists($captured['path']);
+    }
+
     private function makeService(callable $onCreate): MediaManagerService
     {
         $repository = new class($onCreate) implements MediaRepositoryInterface

@@ -130,6 +130,14 @@ class SiteAiTemplateGenerationTest extends TestCase
             'slug' => 'index',
             'title' => 'Old Title',
         ]);
+        $this->assertSame(
+            '<nav class="header__nav menu"><a class="menu__link" href="app.html">App</a></nav>',
+            $site->fresh()->menu_html
+        );
+        $this->assertSame(
+            '<div class="mobile-menu"><nav><a href="app.html">App</a></nav></div>',
+            $site->fresh()->mobile_menu_html
+        );
     }
 
     public function test_template_catalog_hides_main_menu_text_and_mobile_menu_section_fields(): void
@@ -262,6 +270,110 @@ class SiteAiTemplateGenerationTest extends TestCase
 
         $site = Site::where('domain', 'manual-image-site.example')->firstOrFail();
         $this->assertFileExists(storage_path("generated/site{$site->id}/assets/images/hero/replacement.png"));
+    }
+
+    public function test_template_catalog_extracts_raw_html_background_image_urls_from_style_blocks(): void
+    {
+        $sourceFile = $this->templatesRoot . '/test.com/index-raw_html.md';
+        $fixture = Yaml::parseFile($sourceFile);
+        $fixture['pages'][0]['sections'][0]['raw_html'] = implode('', [
+            '<section class="hero">',
+            '<style>',
+            '.hero { background-image: url(/assets/images/hero/hero-background.webp); }',
+            '.conclusion__card::before { background-image: linear-gradient(270deg, #121629 0%, rgba(18, 22, 41, 0) 100%), url(/assets/images/hero/hero-background.webp); }',
+            '</style>',
+            '<h1>Old Heading</h1>',
+            '</section>',
+        ]);
+        file_put_contents($sourceFile, "---\n" . Yaml::dump($fixture, 8, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK));
+
+        $catalog = app(AiAgentService::class)->listTemplateFields('test.com');
+        $indexFile = collect($catalog)->firstWhere('file', 'index-raw_html.md');
+        $sectionFields = collect($indexFile['section_fields'] ?? []);
+
+        $heroField = $sectionFields->first(
+            fn ($field) => is_array($field)
+                && (($field['target_type'] ?? null) === 'style')
+                && (($field['asset_kind'] ?? null) === 'background-image-url')
+                && (($field['value'] ?? null) === '/assets/images/hero/hero-background.webp')
+                && str_contains((string) ($field['field'] ?? ''), '.hero background-image')
+        );
+
+        $conclusionField = $sectionFields->first(
+            fn ($field) => is_array($field)
+                && (($field['target_type'] ?? null) === 'style')
+                && (($field['asset_kind'] ?? null) === 'background-image-url')
+                && (($field['value'] ?? null) === '/assets/images/hero/hero-background.webp')
+                && str_contains((string) ($field['field'] ?? ''), '.conclusion__card::before background-image')
+        );
+
+        $this->assertIsArray($heroField);
+        $this->assertIsArray($conclusionField);
+        $this->assertStringContainsString('.raw_html.__style__.', (string) $heroField['path']);
+        $this->assertSame('style', $heroField['tag']);
+    }
+
+    public function test_site_creation_can_replace_raw_html_background_image_file_and_src(): void
+    {
+        $user = User::factory()->create();
+
+        $sourceFile = $this->templatesRoot . '/test.com/index-raw_html.md';
+        $fixture = Yaml::parseFile($sourceFile);
+        $fixture['pages'][0]['sections'][0]['raw_html'] = implode('', [
+            '<section class="hero">',
+            '<style>',
+            '.hero { background-image: url(/assets/images/hero/hero-background.webp); }',
+            '</style>',
+            '<h1>Old Heading</h1>',
+            '</section>',
+        ]);
+        file_put_contents($sourceFile, "---\n" . Yaml::dump($fixture, 8, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK));
+
+        $catalog = app(AiAgentService::class)->listTemplateFields('test.com');
+        $indexFile = collect($catalog)->firstWhere('file', 'index-raw_html.md');
+        $sectionFields = collect($indexFile['section_fields'] ?? []);
+        $backgroundField = $sectionFields->first(
+            fn ($field) => is_array($field)
+                && (($field['target_type'] ?? null) === 'style')
+                && (($field['asset_kind'] ?? null) === 'background-image-url')
+                && (($field['value'] ?? null) === '/assets/images/hero/hero-background.webp')
+        );
+
+        $this->assertIsArray($backgroundField);
+
+        $payload = [
+            'name' => 'Manual Background Image Site',
+            'domain' => 'manual-background-image-site.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/manual-background-image-site.example',
+            'status' => 'draft',
+            'locale' => 'en',
+            'default_locale' => 'en',
+            'ai_clone_templates' => true,
+            'ai_source_domain' => 'test.com',
+            'ai_field_prompts' => [],
+            'ai_image_replacements' => [[
+                'file' => 'index-raw_html.md',
+                'path' => $backgroundField['path'],
+                'src' => '/assets/images/hero/replacement-background.png',
+                'filename' => 'replacement-background.png',
+                'data_url' => 'data:image/png;base64,' . base64_encode('replacement-background-image'),
+            ]],
+        ];
+
+        $response = $this->actingAs($user)->postJson('/api/sites', $payload);
+        $response->assertStatus(201);
+        $response->assertJsonPath('ai_generation.manual_updated_fields', 1);
+
+        $targetFile = $this->templatesRoot . '/manual-background-image-site.example/index-raw_html.md';
+        $updated = Yaml::parseFile($targetFile);
+        $rawHtml = (string) data_get($updated, 'pages.0.sections.0.raw_html');
+
+        $this->assertStringContainsString('url(/assets/images/hero/replacement-background.png)', $rawHtml);
+        $this->assertFileExists($this->templatesRoot . '/manual-background-image-site.example/assets/images/hero/replacement-background.png');
+
+        $site = Site::where('domain', 'manual-background-image-site.example')->firstOrFail();
+        $this->assertFileExists(storage_path("generated/site{$site->id}/assets/images/hero/replacement-background.png"));
     }
 
     public function test_site_creation_copies_replaced_images_for_main_formats(): void

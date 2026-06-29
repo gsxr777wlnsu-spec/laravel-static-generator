@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Storage;
 
 class MediaManagerService implements MediaManagerInterface
 {
-    private const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/x-webp', 'image/svg+xml'];
+    private const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/x-webp', 'image/svg+xml', 'image/avif'];
     private const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
     private const WARNING_FILE_SIZE = 2 * 1024 * 1024; // 2MB
 
@@ -20,7 +20,7 @@ class MediaManagerService implements MediaManagerInterface
         private MediaRepositoryInterface $repository
     ) {}
 
-    public function upload(UploadedFile $file, Site $site, string $alt, ?string $title = null): Media
+    public function upload(UploadedFile $file, Site $site, string $alt, ?string $title = null, ?string $targetDirectory = null): Media
     {
         $validation = $this->validateFile($file);
         
@@ -30,7 +30,8 @@ class MediaManagerService implements MediaManagerInterface
 
         $mimeType = $this->normalizeMimeType((string) $file->getMimeType());
         $filename = $this->generateUniqueFilename($file);
-        $path = "{$site->id}/assets/images/upload/{$filename}";
+        $relativeDirectory = $this->normalizeTargetDirectory($targetDirectory);
+        $path = "{$site->id}/{$relativeDirectory}/{$filename}";
         
         Storage::disk('sites')->put($path, file_get_contents($file->getRealPath()));
 
@@ -147,6 +148,7 @@ class MediaManagerService implements MediaManagerInterface
             'image/gif' => ['gif'],
             'image/webp' => ['webp'],
             'image/svg+xml' => ['svg'],
+            'image/avif' => ['avif'],
             default => [],
         };
     }
@@ -169,6 +171,21 @@ class MediaManagerService implements MediaManagerInterface
         }
 
         return $mimeType;
+    }
+
+    private function normalizeTargetDirectory(?string $targetDirectory): string
+    {
+        $normalized = trim(str_replace('\\', '/', (string) $targetDirectory), '/');
+
+        if ($normalized === '') {
+            return 'assets/images/upload';
+        }
+
+        if (str_contains($normalized, '..')) {
+            throw new \InvalidArgumentException('Invalid target directory.');
+        }
+
+        return $normalized;
     }
 
     public function discoverExistingMedia(Site $site): int

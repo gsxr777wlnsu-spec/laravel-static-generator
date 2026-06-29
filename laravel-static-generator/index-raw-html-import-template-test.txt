@@ -453,6 +453,34 @@ file = index-raw_html.md
 
 section = HERO
 
+label = hero :: .hero background-image url (40 chars)
+
+path = pages.0.sections.0.raw_html.__style__.b81ba7f983ed58c2
+send_current_value = true
+prompt_path = pages.0.sections.0.raw_html.__style__.b81ba7f983ed58c2
+
+target_key = b81ba7f983ed58c2
+
+block_key = b81ba7f983ed58c2
+
+tag = style
+attribute = background-image
+
+value:
+```text
+/assets/images/hero/hero-background.webp
+```
+
+prompt:
+```text
+
+```
+
+[FIELD]
+file = index-raw_html.md
+
+section = HERO
+
 label = hero :: img src (32 chars)
 
 path = pages.0.sections.0.raw_html.__attr__.003072fc76bfa802
@@ -10106,6 +10134,34 @@ tag = p
 value:
 ```text
 In conclusion, we want to say the game’s success can be attributed to the high RTP of 97%, user-friendly interface, availability of demo mode for practice, and engaging aviation-themed design. Additionally, players have access to various Aviator airplane game strategies, tips, and tricks to enhance their gameplay experience and potentially increase their winnings.However, while Aviator offers numerous advantages.
+```
+
+prompt:
+```text
+
+```
+
+[FIELD]
+file = index-raw_html.md
+
+section = CONCLUSION
+
+label = conclusion :: .conclusion__card::before background-image url (40 chars)
+
+path = pages.0.sections.13.raw_html.__style__.b81ba7f983ed58c2
+send_current_value = true
+prompt_path = pages.0.sections.13.raw_html.__style__.b81ba7f983ed58c2
+
+target_key = b81ba7f983ed58c2
+
+block_key = b81ba7f983ed58c2
+
+tag = style
+attribute = background-image
+
+value:
+```text
+/assets/images/hero/hero-background.webp
 ```
 
 prompt:

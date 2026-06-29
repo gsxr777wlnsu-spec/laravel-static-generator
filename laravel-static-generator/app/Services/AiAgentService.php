@@ -3062,7 +3062,7 @@ class AiAgentService
         }
 
         $type = (string) ($matches[3] ?? '');
-        if (!in_array($type, ['text', 'attr', 'group'], true)) {
+        if (!in_array($type, ['text', 'attr', 'group', 'style'], true)) {
             return null;
         }
 
@@ -3684,7 +3684,11 @@ class AiAgentService
                 continue;
             }
 
-            $virtualType = $target['type'] === 'attr' ? 'attr' : 'text';
+            $virtualType = match ((string) ($target['type'] ?? 'text')) {
+                'attr' => 'attr',
+                'style' => 'style',
+                default => 'text',
+            };
             $path = "{$sectionPath}.raw_html.__{$virtualType}__.{$key}";
             $promptPath = $path;
             $showPrompt = true;
@@ -3710,6 +3714,7 @@ class AiAgentService
                 'target_key' => (string) ($target['key'] ?? $key),
                 'target_type' => (string) ($target['type'] ?? 'text'),
                 'attribute' => (string) ($target['attribute'] ?? ''),
+                'asset_kind' => (string) ($target['asset_kind'] ?? ''),
                 'image_class' => (string) ($target['image_class'] ?? ''),
                 'image_alt' => (string) ($target['image_alt'] ?? ''),
                 'image_src' => (string) ($target['image_src'] ?? ''),
@@ -3887,6 +3892,29 @@ class AiAgentService
                             : '',
                     ];
                     $ordered[] = $key;
+                }
+            }
+        }
+
+        $styleNodes = $xpath->query('.//style', $root);
+        if ($styleNodes !== false) {
+            foreach ($styleNodes as $node) {
+                if (!$node instanceof DOMElement) {
+                    continue;
+                }
+
+                if ($module !== null && $this->shouldHideRawHtmlTargetForModule($module, $node)) {
+                    continue;
+                }
+
+                $cssText = (string) $node->textContent;
+                if (trim($cssText) === '') {
+                    continue;
+                }
+
+                foreach ($this->extractEditableCssBackgroundTargets($cssText, $node, (string) ($module ?? 'raw_html')) as $target) {
+                    $targets[$target['key']] = $target;
+                    $ordered[] = $target['key'];
                 }
             }
         }
@@ -4187,6 +4215,12 @@ class AiAgentService
     {
         $tag = strtolower((string) ($target['tag'] ?? 'text'));
         $type = (string) ($target['type'] ?? 'text');
+        if ($type === 'style') {
+            $selector = trim((string) ($target['css_selector'] ?? 'style'));
+            $property = strtolower((string) ($target['css_property'] ?? 'background-image'));
+            return "{$module} :: {$selector} {$property} url";
+        }
+
         if ($type === 'attr') {
             $attribute = strtolower((string) ($target['attribute'] ?? 'attr'));
             return "{$module} :: {$tag} {$attribute}";
@@ -4287,6 +4321,20 @@ class AiAgentService
         }
 
         if (
+            $virtualPath['type'] === 'style'
+            && ($target['node'] ?? null) instanceof DOMElement
+        ) {
+            $cssText = (string) $target['node']->textContent;
+            $updatedCssText = $this->replaceEditableCssBackgroundTarget($cssText, $target, $newValue);
+            if ($updatedCssText === null || $updatedCssText === $cssText) {
+                return null;
+            }
+
+            $target['node']->nodeValue = $updatedCssText;
+            return $this->innerHtml($root);
+        }
+
+        if (
             $virtualPath['type'] === 'attr'
             && ($target['node'] ?? null) instanceof DOMElement
         ) {
@@ -4300,6 +4348,132 @@ class AiAgentService
         }
 
         return null;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function extractEditableCssBackgroundTargets(string $cssText, DOMElement $node, string $module): array
+    {
+        preg_match_all('/(?P<selector>[^{}]+)\{(?P<body>[^{}]*)\}/s', $cssText, $blocks, PREG_SET_ORDER);
+        if ($blocks === []) {
+            return [];
+        }
+
+        $targets = [];
+
+        foreach ($blocks as $blockIndex => $blockMatch) {
+            $selector = trim((string) ($blockMatch['selector'] ?? ''));
+            $body = (string) ($blockMatch['body'] ?? '');
+            if ($selector === '' || $body === '') {
+                continue;
+            }
+
+            preg_match_all('/(?P<property>background-image)\s*:\s*(?P<value>[^;]+)\s*;?/i', $body, $declarations, PREG_SET_ORDER);
+            if ($declarations === []) {
+                continue;
+            }
+
+            foreach ($declarations as $declarationIndex => $declaration) {
+                $property = strtolower(trim((string) ($declaration['property'] ?? 'background-image')));
+                $value = (string) ($declaration['value'] ?? '');
+
+                preg_match_all('/url\((["\']?)(?P<url>[^)"\']+)\1\)/i', $value, $urlMatches, PREG_SET_ORDER);
+                if ($urlMatches === []) {
+                    continue;
+                }
+
+                foreach ($urlMatches as $urlIndex => $urlMatch) {
+                    $url = trim((string) ($urlMatch['url'] ?? ''));
+                    if ($url === '') {
+                        continue;
+                    }
+
+                    $key = $this->shortHash('style|' . $this->buildNodePath($node) . '|' . $blockIndex . '|' . $declarationIndex . '|' . $urlIndex);
+                    $targets[] = [
+                        'key' => $key,
+                        'type' => 'style',
+                        'node' => $node,
+                        'tag' => 'style',
+                        'attribute' => $property,
+                        'value' => $url,
+                        'css_selector' => $selector,
+                        'css_property' => $property,
+                        'css_block_index' => $blockIndex,
+                        'css_declaration_index' => $declarationIndex,
+                        'css_url_index' => $urlIndex,
+                        'block_key' => $key,
+                        'block_tag' => 'style',
+                        'block_type' => 'text',
+                        'block_label' => "{$module} :: {$selector} {$property}",
+                        'item_key' => $key,
+                        'item_tag' => 'style',
+                        'item_label' => '',
+                        'asset_kind' => 'background-image-url',
+                        'image_src' => $url,
+                    ];
+                }
+            }
+        }
+
+        return $targets;
+    }
+
+    /**
+     * @param  array<string, mixed>  $target
+     */
+    private function replaceEditableCssBackgroundTarget(string $cssText, array $target, string $newValue): ?string
+    {
+        preg_match_all('/(?P<selector>[^{}]+)\{(?P<body>[^{}]*)\}/s', $cssText, $blocks, PREG_OFFSET_CAPTURE);
+
+        $blockIndex = (int) ($target['css_block_index'] ?? -1);
+        $declarationIndex = (int) ($target['css_declaration_index'] ?? -1);
+        $urlIndex = (int) ($target['css_url_index'] ?? -1);
+
+        if ($blockIndex < 0 || $declarationIndex < 0 || $urlIndex < 0 || !isset($blocks[0][$blockIndex])) {
+            return null;
+        }
+
+        $blockText = (string) ($blocks[0][$blockIndex][0] ?? '');
+        $blockOffset = (int) ($blocks[0][$blockIndex][1] ?? -1);
+        if ($blockText === '' || $blockOffset < 0) {
+            return null;
+        }
+
+        preg_match_all('/(?P<property>background-image)\s*:\s*(?P<value>[^;]+)\s*;?/i', $blockText, $declarations, PREG_OFFSET_CAPTURE);
+        if (!isset($declarations['value'][$declarationIndex])) {
+            return null;
+        }
+
+        $valueText = (string) ($declarations['value'][$declarationIndex][0] ?? '');
+        $valueOffset = (int) ($declarations['value'][$declarationIndex][1] ?? -1);
+        if ($valueText === '' || $valueOffset < 0) {
+            return null;
+        }
+
+        preg_match_all('/url\((["\']?)(?P<url>[^)"\']+)\1\)/i', $valueText, $urls, PREG_OFFSET_CAPTURE);
+        if (!isset($urls[0][$urlIndex], $urls['url'][$urlIndex])) {
+            return null;
+        }
+
+        $fullUrlText = (string) ($urls[0][$urlIndex][0] ?? '');
+        $fullUrlOffset = (int) ($urls[0][$urlIndex][1] ?? -1);
+        $currentUrl = (string) ($urls['url'][$urlIndex][0] ?? '');
+        $currentUrlOffset = (int) ($urls['url'][$urlIndex][1] ?? -1);
+
+        if ($fullUrlText === '' || $fullUrlOffset < 0 || $currentUrlOffset < 0) {
+            return null;
+        }
+
+        $quote = '';
+        if (preg_match('/^url\((["\'])/i', $fullUrlText, $quoteMatch)) {
+            $quote = (string) ($quoteMatch[1] ?? '');
+        }
+
+        $absoluteStart = $blockOffset + $valueOffset + $currentUrlOffset;
+        $absoluteLength = strlen($currentUrl);
+
+        return substr_replace($cssText, $newValue, $absoluteStart, $absoluteLength);
     }
 
     /**

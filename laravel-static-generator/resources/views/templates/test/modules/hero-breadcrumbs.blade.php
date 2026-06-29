@@ -25,8 +25,6 @@
         : 'Aviator';
 @endphp
 <section class="hero hero--has-breadcrumbs" id="hero">
-    @include('templates.test.modules._hero_header')
-
     <nav class="breadcrumbs-container" aria-label="Breadcrumb">
         <div class="breadcrumbs">
             <a class="breadcrumbs__item" href="/">Home page</a>
@@ -54,6 +52,4 @@
         </div>
     </div>
 </section>
-
-@include('templates.test.modules._hero_mobile_menu')
 @endif

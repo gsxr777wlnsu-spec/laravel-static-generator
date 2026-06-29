@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Contracts\SectionServiceInterface;
 use App\Contracts\SectionRepositoryInterface;
 use App\Models\Section;
+use App\Support\SiteLayoutContent;
 
 class SectionService implements SectionServiceInterface
 {
@@ -22,11 +23,13 @@ class SectionService implements SectionServiceInterface
     ];
 
     public function __construct(
-        private SectionRepositoryInterface $repository
+        private SectionRepositoryInterface $repository,
+        private SiteLayoutContent $layoutContent
     ) {}
 
     public function add(int $pageId, string $type, array $content, ?int $order = null): Section
     {
+        $content = $this->sanitizeContentRawHtml($content);
         $validation = $this->validateSectionType($type, $content);
         
         if (!$validation['valid']) {
@@ -43,6 +46,10 @@ class SectionService implements SectionServiceInterface
 
     public function update(Section $section, array $data): Section
     {
+        if (isset($data['content']) && is_array($data['content'])) {
+            $data['content'] = $this->sanitizeContentRawHtml($data['content']);
+        }
+
         if (isset($data['type']) && isset($data['content'])) {
             $validation = $this->validateSectionType($data['type'], $data['content']);
             
@@ -95,5 +102,16 @@ class SectionService implements SectionServiceInterface
         }
 
         return ['valid' => true, 'message' => null];
+    }
+
+    private function sanitizeContentRawHtml(array $content): array
+    {
+        if (!array_key_exists('raw_html', $content) || !is_string($content['raw_html'])) {
+            return $content;
+        }
+
+        $content['raw_html'] = $this->layoutContent->sanitizeSectionHtml($content['raw_html']);
+
+        return $content;
     }
 }

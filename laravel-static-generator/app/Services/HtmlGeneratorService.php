@@ -41,7 +41,9 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
 
         $html = View::make($templatePath, $data)->render();
 
-        return $this->normalizeGoogleMapEmbeds($html);
+        $result = $this->normalizeGoogleMapEmbeds($html);
+
+        return $result;
     }
 
     public function generateSite(Site $site, ?callable $onProgress = null): array

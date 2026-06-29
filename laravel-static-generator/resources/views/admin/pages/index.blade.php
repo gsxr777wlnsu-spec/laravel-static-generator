@@ -78,6 +78,46 @@
             </tbody>
         </table>
     </div>
+    <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg overflow-hidden">
+        <div class="border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+            <h3 class="text-base font-semibold text-gray-900 dark:text-white">Shared Site Blocks</h3>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">These blocks are rendered on every page of the site.</p>
+        </div>
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
+                <tr>
+                    <td class="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">Menu</td>
+                    <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">Header navigation and logo from <code>&lt;div class="header__inner"&gt;</code></td>
+                    <td class="px-6 py-4 text-right text-sm font-medium">
+                        <a href="{{ route('admin.pages.shared.edit', [$site->id, 'menu']) }}"
+                           class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">
+                            Edit
+                        </a>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">Mobile Menu</td>
+                    <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">Shared mobile navigation from <code>&lt;div class="mobile-menu"&gt;</code></td>
+                    <td class="px-6 py-4 text-right text-sm font-medium">
+                        <a href="{{ route('admin.pages.shared.edit', [$site->id, 'mobile-menu']) }}"
+                           class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">
+                            Edit
+                        </a>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">Footer</td>
+                    <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">Shared footer content from <code>&lt;footer class="footer" id="footer"&gt;</code></td>
+                    <td class="px-6 py-4 text-right text-sm font-medium">
+                        <a href="{{ route('admin.pages.shared.edit', [$site->id, 'footer']) }}"
+                           class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">
+                            Edit
+                        </a>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
     <div id="pages-index-status" class="hidden rounded-md border px-4 py-3 text-sm shadow-sm">
         <div id="pages-index-status-text"></div>
     </div>

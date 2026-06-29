@@ -80,6 +80,9 @@ class SiteCrudTest extends TestCase
             'locale' => 'de',
             'default_locale' => 'de',
             'status' => 'inactive',
+            'menu_html' => '<header class="header"><div class="header__inner"><nav>Menu</nav></div></header>',
+            'mobile_menu_html' => '<section><div class="mobile-menu"><nav>Mobile Menu</nav></div></section>',
+            'footer_html' => '<footer class="footer" id="footer"><div class="footer__inner"><p>Footer</p></div></footer>',
         ]);
 
         $response->assertOk();
@@ -87,6 +90,9 @@ class SiteCrudTest extends TestCase
         $response->assertJsonPath('locale', 'de');
         $response->assertJsonPath('default_locale', 'de');
         $response->assertJsonPath('status', 'inactive');
+        $response->assertJsonPath('menu_html', '<div class="header__inner"><nav>Menu</nav></div>');
+        $response->assertJsonPath('mobile_menu_html', '<div class="mobile-menu"><nav>Mobile Menu</nav></div>');
+        $response->assertJsonPath('footer_html', '<div class="footer__inner"><p>Footer</p></div>');
 
         $this->assertDatabaseHas('sites', [
             'id' => $site->id,
@@ -94,6 +100,9 @@ class SiteCrudTest extends TestCase
             'locale' => 'de',
             'default_locale' => 'de',
             'status' => 'inactive',
+            'menu_html' => '<div class="header__inner"><nav>Menu</nav></div>',
+            'mobile_menu_html' => '<div class="mobile-menu"><nav>Mobile Menu</nav></div>',
+            'footer_html' => '<div class="footer__inner"><p>Footer</p></div>',
         ]);
     }
 

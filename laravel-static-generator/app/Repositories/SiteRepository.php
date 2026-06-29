@@ -96,7 +96,7 @@ class SiteRepository implements SiteRepositoryInterface
     public function clone(Site $site, array $overrides): Site
     {
         $newSite = $this->create(array_merge(
-            $site->only(['name', 'template_set', 'locale', 'default_locale']),
+            $site->only(['name', 'template_set', 'locale', 'default_locale', 'menu_html', 'mobile_menu_html', 'footer_html']),
             $overrides
         ));
 

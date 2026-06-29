@@ -7,13 +7,15 @@ use App\Contracts\SiteRepositoryInterface;
 use App\Http\Controllers\Controller;
 use App\Models\Page;
 use App\Services\PageTemplatePresetService;
+use App\Support\SiteLayoutContent;
 
 class PageController extends Controller
 {
     public function __construct(
         private PageRepositoryInterface $pages,
         private SiteRepositoryInterface $sites,
-        private PageTemplatePresetService $templatePresets
+        private PageTemplatePresetService $templatePresets,
+        private SiteLayoutContent $layoutContent
     ) {}
 
     public function index(int $siteId)
@@ -28,6 +30,30 @@ class PageController extends Controller
         $pages = Page::where('site_id', $siteId)->with('sections')->get();
         
         return view('admin.pages.index', compact('site', 'pages'));
+    }
+
+    public function editShared(int $siteId, string $part)
+    {
+        $site = $this->sites->findById($siteId);
+
+        if (!$site) {
+            return redirect()->route('admin.sites.index')
+                ->with('error', 'Site not found');
+        }
+
+        $part = strtolower(trim($part));
+        if (!in_array($part, ['menu', 'mobile-menu', 'footer'], true)) {
+            return redirect()->route('admin.pages.index', $siteId)
+                ->with('error', 'Shared block not found');
+        }
+
+        $html = match ($part) {
+            'menu' => $this->layoutContent->resolveMenuInner($site),
+            'mobile-menu' => $this->layoutContent->resolveMobileMenuHtml($site),
+            default => $this->layoutContent->resolveFooterInner($site),
+        };
+
+        return view('admin.pages.edit-shared', compact('site', 'part', 'html'));
     }
 
     public function create(int $siteId)
@@ -55,6 +81,36 @@ class PageController extends Controller
             return redirect()->route('admin.sites.index')
                 ->with('error', 'Site or Page not found');
         }
+
+        $sanitizedSections = $page->sections
+            ->reject(function ($section) {
+                $content = is_array($section->content ?? null)
+                    ? $section->content
+                    : (is_string($section->content ?? null) ? json_decode($section->content, true) ?: [] : []);
+
+                $moduleKey = strtolower(trim((string) ($section->module ?? $content['module'] ?? $content['module_key'] ?? '')));
+
+                return in_array($moduleKey, ['header', 'footer', 'menu', 'mobile-menu'], true);
+            })
+            ->map(function ($section) {
+                $content = is_array($section->content ?? null)
+                    ? $section->content
+                    : (is_string($section->content ?? null) ? json_decode($section->content, true) ?: [] : []);
+
+                if (isset($content['raw_html']) && is_string($content['raw_html'])) {
+                    $content['raw_html'] = $this->layoutContent->sanitizeSectionHtml($content['raw_html']);
+                }
+
+                $section->content = $content;
+                if (is_string($section->raw_html) && trim($section->raw_html) !== '') {
+                    $section->raw_html = $this->layoutContent->sanitizeSectionHtml($section->raw_html);
+                }
+
+                return $section;
+            })
+            ->values();
+
+        $page->setRelation('sections', $sanitizedSections);
 
         $pageTemplates = $this->templatePresets->listForUi();
         $moduleCatalog = $this->templatePresets->listModulesForUi();
