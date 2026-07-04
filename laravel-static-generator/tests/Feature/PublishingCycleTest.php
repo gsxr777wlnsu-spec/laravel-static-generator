@@ -10,6 +10,7 @@ use App\Models\Section;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\GitService;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -136,6 +137,96 @@ class PublishingCycleTest extends TestCase
         $previewResponse->assertSee('Welcome');
     }
 
+    public function test_base_site_generation_upload_preview_and_delete_removes_all_local_artifacts(): void
+    {
+        $this->useTemporaryGeneratedDisk();
+        $this->useTemporarySitesDisk();
+
+        $siteResponse = $this->actingAs($this->admin)->postJson('/api/sites', [
+            'name' => 'Delete Base Cycle',
+            'domain' => 'delete-base-cycle.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/delete-base-cycle',
+            'status' => 'active',
+            'locale' => 'en',
+            'default_locale' => 'en',
+        ]);
+        $siteResponse->assertCreated();
+
+        $siteId = (int) $siteResponse->json('id');
+        $site = Site::findOrFail($siteId);
+
+        $page = Page::create([
+            'site_id' => $siteId,
+            'slug' => 'index',
+            'title' => 'Base Delete Cycle',
+            'status' => 'published',
+            'locale' => 'en',
+        ]);
+
+        $section = Section::create([
+            'page_id' => $page->id,
+            'type' => 'text',
+            'order' => 1,
+            'content' => [
+                'heading' => 'Delete Cycle',
+                'content' => '<p>Generated base content</p>',
+                'module' => 'hero-main',
+                'id' => 'hero-main',
+                'class' => 'hero-section reusable-block',
+            ],
+        ]);
+
+        Storage::disk('sites')->put("{$siteId}/assets/js/app.js", 'console.log("delete cycle");');
+        Storage::disk('sites')->put("{$siteId}/assets/css/style.css", '.hero{background-image:url("/assets/images/upload/photo.webp")}');
+
+        $uploadResponse = $this->actingAs($this->admin)->postJson('/api/media', [
+            'site_id' => $siteId,
+            'file' => UploadedFile::fake()->create('photo.webp', 16, 'image/webp'),
+            'alt' => 'Uploaded photo',
+            'target_directory' => 'assets/images/upload',
+        ]);
+        $uploadResponse->assertCreated();
+
+        $mediaId = (int) $uploadResponse->json('id');
+        $mediaPath = (string) $uploadResponse->json('path');
+        Storage::disk('sites')->assertExists($mediaPath);
+
+        $mockGitService = \Mockery::mock(GitService::class);
+        $mockGitService->shouldReceive('setRepositoryPath')->andReturnSelf();
+        $mockGitService->shouldReceive('commit')->andReturnNull();
+        $this->app->instance(GitService::class, $mockGitService);
+
+        $generateResponse = $this->actingAs($this->admin)->postJson("/api/sites/{$siteId}/generate");
+        $generateResponse->assertOk();
+        $this->assertTrue((bool) $generateResponse->json('success'));
+        Storage::disk('generated')->assertExists("site{$siteId}/index.html");
+        Storage::disk('generated')->assertExists("site{$siteId}/assets/images/upload/" . basename($mediaPath));
+
+        $previewTokenResponse = $this->actingAs($this->admin)->postJson("/api/pages/{$page->id}/preview-token");
+        $previewTokenResponse->assertOk();
+        preg_match('#^/api/preview/([^/]+)/#', (string) $previewTokenResponse->json('preview_url'), $matches);
+        $this->assertArrayHasKey(1, $matches);
+        $previewToken = $matches[1];
+
+        Storage::disk('generated')->assertExists("preview/{$previewToken}/.site.json");
+        Storage::disk('generated')->assertExists("preview/{$previewToken}/assets/images/upload/" . basename($mediaPath));
+        $this->assertCount(1, Storage::disk('generated')->directories('preview'));
+
+        $deleteResponse = $this->actingAs($this->admin)->deleteJson("/api/sites/{$siteId}");
+        $deleteResponse->assertOk();
+
+        $this->assertDatabaseMissing('sites', ['id' => $siteId]);
+        $this->assertDatabaseMissing('pages', ['id' => $page->id]);
+        $this->assertDatabaseMissing('sections', ['id' => $section->id]);
+        $this->assertDatabaseMissing('media', ['id' => $mediaId]);
+
+        $this->assertFalse(Storage::disk('sites')->exists((string) $siteId));
+        $this->assertFalse(Storage::disk('generated')->exists("site{$siteId}"));
+        $this->assertFalse(Storage::disk('generated')->exists("preview/{$previewToken}"));
+        $this->assertSame([], Storage::disk('generated')->directories('preview'));
+    }
+
     public function test_generate_falls_back_to_complete_generated_assets_when_site_assets_are_incomplete(): void
     {
         $this->useTemporaryGeneratedDisk();
@@ -196,6 +287,100 @@ class PublishingCycleTest extends TestCase
         $this->assertSame(
             'console.log("fallback source");',
             Storage::disk('generated')->get("site{$site->id}/assets/js/main.js")
+        );
+    }
+
+    public function test_generate_aliases_fallback_main_css_to_style_css(): void
+    {
+        $this->useTemporaryGeneratedDisk();
+        $this->useTemporarySitesDisk();
+
+        $site = Site::create([
+            'name' => 'Main Css Fallback Site',
+            'domain' => 'main-css-fallback.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/main-css-fallback',
+            'status' => 'active',
+            'locale' => 'en',
+            'default_locale' => 'en',
+        ]);
+
+        Page::create([
+            'site_id' => $site->id,
+            'slug' => 'index',
+            'title' => 'Main Css Fallback',
+            'status' => 'published',
+            'locale' => 'en',
+        ]);
+
+        Storage::disk('generated')->put('site1/assets/css/main.css', '.main-css{color:#123;}');
+        Storage::disk('generated')->put('site1/assets/js/main.js', 'console.log("main css fallback");');
+
+        $mockGitService = \Mockery::mock(GitService::class);
+        $mockGitService->shouldReceive('setRepositoryPath')->andReturnSelf();
+        $mockGitService->shouldReceive('commit')->andReturnNull();
+        $this->app->instance(GitService::class, $mockGitService);
+
+        $generateResponse = $this->actingAs($this->admin)->postJson("/api/sites/{$site->id}/generate");
+        $generateResponse->assertOk();
+        $this->assertTrue((bool) $generateResponse->json('success'));
+
+        Storage::disk('generated')->assertExists("site{$site->id}/assets/css/main.css");
+        Storage::disk('generated')->assertExists("site{$site->id}/assets/css/style.css");
+        $this->assertSame(
+            '.main-css{color:#123;}',
+            Storage::disk('generated')->get("site{$site->id}/assets/css/style.css")
+        );
+    }
+
+    public function test_preview_copies_partial_generated_site_assets_when_no_complete_asset_set_exists(): void
+    {
+        $this->useTemporaryGeneratedDisk();
+        $this->useTemporarySitesDisk();
+
+        $site = Site::create([
+            'name' => 'Partial Asset Preview Site',
+            'domain' => 'partial-preview.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/partial-preview',
+            'status' => 'active',
+            'locale' => 'en',
+            'default_locale' => 'en',
+        ]);
+
+        $page = Page::create([
+            'site_id' => $site->id,
+            'slug' => 'index',
+            'title' => 'Partial Preview',
+            'status' => 'published',
+            'locale' => 'en',
+        ]);
+
+        Section::create([
+            'page_id' => $page->id,
+            'type' => 'text',
+            'order' => 1,
+            'content' => [
+                'heading' => 'Partial Preview',
+                'content' => '<p>Preview content</p>',
+                'module' => 'hero-main',
+                'id' => 'hero-main',
+                'class' => 'hero-section reusable-block',
+            ],
+        ]);
+
+        Storage::disk('generated')->put("site{$site->id}/assets/images/hero/hero.webp", 'hero-image');
+
+        $previewTokenResponse = $this->actingAs($this->admin)->postJson("/api/pages/{$page->id}/preview-token");
+        $previewTokenResponse->assertOk();
+
+        preg_match('#^/api/preview/([^/]+)/#', (string) $previewTokenResponse->json('preview_url'), $matches);
+        $this->assertArrayHasKey(1, $matches);
+
+        Storage::disk('generated')->assertExists("preview/{$matches[1]}/assets/images/hero/hero.webp");
+        $this->assertSame(
+            'hero-image',
+            Storage::disk('generated')->get("preview/{$matches[1]}/assets/images/hero/hero.webp")
         );
     }
 

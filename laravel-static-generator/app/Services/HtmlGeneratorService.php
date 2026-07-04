@@ -434,6 +434,12 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         $previewToken = Str::random(32);
         $previewDir = "preview/{$previewToken}";
 
+        Storage::disk('generated')->put("{$previewDir}/.site.json", json_encode([
+            'site_id' => (int) $page->site_id,
+            'page_id' => (int) $page->id,
+            'created_at' => now()->toDateTimeString(),
+        ], JSON_THROW_ON_ERROR));
+
         $previewPages = $this->pageRepository->getActiveBySite($page->site)->keyBy('id');
         $previewPages->put($page->id, $page);
 
@@ -501,6 +507,7 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         if ($sourceAssetPath !== $siteAssetsPath) {
             $this->copyGeneratedAssetOverlay($siteAssetsPath, $previewAssetsPath);
         }
+        $this->ensureStyleSheetAlias('generated', $previewAssetsPath);
         $this->ensureMainScriptAlias('generated', $previewAssetsPath);
         $this->rewritePreviewCssAssetPaths($previewAssetsPath, $previewToken);
     }
@@ -547,6 +554,7 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         if ($this->hasCompleteAssets('sites', $sourceFromSitesDisk)) {
             Storage::disk('generated')->deleteDirectory($targetPath);
             $this->copyStorageDirectory('sites', $sourceFromSitesDisk, 'generated', $targetPath);
+            $this->ensureStyleSheetAlias('generated', $targetPath);
             $this->ensureMainScriptAlias('generated', $targetPath);
             return;
         }
@@ -560,6 +568,7 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         }
 
         if ($fallbackPath === $targetPath) {
+            $this->ensureStyleSheetAlias('generated', $targetPath);
             $this->ensureMainScriptAlias('generated', $targetPath);
             return;
         }
@@ -569,6 +578,7 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         Storage::disk('generated')->deleteDirectory($targetPath);
         $this->copyStorageDirectory('generated', $fallbackPath, 'generated', $targetPath);
         $this->writeGeneratedAssetOverlay($targetPath, $assetOverlay);
+        $this->ensureStyleSheetAlias('generated', $targetPath);
         $this->ensureMainScriptAlias('generated', $targetPath);
     }
 
@@ -630,6 +640,14 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
             return $etalonPath;
         }
 
+        if ($this->hasAnyAssetFiles('generated', $siteAssetsPath)) {
+            return $siteAssetsPath;
+        }
+
+        if ($etalonPath !== $siteAssetsPath && $this->hasAnyAssetFiles('generated', $etalonPath)) {
+            return $etalonPath;
+        }
+
         return $this->findLatestPreviewAssetsPath($excludePreviewToken);
     }
 
@@ -638,12 +656,42 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         $disk = Storage::disk($diskName);
         $normalizedPath = trim($assetsPath, '/');
 
-        if (!$disk->exists("{$normalizedPath}/css/style.css")) {
+        if (!$disk->exists("{$normalizedPath}/css/style.css") && !$disk->exists("{$normalizedPath}/css/main.css")) {
             return false;
         }
 
         return $disk->exists("{$normalizedPath}/js/main.js")
             || $disk->exists("{$normalizedPath}/js/app.js");
+    }
+
+    private function hasAnyAssetFiles(string $diskName, string $assetsPath): bool
+    {
+        $disk = Storage::disk($diskName);
+        $normalizedPath = trim($assetsPath, '/');
+
+        if (!$disk->exists($normalizedPath)) {
+            return false;
+        }
+
+        return $disk->allFiles($normalizedPath) !== [];
+    }
+
+    private function ensureStyleSheetAlias(string $diskName, string $assetsPath): void
+    {
+        $disk = Storage::disk($diskName);
+        $normalizedAssetsPath = trim($assetsPath, '/');
+
+        $stylePath = "{$normalizedAssetsPath}/css/style.css";
+        if ($disk->exists($stylePath)) {
+            return;
+        }
+
+        $mainPath = "{$normalizedAssetsPath}/css/main.css";
+        if (!$disk->exists($mainPath)) {
+            return;
+        }
+
+        $disk->put($stylePath, $disk->get($mainPath));
     }
 
     private function findLatestPreviewAssetsPath(?string $excludeToken = null): ?string

@@ -151,6 +151,7 @@ class SiteRepository implements SiteRepositoryInterface
         $this->deleteDirectoryOnDisk('generated', (string) $siteId);
         $this->deleteDirectoryOnDisk('staging', 'site' . $siteId);
         $this->deleteDirectoryOnDisk('staging', (string) $siteId);
+        $this->cleanupGeneratedPreviews($siteId);
 
         $normalizedOutputPath = $this->normalizeOutputPathForGeneratedDisk($outputPath);
         if ($normalizedOutputPath !== null) {
@@ -179,6 +180,36 @@ class SiteRepository implements SiteRepositoryInterface
 
         if (is_dir($templatePath)) {
             $this->recordCleanupIssue('filesystem', 'site-template', $templatePath, 'Template directory still exists after cleanup');
+        }
+    }
+
+    private function cleanupGeneratedPreviews(int $siteId): void
+    {
+        try {
+            $previewDirs = Storage::disk('generated')->directories('preview');
+        } catch (\Throwable $e) {
+            $this->recordCleanupIssue('filesystem', 'preview-directory', 'generated:preview', $e->getMessage());
+            return;
+        }
+
+        foreach ($previewDirs as $previewDir) {
+            $metaPath = trim($previewDir, '/') . '/.site.json';
+            if (!Storage::disk('generated')->exists($metaPath)) {
+                continue;
+            }
+
+            try {
+                $metadata = json_decode(Storage::disk('generated')->get($metaPath), true, 512, JSON_THROW_ON_ERROR);
+            } catch (\Throwable $e) {
+                $this->recordCleanupIssue('filesystem', 'preview-metadata', "generated:{$metaPath}", $e->getMessage());
+                continue;
+            }
+
+            if ((int) ($metadata['site_id'] ?? 0) !== $siteId) {
+                continue;
+            }
+
+            $this->deleteDirectoryOnDisk('generated', $previewDir);
         }
     }
 

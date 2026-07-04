@@ -187,6 +187,10 @@ class SiteCrudTest extends TestCase
         Storage::disk('sites')->put("{$site->id}/assets/images/upload/test.png", 'binary');
         Storage::disk('generated')->put("site{$site->id}/index.html", '<html></html>');
         Storage::disk('generated')->put('delete-site/index.html', '<html></html>');
+        Storage::disk('generated')->put('preview/delete-site-token/.site.json', json_encode(['site_id' => $site->id]));
+        Storage::disk('generated')->put('preview/delete-site-token/assets/images/preview.png', 'preview');
+        Storage::disk('generated')->put('preview/other-site-token/.site.json', json_encode(['site_id' => $site->id + 1]));
+        Storage::disk('generated')->put('preview/other-site-token/assets/images/preview.png', 'other');
         Storage::disk('staging')->put("site{$site->id}/keep.txt", 'temp');
 
         $templatesRoot = '/tmp/laravel-static-generator-tests/ai-templates-delete-' . Str::uuid();
@@ -222,6 +226,8 @@ class SiteCrudTest extends TestCase
         $this->assertFalse(Storage::disk('sites')->exists((string) $site->id));
         $this->assertFalse(Storage::disk('generated')->exists("site{$site->id}"));
         $this->assertFalse(Storage::disk('generated')->exists('delete-site'));
+        $this->assertFalse(Storage::disk('generated')->exists('preview/delete-site-token'));
+        $this->assertTrue(Storage::disk('generated')->exists('preview/other-site-token'));
         $this->assertFalse(Storage::disk('staging')->exists("site{$site->id}"));
         $this->assertFalse(File::isDirectory($siteTemplateDir));
     }
