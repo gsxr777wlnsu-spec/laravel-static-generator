@@ -44,6 +44,7 @@ Route::middleware(['web', 'auth', 'throttle:api'])->group(function () {
         Route::post('/', [SectionController::class, 'store']);
         Route::get('/{id}', [SectionController::class, 'show']);
         Route::put('/{id}', [SectionController::class, 'update']);
+        Route::post('/{id}/generated-background-override', [SectionController::class, 'storeGeneratedBackgroundOverride']);
         Route::delete('/{id}', [SectionController::class, 'destroy']);
         Route::post('/reorder', [SectionController::class, 'reorder']);
     });

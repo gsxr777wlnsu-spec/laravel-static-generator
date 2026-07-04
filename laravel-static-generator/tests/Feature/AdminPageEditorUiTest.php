@@ -102,6 +102,10 @@ class AdminPageEditorUiTest extends TestCase
         $this->assertStringContainsString('function shouldPreserveRawHtml(container, rawHtml)', $source);
         $this->assertStringContainsString('data-raw-image-index', $source);
         $this->assertStringContainsString('function patchRawImageAttributes(state, rawImageIndex, attrs)', $source);
+        $this->assertStringContainsString('function generatedBackgroundOverrideConfig(target)', $source);
+        $this->assertStringContainsString('function uploadGeneratedBackgroundOverride(sectionId, targetPath, file)', $source);
+        $this->assertStringContainsString('function syntheticBackgroundTargets(moduleKey)', $source);
+        $this->assertStringContainsString('function ensureBackgroundStyleOverride(rawHtml, target, nextUrl)', $source);
         $this->assertStringContainsString('function patchRawTextNodesFromEditor(state)', $source);
         $this->assertStringContainsString('function normalizePatchText(text)', $source);
         $this->assertStringContainsString('function findRawTextNodeSpan(rawTextNodes, searchOffset, text)', $source);
@@ -160,6 +164,7 @@ class AdminPageEditorUiTest extends TestCase
         $this->assertStringContainsString('Page and modules saved at', $matches['body']);
         $this->assertStringContainsString('setInlineButtonBusy(button, true)', $source);
         $this->assertStringContainsString('Saving module #${sectionId}', $source);
+        $this->assertStringContainsString('window.savePageSection = saveSection;', $source);
     }
 
     public function test_create_site_index_raw_html_fields_are_grouped_by_sections(): void

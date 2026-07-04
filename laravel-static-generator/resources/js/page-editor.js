@@ -489,6 +489,133 @@ function replaceRawBackgroundTarget(rawHtml, targetKey, nextUrl) {
     return template.innerHTML;
 }
 
+function sectionModuleKey(container) {
+    const content = getSectionJson(container);
+    return String(content.module || content.module_key || '').trim();
+}
+
+function syntheticBackgroundTargets(moduleKey) {
+    if (moduleKey === 'hero') {
+        return [{
+            key: 'synthetic:hero',
+            selector: '.hero',
+            property: 'background-image',
+            url: '/assets/images/hero/hero-background.webp',
+            label: '.hero background-image',
+            synthetic: true,
+        }];
+    }
+
+    if (moduleKey === 'conclusion') {
+        return [{
+            key: 'synthetic:conclusion',
+            selector: '.conclusion__card::before',
+            property: 'background-image',
+            url: '/assets/images/hero/conclusion-background.webp',
+            label: '.conclusion__card::before background-image',
+            synthetic: true,
+        }];
+    }
+
+    return [];
+}
+
+function ensureBackgroundStyleOverride(rawHtml, target, nextUrl) {
+    if (target?.key && !String(target.key).startsWith('synthetic:')) {
+        return replaceRawBackgroundTarget(rawHtml, target.key, nextUrl);
+    }
+
+    if (typeof rawHtml !== 'string' || rawHtml.trim() === '') {
+        return rawHtml;
+    }
+
+    const selector = String(target?.selector || '').trim();
+    if (selector === '') {
+        return rawHtml;
+    }
+
+    const propertyValue = selector === '.conclusion__card::before'
+        ? `linear-gradient(270deg, #121629 0%, rgba(18, 22, 41, 0) 100%), url(${nextUrl})`
+        : `url(${nextUrl})`;
+
+    const cssRule = `${selector} { background-image: ${propertyValue}; }`;
+    const template = document.createElement('template');
+    template.innerHTML = rawHtml;
+
+    const styleNodes = Array.from(template.content.querySelectorAll('style'));
+    const matchingStyleNode = styleNodes.find((node) => (node.textContent || '').includes(selector));
+
+    if (matchingStyleNode) {
+        const cssText = matchingStyleNode.textContent || '';
+        const selectorRegex = new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{[^{}]*\\}`, 's');
+        if (selectorRegex.test(cssText)) {
+            matchingStyleNode.textContent = cssText.replace(selectorRegex, cssRule);
+        } else {
+            matchingStyleNode.textContent = `${cssText}\n${cssRule}`;
+        }
+
+        return template.innerHTML;
+    }
+
+    const firstElement = template.content.firstElementChild;
+    if (!firstElement) {
+        return rawHtml;
+    }
+
+    const styleNode = document.createElement('style');
+    styleNode.textContent = cssRule;
+    firstElement.prepend(styleNode);
+
+    return template.innerHTML;
+}
+
+function generatedBackgroundOverrideConfig(target) {
+    const selector = String(target?.selector || '').trim();
+
+    if (selector === '.hero') {
+        return {
+            targetPath: 'assets/images/hero/hero-background.webp',
+            replacementUrl: '/assets/images/hero/hero-background.webp',
+            buttonLabel: 'Upload Hero Background',
+        };
+    }
+
+    if (selector === '.conclusion__card::before') {
+        return {
+            targetPath: 'assets/images/hero/conclusion-background.webp',
+            replacementUrl: '/assets/images/hero/conclusion-background.webp',
+            buttonLabel: 'Upload Conclusion Background',
+        };
+    }
+
+    return null;
+}
+
+async function uploadGeneratedBackgroundOverride(sectionId, targetPath, file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('target_path', targetPath);
+
+    const response = await fetch(`/api/sections/${sectionId}/generated-background-override`, {
+        method: 'POST',
+        headers: {
+            Accept: 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        credentials: 'same-origin',
+        body: formData,
+    });
+
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        const message = result.errors ? JSON.stringify(result.errors) : (result.error || `Request failed with status ${response.status}`);
+        throw new Error(message);
+    }
+
+    return result;
+}
+
 function updateBackgroundSidebar(container) {
     const state = editors.get(container);
     const sidebar = state?.backgroundSidebar;
@@ -499,21 +626,33 @@ function updateBackgroundSidebar(container) {
     }
 
     const rawHtml = state.originalRawHtml || state.codeTextarea?.value || '';
-    const targets = extractRawBackgroundTargets(rawHtml);
+    const moduleKey = sectionModuleKey(container);
+    const extractedTargets = extractRawBackgroundTargets(rawHtml);
+    const targets = extractedTargets.length > 0
+        ? extractedTargets
+        : syntheticBackgroundTargets(moduleKey);
 
     fields.innerHTML = '';
     sidebar.classList.toggle('hidden', targets.length === 0);
 
     targets.forEach((target) => {
         const wrapper = document.createElement('div');
+        const overrideConfig = generatedBackgroundOverrideConfig(target);
         wrapper.innerHTML = `
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">${target.label}</label>
             <input type="text" class="tiptap-background-input mt-1 block w-full rounded-md shadow-sm sm:text-sm" value="${target.url.replace(/"/g, '&quot;')}">
+            ${overrideConfig ? `
+                <label class="mt-2 inline-flex cursor-pointer items-center rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500">
+                    ${overrideConfig.buttonLabel}
+                    <input type="file" accept="image/webp" class="tiptap-background-upload hidden">
+                </label>
+                <div class="tiptap-background-upload-status mt-2 text-xs text-gray-500 dark:text-gray-400 hidden"></div>
+            ` : ''}
         `;
 
         const input = wrapper.querySelector('input');
         input?.addEventListener('input', () => {
-            const nextHtml = replaceRawBackgroundTarget(state.originalRawHtml || state.codeTextarea?.value || '', target.key, input.value);
+            const nextHtml = ensureBackgroundStyleOverride(state.originalRawHtml || state.codeTextarea?.value || '', target, input.value);
             if (nextHtml === (state.originalRawHtml || state.codeTextarea?.value || '')) {
                 return;
             }
@@ -521,6 +660,56 @@ function updateBackgroundSidebar(container) {
             setRawHtmlForState(container, state, nextHtml);
             state.rawTextNodeMap = buildRawTextNodeMap(state.originalRawHtml, state.editorTextSnapshot || []);
             updateBackgroundSidebar(container);
+        });
+
+        const uploadInput = wrapper.querySelector('.tiptap-background-upload');
+        const uploadStatus = wrapper.querySelector('.tiptap-background-upload-status');
+        uploadInput?.addEventListener('change', async () => {
+            const file = uploadInput.files?.[0];
+            if (!file || !overrideConfig) {
+                return;
+            }
+
+            if (uploadStatus) {
+                uploadStatus.textContent = 'Uploading...';
+                uploadStatus.classList.remove('hidden');
+            }
+
+            try {
+                await uploadGeneratedBackgroundOverride(
+                    Number(container.dataset.sectionId || 0),
+                    overrideConfig.targetPath,
+                    file
+                );
+
+                const nextHtml = ensureBackgroundStyleOverride(
+                    state.originalRawHtml || state.codeTextarea?.value || '',
+                    target,
+                    overrideConfig.replacementUrl
+                );
+                setRawHtmlForState(container, state, nextHtml);
+                state.rawTextNodeMap = buildRawTextNodeMap(state.originalRawHtml, state.editorTextSnapshot || []);
+
+                if (typeof window.savePageSection === 'function') {
+                    await window.savePageSection(container.dataset.sectionId, container, { silent: true });
+                }
+
+                if (typeof window.renderPageEditStatus === 'function') {
+                    window.renderPageEditStatus('Generated background override uploaded successfully.', 'success');
+                }
+
+                updateBackgroundSidebar(container);
+            } catch (error) {
+                if (typeof window.renderPageEditStatus === 'function') {
+                    window.renderPageEditStatus(`Background upload failed: ${error.message}`, 'error');
+                }
+            } finally {
+                if (uploadStatus) {
+                    uploadStatus.textContent = '';
+                    uploadStatus.classList.add('hidden');
+                }
+                uploadInput.value = '';
+            }
         });
 
         fields.appendChild(wrapper);

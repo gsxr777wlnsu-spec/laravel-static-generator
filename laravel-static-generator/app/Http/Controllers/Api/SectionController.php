@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Section;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 class SectionController extends Controller
@@ -117,6 +118,62 @@ class SectionController extends Controller
         return response()->json(['message' => 'Section deleted successfully']);
     }
 
+    public function storeGeneratedBackgroundOverride(Request $request, int $id): JsonResponse
+    {
+        $section = Section::with('page.site')->find($id);
+
+        if (!$section) {
+            return response()->json(['error' => 'Section not found'], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'file' => 'required|file|max:10240',
+            'target_path' => 'required|string|max:500',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $siteId = (int) ($section->page?->site_id ?? 0);
+        if ($siteId <= 0) {
+            return response()->json(['error' => 'Section site was not found'], 422);
+        }
+
+        $file = $request->file('file');
+        if ($file === null || !$file->isValid()) {
+            return response()->json(['error' => 'Uploaded file is invalid'], 422);
+        }
+
+        $targetPath = $this->normalizeGeneratedAssetPath((string) $request->input('target_path'));
+        if ($targetPath === null) {
+            return response()->json(['error' => 'Target path is invalid'], 422);
+        }
+
+        $mimeType = strtolower(trim((string) $file->getMimeType()));
+        if ($mimeType === 'image/x-webp') {
+            $mimeType = 'image/webp';
+        }
+
+        $expectedMimeType = $this->mimeTypeFromExtension($targetPath);
+        if ($expectedMimeType === null || $mimeType !== $expectedMimeType) {
+            return response()->json([
+                'error' => 'Uploaded file type does not match target extension',
+            ], 422);
+        }
+
+        $storagePath = "site{$siteId}/{$targetPath}";
+        Storage::disk('generated')->put($storagePath, file_get_contents($file->getRealPath()));
+
+        return response()->json([
+            'message' => 'Generated background override stored successfully',
+            'site_id' => $siteId,
+            'target_path' => $targetPath,
+            'stored_path' => $storagePath,
+            'asset_url' => '/' . $targetPath,
+        ]);
+    }
+
     public function reorder(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
@@ -154,5 +211,34 @@ class SectionController extends Controller
         $this->sections->reorder($data['page_id'], $data['order']);
 
         return response()->json(['message' => 'Sections reordered successfully']);
+    }
+
+    private function normalizeGeneratedAssetPath(string $path): ?string
+    {
+        $normalized = trim(str_replace('\\', '/', $path), '/');
+        $normalized = preg_replace('#/+#', '/', $normalized) ?? '';
+
+        if (
+            $normalized === ''
+            || str_contains($normalized, '..')
+            || !str_starts_with($normalized, 'assets/')
+        ) {
+            return null;
+        }
+
+        return $normalized;
+    }
+
+    private function mimeTypeFromExtension(string $path): ?string
+    {
+        return match (strtolower(pathinfo($path, PATHINFO_EXTENSION))) {
+            'webp' => 'image/webp',
+            'png' => 'image/png',
+            'jpg', 'jpeg' => 'image/jpeg',
+            'gif' => 'image/gif',
+            'svg' => 'image/svg+xml',
+            'avif' => 'image/avif',
+            default => null,
+        };
     }
 }

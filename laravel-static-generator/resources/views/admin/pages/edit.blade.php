@@ -820,6 +820,8 @@ async function saveSection(sectionId, container, options = {}) {
     return true;
 }
 
+window.savePageSection = saveSection;
+
 async function deleteSection(sectionId) {
     if (!confirm('Delete this module?')) {
         return;
