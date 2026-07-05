@@ -6,7 +6,10 @@ use App\Contracts\PageRepositoryInterface;
 use App\Contracts\SiteRepositoryInterface;
 use App\Http\Controllers\Controller;
 use App\Models\Page;
+use App\Services\LanguageService;
 use App\Services\PageTemplatePresetService;
+use App\Services\AiAgentService;
+use App\Contracts\AiAgentConfigRepositoryInterface;
 use App\Support\SiteLayoutContent;
 
 class PageController extends Controller
@@ -15,7 +18,10 @@ class PageController extends Controller
         private PageRepositoryInterface $pages,
         private SiteRepositoryInterface $sites,
         private PageTemplatePresetService $templatePresets,
-        private SiteLayoutContent $layoutContent
+        private SiteLayoutContent $layoutContent,
+        private LanguageService $languageService,
+        private AiAgentService $aiAgentService,
+        private AiAgentConfigRepositoryInterface $aiAgentConfigs
     ) {}
 
     public function index(int $siteId)
@@ -27,12 +33,16 @@ class PageController extends Controller
                 ->with('error', 'Site not found');
         }
 
-        $pages = Page::where('site_id', $siteId)->with('sections')->get();
+        $pages = Page::where('site_id', $siteId)->with('sections')->orderBy('locale')->orderBy('slug')->get();
+        $locales = $this->languageService->buildLocaleSet((string) ($site->locale ?? 'en'), is_array($site->alternate_locales) ? $site->alternate_locales : []);
+        $defaultLocale = $this->languageService->normalizeLocale((string) ($site->locale ?? 'en')) ?: 'en';
+        $pagesByLocale = $pages->groupBy(fn (Page $page) => $this->languageService->normalizeLocale((string) ($page->locale ?? $site->locale ?? 'en')) ?: 'en');
+        $languageOptions = $this->languageService->languageOptions();
         
-        return view('admin.pages.index', compact('site', 'pages'));
+        return view('admin.pages.index', compact('site', 'pages', 'pagesByLocale', 'locales', 'defaultLocale', 'languageOptions'));
     }
 
-    public function editShared(int $siteId, string $part)
+    public function editShared(int $siteId, string $part, ?string $locale = null)
     {
         $site = $this->sites->findById($siteId);
 
@@ -47,13 +57,15 @@ class PageController extends Controller
                 ->with('error', 'Shared block not found');
         }
 
+        $locale = $this->languageService->normalizeLocale($locale ?: (string) ($site->locale ?? 'en')) ?: 'en';
+
         $html = match ($part) {
-            'menu' => $this->layoutContent->resolveMenuInner($site),
-            'mobile-menu' => $this->layoutContent->resolveMobileMenuHtml($site),
-            default => $this->layoutContent->resolveFooterInner($site),
+            'menu' => $this->layoutContent->resolveMenuInner($site, $locale),
+            'mobile-menu' => $this->layoutContent->resolveMobileMenuHtml($site, $locale),
+            default => $this->layoutContent->resolveFooterInner($site, $locale),
         };
 
-        return view('admin.pages.edit-shared', compact('site', 'part', 'html'));
+        return view('admin.pages.edit-shared', compact('site', 'part', 'html', 'locale'));
     }
 
     public function create(int $siteId)
@@ -115,7 +127,9 @@ class PageController extends Controller
         $pageTemplates = $this->templatePresets->listForUi();
         $moduleCatalog = $this->templatePresets->listModulesForUi();
         $moduleDefaults = $this->templatePresets->getModuleDefaults();
+        $aiConfig = auth()->user() ? $this->aiAgentConfigs->findForUser((int) auth()->id()) : null;
+        $aiModelOptions = $this->aiAgentService->modelOptions($aiConfig);
 
-        return view('admin.pages.edit', compact('site', 'page', 'pageTemplates', 'moduleCatalog', 'moduleDefaults'));
+        return view('admin.pages.edit', compact('site', 'page', 'pageTemplates', 'moduleCatalog', 'moduleDefaults', 'aiModelOptions'));
     }
 }

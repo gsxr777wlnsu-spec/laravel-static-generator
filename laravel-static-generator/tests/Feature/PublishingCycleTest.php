@@ -10,6 +10,7 @@ use App\Models\Section;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\GitService;
+use App\Services\LanguageService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -120,7 +121,7 @@ class PublishingCycleTest extends TestCase
         Storage::disk('generated')->assertExists("preview/{$previewToken}/assets/js/main.js");
         Storage::disk('generated')->assertExists("preview/{$previewToken}/assets/css/style.css");
         $previewHtml = Storage::disk('generated')->get("preview/{$previewToken}/index.html");
-        $this->assertStringContainsString('href="index.html#where-to-play"', $previewHtml);
+        $this->assertStringContainsString("href=\"/api/preview/{$previewToken}/index.html#where-to-play\"", $previewHtml);
         $this->assertStringContainsString('href="terms-and-conditions.html"', $previewHtml);
         $previewCss = Storage::disk('generated')->get("preview/{$previewToken}/assets/css/style.css");
         $this->assertStringContainsString("/api/preview/{$previewToken}/assets/images/hero/hero-background.webp", $previewCss);
@@ -225,6 +226,135 @@ class PublishingCycleTest extends TestCase
         $this->assertFalse(Storage::disk('generated')->exists("site{$siteId}"));
         $this->assertFalse(Storage::disk('generated')->exists("preview/{$previewToken}"));
         $this->assertSame([], Storage::disk('generated')->directories('preview'));
+    }
+
+    public function test_multilingual_site_generates_language_folders_shared_blocks_and_preview_assets(): void
+    {
+        $this->useTemporaryGeneratedDisk();
+        $this->useTemporarySitesDisk();
+
+        $site = Site::create([
+            'name' => 'Multilingual Site',
+            'domain' => 'multilingual.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/multilingual',
+            'status' => 'active',
+            'locale' => 'en_US',
+            'default_locale' => 'en_US',
+            'alternate_locales' => ['en', 'es', 'de'],
+            'menu_html' => '<div class="header__inner"><div class="header__logo"><a class="header__logo-wrapper" href="/">Logo</a></div><nav class="header__nav menu"><ul class="menu__list"><li class="menu__item"><a class="menu__link" href="/">App</a></li></ul></nav></div>',
+            'footer_html' => '<div class="footer__inner"><div class="footer__logo"><a class="footer__logo-wrapper" href="/">Logo</a></div><a href="/privacy-policy.html">Privacy Policy</a></div>',
+        ]);
+
+        $page = Page::create([
+            'site_id' => $site->id,
+            'slug' => 'index',
+            'title' => 'Home Page',
+            'status' => 'published',
+            'locale' => 'en_US',
+        ]);
+
+        Section::create([
+            'page_id' => $page->id,
+            'type' => 'text',
+            'order' => 1,
+            'content' => [
+                'module' => 'hero-main',
+                'raw_html' => '<section class="hero"><h1>Home</h1></section>',
+            ],
+        ]);
+
+        $privacy = Page::create([
+            'site_id' => $site->id,
+            'slug' => 'privacy-policy',
+            'title' => 'Privacy Policy',
+            'status' => 'published',
+            'locale' => 'en_US',
+        ]);
+
+        Section::create([
+            'page_id' => $privacy->id,
+            'type' => 'text',
+            'order' => 1,
+            'content' => [
+                'module' => 'content',
+                'raw_html' => '<section><h1>Privacy Policy</h1></section>',
+            ],
+        ]);
+
+        $sitemap = Page::create([
+            'site_id' => $site->id,
+            'slug' => 'sitemap',
+            'title' => 'Sitemap',
+            'status' => 'published',
+            'locale' => 'en_US',
+        ]);
+
+        Section::create([
+            'page_id' => $sitemap->id,
+            'type' => 'text',
+            'order' => 1,
+            'content' => [
+                'module' => 'sitemap',
+            ],
+        ]);
+
+        Storage::disk('sites')->put("{$site->id}/assets/js/main.js", 'console.log("main");');
+        Storage::disk('sites')->put("{$site->id}/assets/css/style.css", 'body{background:url("/assets/images/bg.webp")}');
+        Storage::disk('sites')->put("{$site->id}/assets/images/bg.webp", 'image');
+
+        app(LanguageService::class)->prepareSiteLanguages($site, ['en', 'es', 'de']);
+        $site = $site->fresh();
+
+        $this->assertDatabaseHas('pages', ['site_id' => $site->id, 'slug' => 'index', 'locale' => 'en_US']);
+        $this->assertDatabaseHas('pages', ['site_id' => $site->id, 'slug' => 'index', 'locale' => 'es']);
+        $this->assertDatabaseHas('pages', ['site_id' => $site->id, 'slug' => 'privacy-policy', 'locale' => 'de']);
+        $this->assertDatabaseHas('site_shared_blocks', ['site_id' => $site->id, 'locale' => 'es']);
+
+        $mockGitService = \Mockery::mock(GitService::class);
+        $mockGitService->shouldReceive('setRepositoryPath')->andReturnSelf();
+        $mockGitService->shouldReceive('commit')->andReturnNull();
+        $this->app->instance(GitService::class, $mockGitService);
+
+        $generateResponse = $this->actingAs($this->admin)->postJson("/api/sites/{$site->id}/generate");
+        $generateResponse->assertOk();
+
+        Storage::disk('generated')->assertExists("site{$site->id}/index.html");
+        Storage::disk('generated')->assertExists("site{$site->id}/es/index.html");
+        Storage::disk('generated')->assertExists("site{$site->id}/de/privacy-policy.html");
+        Storage::disk('generated')->assertExists("site{$site->id}/es/sitemap.html");
+
+        $spanishHtml = Storage::disk('generated')->get("site{$site->id}/es/index.html");
+        $this->assertStringContainsString('lang="es"', $spanishHtml);
+        $this->assertStringContainsString('menu__item--lang', $spanishHtml);
+        $this->assertStringContainsString('/de/', $spanishHtml);
+        $this->assertStringContainsString('Aplicación', $spanishHtml);
+        $this->assertStringContainsString('class="header__logo-wrapper" href="/es/"', $spanishHtml);
+        $this->assertStringContainsString('class="footer__logo-wrapper" href="/es/"', $spanishHtml);
+        $defaultHtml = Storage::disk('generated')->get("site{$site->id}/index.html");
+        $this->assertStringContainsString('lang="en_US"', $defaultHtml);
+
+        $spanishSitemapHtml = Storage::disk('generated')->get("site{$site->id}/es/sitemap.html");
+        $this->assertStringContainsString('class="sitemap__link" href="/es/privacy-policy.html"', $spanishSitemapHtml);
+        $this->assertStringNotContainsString('class="sitemap__link" href="/privacy-policy.html"', $spanishSitemapHtml);
+        $this->assertStringNotContainsString('class="sitemap__link" href="/de/privacy-policy.html"', $spanishSitemapHtml);
+
+        $spanishPage = Page::where('site_id', $site->id)->where('slug', 'index')->where('locale', 'es')->firstOrFail();
+        $previewTokenResponse = $this->actingAs($this->admin)->postJson("/api/pages/{$spanishPage->id}/preview-token");
+        $previewTokenResponse->assertOk();
+
+        $previewUrl = (string) $previewTokenResponse->json('preview_url');
+        $this->assertStringContainsString('/es/index.html', $previewUrl);
+        preg_match('#^/api/preview/([^/]+)/#', $previewUrl, $matches);
+        $previewToken = $matches[1] ?? '';
+
+        Storage::disk('generated')->assertExists("preview/{$previewToken}/es/index.html");
+        $previewHtml = Storage::disk('generated')->get("preview/{$previewToken}/es/index.html");
+        $this->assertStringContainsString("/api/preview/{$previewToken}/assets/css/style.css", $previewHtml);
+        $this->assertStringContainsString("/api/preview/{$previewToken}/de/index.html", $previewHtml);
+        $this->assertStringContainsString("class=\"header__logo-wrapper\" href=\"/api/preview/{$previewToken}/es/index.html\"", $previewHtml);
+        $this->assertStringContainsString("class=\"footer__logo-wrapper\" href=\"/api/preview/{$previewToken}/es/index.html\"", $previewHtml);
+        $this->assertStringNotContainsString('href="assets/css/style.css"', $previewHtml);
     }
 
     public function test_generate_falls_back_to_complete_generated_assets_when_site_assets_are_incomplete(): void

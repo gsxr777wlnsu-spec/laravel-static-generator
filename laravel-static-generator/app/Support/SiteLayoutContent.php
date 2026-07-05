@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Site;
 use App\Models\Page;
+use App\Models\SiteSharedBlock;
 use DOMDocument;
 use DOMElement;
 use DOMNode;
@@ -11,16 +12,20 @@ use DOMXPath;
 
 class SiteLayoutContent
 {
-    public function resolveMenuInner(?Site $site): string
+    public function resolveMenuInner(?Site $site, ?string $locale = null): string
     {
-        $stored = is_string($site?->menu_html) ? $site->menu_html : '';
+        $block = $this->sharedBlockForLocale($site, $locale);
+        $stored = is_string($block?->menu_html) ? $block->menu_html : (is_string($site?->menu_html) ? $site->menu_html : '');
 
-        return $this->normalizeMenuInner($stored !== '' ? $stored : $this->defaultMenuInner());
+        $menuHtml = $this->normalizeMenuInner($stored !== '' ? $stored : $this->defaultMenuInner());
+
+        return $stored === '' ? $this->filterDefaultMenuLinks($menuHtml, $site) : $menuHtml;
     }
 
-    public function resolveFooterInner(?Site $site): string
+    public function resolveFooterInner(?Site $site, ?string $locale = null): string
     {
-        $stored = is_string($site?->footer_html) ? $site->footer_html : '';
+        $block = $this->sharedBlockForLocale($site, $locale);
+        $stored = is_string($block?->footer_html) ? $block->footer_html : (is_string($site?->footer_html) ? $site->footer_html : '');
         $footerHtml = $this->normalizeFooterInner($stored !== '' ? $stored : $this->defaultFooterInner());
         $domain = trim((string) ($site?->domain ?? 'site.com'));
 
@@ -31,11 +36,26 @@ class SiteLayoutContent
         return preg_replace('/© Copyright 2024-\d{4}/', '© Copyright 2024-' . date('Y'), $footerHtml) ?? $footerHtml;
     }
 
-    public function resolveMobileMenuHtml(?Site $site): string
+    public function resolveMobileMenuHtml(?Site $site, ?string $locale = null): string
     {
-        $stored = is_string($site?->mobile_menu_html) ? $site->mobile_menu_html : '';
+        $block = $this->sharedBlockForLocale($site, $locale);
+        $stored = is_string($block?->mobile_menu_html) ? $block->mobile_menu_html : (is_string($site?->mobile_menu_html) ? $site->mobile_menu_html : '');
 
-        return $this->normalizeMobileMenuHtml($stored !== '' ? $stored : $this->defaultMobileMenuHtml($site));
+        $mobileMenuHtml = $this->normalizeMobileMenuHtml($stored !== '' ? $stored : $this->defaultMobileMenuHtml($site));
+
+        return $stored === '' ? $this->filterDefaultMenuLinks($mobileMenuHtml, $site) : $mobileMenuHtml;
+    }
+
+    private function sharedBlockForLocale(?Site $site, ?string $locale): ?SiteSharedBlock
+    {
+        $normalizedLocale = strtolower(substr(str_replace('_', '-', trim((string) $locale)), 0, 2));
+        if (!$site || $normalizedLocale === '') {
+            return null;
+        }
+
+        return SiteSharedBlock::where('site_id', $site->id)
+            ->where('locale', $normalizedLocale)
+            ->first();
     }
 
     public function normalizeMenuInner(?string $html): string
@@ -229,6 +249,42 @@ class SiteLayoutContent
         }
 
         return '';
+    }
+
+    private function filterDefaultMenuLinks(string $html, ?Site $site): string
+    {
+        if (!$site) {
+            return $html;
+        }
+
+        $publishedSlugs = Page::where('site_id', $site->id)
+            ->where('status', 'published')
+            ->pluck('slug')
+            ->map(fn ($slug) => trim((string) $slug, '/'))
+            ->all();
+
+        if ($publishedSlugs === []) {
+            return $html;
+        }
+
+        $allowed = array_fill_keys($publishedSlugs, true);
+        $allowed[''] = true;
+        $allowed['index'] = true;
+
+        return preg_replace_callback('/<li\b[^>]*>\s*<a\b[^>]*href=(["\'])([^"\']+)\1[\s\S]*?<\/li>/i', function (array $matches) use ($allowed) {
+            if (str_contains(strtolower($matches[0]), '<ul')) {
+                return $matches[0];
+            }
+
+            $href = trim((string) ($matches[2] ?? ''));
+            if ($href === '' || str_starts_with($href, '#') || str_starts_with($href, '/') || preg_match('/^[a-z]+:/i', $href)) {
+                return $matches[0];
+            }
+
+            $slug = preg_replace('/\.html$/i', '', trim($href, '/')) ?? '';
+
+            return isset($allowed[$slug]) ? $matches[0] : '';
+        }, $html) ?? $html;
     }
 
     private function extractFirstNodeOuterHtmlByClass(string $html, string $className): ?string

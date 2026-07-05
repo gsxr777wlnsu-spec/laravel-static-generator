@@ -1,12 +1,12 @@
 @extends('layouts.admin')
 
-@section('title', strtoupper($part) . " - {$site->name}")
+@section('title', strtoupper($part) . ' ' . strtoupper($locale ?? '') . " - {$site->name}")
 
 @section('content')
 <div class="space-y-6">
     <div class="sm:flex sm:items-center sm:justify-between">
         <div>
-            <h2 class="text-2xl font-bold text-gray-900 dark:text-white">{{ strtoupper($part) }}</h2>
+            <h2 class="text-2xl font-bold text-gray-900 dark:text-white">{{ strtoupper($part) }} {{ strtoupper($locale ?? '') }}</h2>
             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">This HTML is rendered on every page of {{ $site->name }}.</p>
         </div>
         <div class="mt-4 flex items-center gap-3 sm:mt-0">
@@ -254,7 +254,7 @@ async function saveSharedBlock() {
     }
 
     const fieldName = @json($part === 'footer' ? 'footer_html' : ($part === 'mobile-menu' ? 'mobile_menu_html' : 'menu_html'));
-    const response = await fetch(`/api/sites/{{ $site->id }}`, {
+    const response = await fetch(`/api/sites/{{ $site->id }}/shared-blocks/{{ $locale ?? 'en' }}`, {
         method: 'PUT',
         headers: {
             'Accept': 'application/json',

@@ -9,6 +9,7 @@ use App\Models\Media;
 use App\Models\Page;
 use App\Models\Section;
 use App\Models\Site;
+use App\Models\SiteSharedBlock;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
@@ -104,6 +105,90 @@ class SiteCrudTest extends TestCase
             'mobile_menu_html' => '<div class="mobile-menu"><nav>Mobile Menu</nav></div>',
             'footer_html' => '<div class="footer__inner"><p>Footer</p></div>',
         ]);
+    }
+
+    public function test_add_and_remove_language_creates_and_deletes_localized_pages_and_shared_blocks(): void
+    {
+        $site = Site::create([
+            'name' => 'Language Site',
+            'domain' => 'language-site.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/language-site',
+            'status' => 'active',
+            'locale' => 'en',
+            'default_locale' => 'en',
+            'menu_html' => '<div class="header__inner"><nav><a>App</a></nav></div>',
+            'footer_html' => '<div class="footer__inner"><a>Privacy Policy</a></div>',
+        ]);
+
+        $page = Page::create([
+            'site_id' => $site->id,
+            'slug' => 'index',
+            'title' => 'Home',
+            'status' => 'published',
+            'locale' => 'en',
+        ]);
+
+        Section::create([
+            'page_id' => $page->id,
+            'type' => 'text',
+            'content' => ['text' => 'x'],
+            'order' => 0,
+        ]);
+
+        $addResponse = $this->actingAs($this->admin)->postJson("/api/sites/{$site->id}/languages", [
+            'locale' => 'ru',
+        ]);
+        $addResponse->assertOk();
+
+        $this->assertDatabaseHas('pages', [
+            'site_id' => $site->id,
+            'slug' => 'index',
+            'locale' => 'ru',
+        ]);
+        $this->assertDatabaseHas('site_shared_blocks', [
+            'site_id' => $site->id,
+            'locale' => 'ru',
+        ]);
+        $this->assertContains('ru', Site::findOrFail($site->id)->alternate_locales);
+
+        $removeResponse = $this->actingAs($this->admin)->deleteJson("/api/sites/{$site->id}/languages/ru");
+        $removeResponse->assertOk();
+
+        $this->assertDatabaseMissing('pages', [
+            'site_id' => $site->id,
+            'slug' => 'index',
+            'locale' => 'ru',
+        ]);
+        $this->assertDatabaseMissing('site_shared_blocks', [
+            'site_id' => $site->id,
+            'locale' => 'ru',
+        ]);
+        $this->assertNotContains('ru', Site::findOrFail($site->id)->alternate_locales ?? []);
+    }
+
+    public function test_add_language_translates_footer_disclaimer_shared_block(): void
+    {
+        $site = Site::create([
+            'name' => 'Footer Language Site',
+            'domain' => 'footer-language.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/footer-language-site',
+            'status' => 'active',
+            'locale' => 'en',
+            'default_locale' => 'en',
+            'footer_html' => '<div class="footer__inner"><span class="footer__info-copy">cleopatraslot.ca is one of Spribe’s independent affiliates. We are experts in presenting accurate, objective information about cutting-edge casino games and iGaming products. Please go over our terms and conditions and privacy policy. Please be aware that the activities of users on third-party sites are not under the control of our organization.</span></div>',
+        ]);
+
+        $response = $this->actingAs($this->admin)->postJson("/api/sites/{$site->id}/languages", [
+            'locale' => 'de',
+        ]);
+        $response->assertOk();
+
+        $block = SiteSharedBlock::where('site_id', $site->id)->where('locale', 'de')->firstOrFail();
+
+        $this->assertStringContainsString('cleopatraslot.ca ist einer der unabhängigen Partner von Spribe', $block->footer_html);
+        $this->assertStringNotContainsString('We are experts in presenting accurate', $block->footer_html);
     }
 
     public function test_destroy_removes_site_related_data_and_artifacts(): void

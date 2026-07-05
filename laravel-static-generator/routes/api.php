@@ -20,6 +20,9 @@ Route::middleware(['web', 'auth', 'throttle:api'])->group(function () {
         Route::post('/', [SiteController::class, 'store']);
         Route::get('/{id}', [SiteController::class, 'show']);
         Route::put('/{id}', [SiteController::class, 'update']);
+        Route::put('/{id}/shared-blocks/{locale}', [SiteController::class, 'updateSharedBlock']);
+        Route::post('/{id}/languages', [SiteController::class, 'addLanguage']);
+        Route::delete('/{id}/languages/{locale}', [SiteController::class, 'removeLanguage']);
         Route::delete('/{id}', [SiteController::class, 'destroy']);
         Route::post('/{id}/clone', [SiteController::class, 'clone']);
         Route::post('/{id}/generate', [SiteController::class, 'generate']);
@@ -66,6 +69,7 @@ Route::middleware(['web', 'auth', 'throttle:api'])->group(function () {
     Route::prefix('ai-agent')->group(function () {
         Route::get('/config', [AiAgentController::class, 'show']);
         Route::put('/config', [AiAgentController::class, 'upsert']);
+        Route::post('/sections/{id}/generate', [AiAgentController::class, 'generateSection']);
     });
 
     Route::prefix('templates')->group(function () {

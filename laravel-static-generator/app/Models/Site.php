@@ -15,6 +15,7 @@ class Site extends Model
         'status',
         'locale',
         'default_locale',
+        'alternate_locales',
         'menu_html',
         'mobile_menu_html',
         'footer_html',
@@ -29,6 +30,7 @@ class Site extends Model
 
     protected $casts = [
         'sftp_port' => 'integer',
+        'alternate_locales' => 'array',
     ];
 
     protected $hidden = [
@@ -49,6 +51,11 @@ class Site extends Model
     public function deployments(): HasMany
     {
         return $this->hasMany(Deployment::class);
+    }
+
+    public function sharedBlocks(): HasMany
+    {
+        return $this->hasMany(SiteSharedBlock::class);
     }
 
     public function getSftpCredentials(): array

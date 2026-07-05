@@ -13,7 +13,8 @@ use Illuminate\Support\Str;
 class HtmlGeneratorService implements HtmlGeneratorInterface
 {
     public function __construct(
-        private PageRepositoryInterface $pageRepository
+        private PageRepositoryInterface $pageRepository,
+        private LanguageService $languageService
     ) {}
 
     public function generatePage(Page $page): string
@@ -34,12 +35,13 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         ];
 
         if ($this->isSitemapPage($page)) {
-            $data['sitemapLinks'] = $this->buildSitemapLinks($page->site);
+            $data['sitemapLinks'] = $this->buildSitemapLinks($page->site, $page);
         }
 
         $templatePath = $this->resolvePageTemplatePath($page);
 
         $html = View::make($templatePath, $data)->render();
+        $html = $this->languageService->applyLanguageSwitcherToHtml($html, $page, $page->site);
 
         $result = $this->normalizeGoogleMapEmbeds($html);
 
@@ -61,11 +63,7 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
             try {
                 $html = $this->generatePage($page);
                 
-                $filename = $page->slug === 'index' || $page->slug === '' 
-                    ? 'index.html' 
-                    : $page->slug . '.html';
-                
-                $path = "site{$site->id}/{$filename}";
+                $path = "site{$site->id}/{$this->pageFilename($page)}";
                 
                 Storage::disk('generated')->put($path, $html);
                 
@@ -97,11 +95,7 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
             try {
                 $html = $this->generatePage($page);
 
-                $filename = $page->slug === 'index' || $page->slug === ''
-                    ? 'index.html'
-                    : $page->slug . '.html';
-
-                $path = "site{$site->id}/{$filename}";
+                $path = "site{$site->id}/{$this->pageFilename($page)}";
 
                 Storage::disk('generated')->put($path, $html);
 
@@ -156,7 +150,11 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . PHP_EOL;
         
         foreach ($pages as $page) {
-            $url = $page->canonical ?? "https://{$site->domain}/{$page->slug}";
+            $url = $page->canonical ?: "https://{$site->domain}" . $this->languageService->hrefForPage(
+                $page,
+                (string) ($page->locale ?? $site->locale ?? 'en'),
+                (string) ($site->locale ?? $site->default_locale ?? 'en')
+            );
             
             $xml .= '  <url>' . PHP_EOL;
             $xml .= "    <loc>{$url}</loc>" . PHP_EOL;
@@ -192,14 +190,29 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
     /**
      * @return array<int, array{href:string,label:string}>
      */
-    private function buildSitemapLinks(Site $site): array
+    private function buildSitemapLinks(Site $site, ?Page $currentPage = null): array
     {
         $links = [];
         $lookup = [];
+        $currentLocale = $this->languageService->normalizeLocale(
+            (string) ($currentPage?->locale ?? $site->locale ?? $site->default_locale ?? 'en')
+        ) ?: 'en';
 
         $activePages = $this->pageRepository->getActiveBySite($site);
         foreach ($activePages as $page) {
-            $href = $this->hrefFromSlug((string) $page->slug);
+            $pageLocale = $this->languageService->normalizeLocale(
+                (string) ($page->locale ?? $site->locale ?? $site->default_locale ?? 'en')
+            ) ?: 'en';
+
+            if ($pageLocale !== $currentLocale) {
+                continue;
+            }
+
+            $href = $this->languageService->hrefForPage(
+                $page,
+                (string) ($page->locale ?? $site->locale ?? 'en'),
+                (string) ($site->locale ?? $site->default_locale ?? 'en')
+            );
             if ($href === null) {
                 continue;
             }
@@ -212,8 +225,10 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
             $this->pushSitemapLink($links, $lookup, $href, $label);
         }
 
-        foreach ($this->sitemapHrefsFromXml($site) as $href) {
-            $this->pushSitemapLink($links, $lookup, $href, $this->labelFromHref($href));
+        if (count($links) === 0) {
+            foreach ($this->sitemapHrefsFromXml($site) as $href) {
+                $this->pushSitemapLink($links, $lookup, $href, $this->labelFromHref($href));
+            }
         }
 
         if (count($links) === 0) {
@@ -445,7 +460,7 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
 
         foreach ($previewPages->values() as $previewPage) {
             $html = $this->generatePage($previewPage);
-            $html = $this->rewriteAssetPathsForPreview($html);
+            $html = $this->rewriteAssetPathsForPreview($html, $previewToken);
 
             Storage::disk('generated')->put(
                 "{$previewDir}/{$this->pageFilename($previewPage)}",
@@ -472,21 +487,63 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         ];
     }
 
-    private function rewriteAssetPathsForPreview(string $html): string
+    private function rewriteAssetPathsForPreview(string $html, string $previewToken): string
     {
-        $html = preg_replace('/(href|src)=(["\'])\/assets\/([^"\']*)\2/', '$1=$2assets/$3$2', $html);
-        $html = preg_replace('/(href|src)=(["\'])\/js\/([^"\']*)\2/', '$1=$2js/$3$2', $html);
-        $html = preg_replace('/href=(["\'])\/#([^"\']*)\1/', 'href=$1index.html#$2$1', $html);
-        $html = preg_replace('/href=(["\'])\/\1/', 'href=$1index.html$1', $html);
+        $html = preg_replace('/(href|src)=(["\'])\/assets\/([^"\']*)\2/', '$1=$2/api/preview/' . $previewToken . '/assets/$3$2', $html);
+        $html = preg_replace('/(href|src)=(["\'])\/js\/([^"\']*)\2/', '$1=$2/api/preview/' . $previewToken . '/js/$3$2', $html);
+        $html = preg_replace_callback('/href=(["\'])\/([^"\']*)\1/i', function (array $matches) use ($previewToken): string {
+            $quote = $matches[1];
+            $path = $matches[2] ?? '';
+
+            if (str_starts_with($path, 'api/preview/') || str_starts_with($path, 'assets/') || str_starts_with($path, 'js/')) {
+                return $matches[0];
+            }
+
+            $previewPath = $this->previewHrefPath($path);
+
+            return 'href=' . $quote . '/api/preview/' . $previewToken . '/' . $previewPath . $quote;
+        }, $html);
         
         return $html;
     }
 
+    private function previewHrefPath(string $path): string
+    {
+        $fragment = '';
+        $query = '';
+        $normalized = $path;
+
+        $fragmentPos = strpos($normalized, '#');
+        if ($fragmentPos !== false) {
+            $fragment = substr($normalized, $fragmentPos);
+            $normalized = substr($normalized, 0, $fragmentPos);
+        }
+
+        $queryPos = strpos($normalized, '?');
+        if ($queryPos !== false) {
+            $query = substr($normalized, $queryPos);
+            $normalized = substr($normalized, 0, $queryPos);
+        }
+
+        $normalized = trim($normalized, '/');
+        if ($normalized === '') {
+            return 'index.html' . $query . $fragment;
+        }
+
+        if (!str_ends_with(strtolower($normalized), '.html')) {
+            $normalized .= '/index.html';
+        }
+
+        return $normalized . $query . $fragment;
+    }
+
     private function pageFilename(Page $page): string
     {
-        return $page->slug === 'index' || $page->slug === ''
-            ? 'index.html'
-            : $page->slug . '.html';
+        return $this->languageService->pathForPage(
+            $page,
+            (string) ($page->locale ?? $page->site?->locale ?? 'en'),
+            (string) ($page->site?->locale ?? $page->site?->default_locale ?? 'en')
+        );
     }
 
     private function copyAssetsToPreview(int $siteId, string $previewToken): void
@@ -502,7 +559,18 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         }
 
         $previewAssetsPath = "preview/{$previewToken}/assets";
-        $this->copyStorageDirectory('generated', $sourceAssetPath, 'generated', $previewAssetsPath);
+        try {
+            $this->copyStorageDirectory('generated', $sourceAssetPath, 'generated', $previewAssetsPath);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Preview assets copy failed', [
+                'site_id' => $siteId,
+                'preview_token' => $previewToken,
+                'source_asset_path' => $sourceAssetPath,
+                'error' => $e->getMessage(),
+            ]);
+            return;
+        }
+
         $siteAssetsPath = "site{$siteId}/assets";
         if ($sourceAssetPath !== $siteAssetsPath) {
             $this->copyGeneratedAssetOverlay($siteAssetsPath, $previewAssetsPath);
@@ -656,12 +724,24 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         $disk = Storage::disk($diskName);
         $normalizedPath = trim($assetsPath, '/');
 
-        if (!$disk->exists("{$normalizedPath}/css/style.css") && !$disk->exists("{$normalizedPath}/css/main.css")) {
+        try {
+            if (!$disk->exists("{$normalizedPath}/css/style.css") && !$disk->exists("{$normalizedPath}/css/main.css")) {
+                return false;
+            }
+
+            if (!$disk->exists("{$normalizedPath}/js/main.js") && !$disk->exists("{$normalizedPath}/js/app.js")) {
+                return false;
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Generated assets existence check failed', [
+                'disk' => $diskName,
+                'assets_path' => $normalizedPath,
+                'error' => $e->getMessage(),
+            ]);
             return false;
         }
 
-        return $disk->exists("{$normalizedPath}/js/main.js")
-            || $disk->exists("{$normalizedPath}/js/app.js");
+        return $this->hasAnyAssetFiles($diskName, $normalizedPath);
     }
 
     private function hasAnyAssetFiles(string $diskName, string $assetsPath): bool
@@ -669,11 +749,20 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         $disk = Storage::disk($diskName);
         $normalizedPath = trim($assetsPath, '/');
 
-        if (!$disk->exists($normalizedPath)) {
+        try {
+            if (!$disk->exists($normalizedPath)) {
+                return false;
+            }
+
+            return $disk->allFiles($normalizedPath) !== [];
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Generated assets listing failed', [
+                'disk' => $diskName,
+                'assets_path' => $normalizedPath,
+                'error' => $e->getMessage(),
+            ]);
             return false;
         }
-
-        return $disk->allFiles($normalizedPath) !== [];
     }
 
     private function ensureStyleSheetAlias(string $diskName, string $assetsPath): void

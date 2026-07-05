@@ -297,6 +297,7 @@ const pendingBlockOperations = [];
 const queuedBlockOperationKeys = new Set();
 const importedHiddenFieldEdits = [];
 const pendingImageReplacements = [];
+let importedAlternateLocales = [];
 
 function parseImportMultiline(lines, startIndex) {
     const marker = lines[startIndex]?.trim() || '';
@@ -518,6 +519,7 @@ function parseCreateSiteImportTemplate(rawText) {
     return {
         blocks,
         warnings,
+        alternate_langs: Array.isArray(variableValues.alternate_lang) ? variableValues.alternate_lang : [],
     };
 }
 
@@ -831,6 +833,7 @@ function resetCreateSiteImportState() {
     siteCreateForm?.reset();
     importedHiddenFieldEdits.splice(0, importedHiddenFieldEdits.length);
     pendingImageReplacements.splice(0, pendingImageReplacements.length);
+    importedAlternateLocales = [];
 
     document.querySelectorAll('.ai-prompt-row').forEach((row) => {
         const manualInput = row.querySelector('.ai-manual-input');
@@ -1158,6 +1161,7 @@ function applyCreateSiteImportTemplate(rawText) {
 
     resetCreateSiteImportState();
     resetPendingBlockOperations();
+    importedAlternateLocales = Array.isArray(parsedImport.alternate_langs) ? parsedImport.alternate_langs : [];
 
     const stats = {
         form: 0,
@@ -2203,6 +2207,10 @@ siteCreateForm.addEventListener('submit', async function(e) {
         data.ai_clone_templates = document.getElementById('ai_clone_templates')?.checked === true;
         data.ai_source_domain = String(document.getElementById('ai_source_domain')?.value || '').trim();
         data.debug_request_id = debugRequestId;
+        data.alternate_locales = importedAlternateLocales
+            .concat(getPromptRowValue('pages.0.alternate_lang').split(/[\s,]+/))
+            .map((locale) => String(locale || '').trim())
+            .filter(Boolean);
         refreshAutoManagedDates();
         syncPrimaryJsonLdFromHeadFields();
         data.ai_field_prompts = Array.from(document.querySelectorAll('.ai-prompt-row'))

@@ -22,10 +22,10 @@
 # Repeat {alternate_lang} as many times as needed. Alternate links are generated only when two or more languages are declared.
 {alternate_lang} = en
 {alternate_lang} = es
-{alternate_lang} = ru
-{alternate_lang} = cn
+{alternate_lang} = it
+{alternate_lang} = fr
 {alternate_lang} = de
-{alternate_lang} = ro
+{alternate_lang} = pt
 {page_description} = Claim 150 Free Spins 👑 & up to 640 CAD bonus on Cleopatra slot! Free demo, no download needed, instant play for Canadian players. Start now!
 # {payments__table_min_deposit_withdrawal} Переменная минимального депозита в таблице оплаты payments__table.
 {payments__table_min_deposit_withdrawal} = €175/€250

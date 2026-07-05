@@ -3,12 +3,15 @@
 namespace App\Services;
 
 use App\Models\AiAgentConfig;
+use App\Models\Section;
+use App\Support\SiteLayoutContent;
 use DOMDocument;
 use DOMElement;
 use DOMNode;
 use DOMText;
 use DOMXPath;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -17,6 +20,10 @@ use Symfony\Component\Yaml\Yaml;
 
 class AiAgentService
 {
+    public function __construct(
+        private SiteLayoutContent $layoutContent
+    ) {}
+
     private const PAGE_EDITABLE_FIELDS = [
         'title',
         'meta_title',
@@ -114,6 +121,18 @@ class AiAgentService
         'mistral' => 'https://api.mistral.ai/v1',
     ];
 
+    /**
+     * @var array<string, array<string, mixed>>
+     */
+    private const DEFAULT_MODEL_SLOTS = [
+        'big_main' => ['key' => 'big_main', 'group' => 'big', 'role' => 'main', 'label' => 'Big main', 'provider' => 'openai', 'api_base_url' => 'https://api.openai.com/v1', 'model_name' => 'gpt-5.5', 'temperature' => null, 'tone' => '', 'max_tokens' => null, 'top_p' => null, 'frequency_penalty' => null, 'presence_penalty' => null],
+        'big_alternate' => ['key' => 'big_alternate', 'group' => 'big', 'role' => 'alternate', 'label' => 'Big alternate', 'provider' => 'anthropic', 'api_base_url' => '', 'model_name' => 'claude-opus-4.9', 'temperature' => null, 'tone' => '', 'max_tokens' => null, 'top_p' => null, 'frequency_penalty' => null, 'presence_penalty' => null],
+        'medium_main' => ['key' => 'medium_main', 'group' => 'medium', 'role' => 'main', 'label' => 'Medium main', 'provider' => 'openrouter', 'api_base_url' => 'https://openrouter.ai/api/v1', 'model_name' => 'z-ai/glm-5.2', 'temperature' => null, 'tone' => '', 'max_tokens' => null, 'top_p' => null, 'frequency_penalty' => null, 'presence_penalty' => null],
+        'medium_alternate' => ['key' => 'medium_alternate', 'group' => 'medium', 'role' => 'alternate', 'label' => 'Medium alternate', 'provider' => 'anthropic', 'api_base_url' => '', 'model_name' => 'claude-sonnet-5', 'temperature' => null, 'tone' => '', 'max_tokens' => null, 'top_p' => null, 'frequency_penalty' => null, 'presence_penalty' => null],
+        'small_main' => ['key' => 'small_main', 'group' => 'small', 'role' => 'main', 'label' => 'Small main', 'provider' => 'openrouter', 'api_base_url' => 'https://openrouter.ai/api/v1', 'model_name' => 'qwen/qwen3.3', 'temperature' => null, 'tone' => '', 'max_tokens' => null, 'top_p' => null, 'frequency_penalty' => null, 'presence_penalty' => null],
+        'small_alternate' => ['key' => 'small_alternate', 'group' => 'small', 'role' => 'alternate', 'label' => 'Small alternate', 'provider' => 'anthropic', 'api_base_url' => '', 'model_name' => 'claude-haiku', 'temperature' => null, 'tone' => '', 'max_tokens' => null, 'top_p' => null, 'frequency_penalty' => null, 'presence_penalty' => null],
+    ];
+
     private const RAW_HTML_TEXT_SCOPE_FILE = 'index-raw_html.md';
     private const RAW_HTML_VIRTUAL_PATH_PATTERN = '/^pages\.(\d+)\.sections\.(\d+)\.raw_html\.__([a-z]+)__\.([a-f0-9]{16})$/';
     private const HEAD_EXTRA_SCRIPT_VIRTUAL_PATH_PATTERN = '/^pages\.(\d+)\.og_data\.head_extra\.__script__\.(\d+)$/';
@@ -193,6 +212,241 @@ class AiAgentService
     public function providerOptions(): array
     {
         return self::PROVIDER_OPTIONS;
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    public function modelSlots(?AiAgentConfig $config = null, bool $includeSecrets = false): array
+    {
+        $configured = is_array($config?->ai_models) ? $config->ai_models : [];
+        $slots = [];
+
+        foreach (self::DEFAULT_MODEL_SLOTS as $key => $defaults) {
+            $incoming = isset($configured[$key]) && is_array($configured[$key]) ? $configured[$key] : [];
+
+            $slot = $defaults;
+            foreach (['provider', 'api_base_url', 'model_name', 'label', 'tone'] as $field) {
+                if (array_key_exists($field, $incoming)) {
+                    $slot[$field] = trim((string) $incoming[$field]);
+                }
+            }
+            foreach (['temperature', 'top_p', 'frequency_penalty', 'presence_penalty'] as $field) {
+                $slot[$field] = $this->nullableFloat($incoming[$field] ?? $defaults[$field] ?? null);
+            }
+            $slot['max_tokens'] = $this->nullableInt($incoming['max_tokens'] ?? $defaults['max_tokens'] ?? null);
+
+            if ($slot['provider'] === '') {
+                $slot['provider'] = $defaults['provider'];
+            }
+            if ($slot['model_name'] === '' && $key === 'medium_main') {
+                $slot['model_name'] = trim((string) ($config?->model_name ?? $defaults['model_name']));
+            }
+            $encryptedApiKey = trim((string) ($incoming['api_key'] ?? ''));
+            $slot['has_api_key'] = $encryptedApiKey !== '';
+            if ($includeSecrets && $encryptedApiKey !== '') {
+                $slot['api_key'] = $this->decryptModelSlotApiKey($encryptedApiKey);
+            }
+
+            $slots[$key] = $slot;
+        }
+
+        return $slots;
+    }
+
+    /**
+     * @return array<int, array{value:string,label:string,group:string,role:string,model_name:string}>
+     */
+    public function modelOptions(?AiAgentConfig $config = null): array
+    {
+        return array_values(array_map(static function (array $slot): array {
+            $model = trim((string) ($slot['model_name'] ?? ''));
+
+            return [
+                'value' => (string) $slot['key'],
+                'label' => trim((string) $slot['label'] . ($model !== '' ? " ({$model})" : '')),
+                'group' => (string) $slot['group'],
+                'role' => (string) $slot['role'],
+                'model_name' => $model,
+            ];
+        }, $this->modelSlots($config)));
+    }
+
+    /**
+     * @param  array<int, int>  $selectedSectionIds
+     */
+    public function generateSectionHtml(
+        Section $section,
+        AiAgentConfig $config,
+        string $prompt,
+        string $modelKey = 'medium_main',
+        string $contextMode = 'none',
+        array $selectedSectionIds = []
+    ): string {
+        $slot = $this->resolveModelSlot($config, $modelKey);
+        if (!$config->is_active || (trim((string) $config->api_key) === '' && trim((string) ($slot['api_key'] ?? '')) === '')) {
+            throw new RuntimeException('AI agent config is not active or API key is missing.');
+        }
+
+        $section->loadMissing('page.site');
+        $page = $section->page;
+        $site = $page?->site;
+        if (!$page || !$site) {
+            throw new RuntimeException('Section page or site was not found.');
+        }
+
+        if (!$config->isSiteAllowed((int) $site->id)) {
+            throw new RuntimeException("AI agent does not have access to site #{$site->id}.");
+        }
+
+        $runtimeConfig = clone $config;
+        $runtimeConfig->provider = $slot['provider'];
+        $runtimeConfig->api_base_url = $slot['api_base_url'] !== '' ? $slot['api_base_url'] : null;
+        $runtimeConfig->model_name = $slot['model_name'];
+        if (trim((string) ($slot['api_key'] ?? '')) !== '') {
+            $runtimeConfig->api_key = $slot['api_key'];
+        }
+        foreach (['temperature', 'top_p', 'frequency_penalty', 'presence_penalty'] as $field) {
+            if ($slot[$field] !== null) {
+                $runtimeConfig->{$field} = $slot[$field];
+            }
+        }
+        if ($slot['max_tokens'] !== null) {
+            $runtimeConfig->max_tokens = $slot['max_tokens'];
+        }
+
+        $module = $this->sectionModuleName($section);
+        $currentHtml = $this->sectionHtml($section);
+        $context = $this->buildSectionContext($section, $contextMode, $selectedSectionIds);
+
+        $systemMessage = 'You generate or rewrite one webpage module. Return only final valid HTML for this module, without markdown fences, JSON, explanations, or surrounding page layout.';
+        $tone = trim((string) ($slot['tone'] !== '' ? $slot['tone'] : $config->tone));
+        if ($tone !== '') {
+            $systemMessage .= " Target tone: {$tone}.";
+        }
+
+        $userMessage = "Site: {$site->domain}\n";
+        $userMessage .= "Page: {$page->slug} / {$page->title}\n";
+        $userMessage .= "Current module: {$module}\n";
+        $userMessage .= "Instruction:\n{$prompt}\n\n";
+        $userMessage .= "Current module HTML:\n{$currentHtml}\n";
+        if ($context !== '') {
+            $userMessage .= "\nContext from other modules on this page:\n{$context}\n";
+        }
+
+        return $this->layoutContent->sanitizeSectionHtml(
+            $this->stripMarkdownFence($this->callConfiguredModel($runtimeConfig, $systemMessage, $userMessage))
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function resolveModelSlot(AiAgentConfig $config, string $modelKey): array
+    {
+        $slots = $this->modelSlots($config, true);
+        if (!isset($slots[$modelKey])) {
+            throw new RuntimeException("Unknown AI model slot: {$modelKey}");
+        }
+
+        if (trim((string) $slots[$modelKey]['model_name']) === '') {
+            throw new RuntimeException("AI model slot '{$modelKey}' has empty model_name.");
+        }
+
+        return $slots[$modelKey];
+    }
+
+    private function nullableFloat(mixed $value): ?float
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return is_numeric($value) ? (float) $value : null;
+    }
+
+    private function nullableInt(mixed $value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return is_numeric($value) ? (int) $value : null;
+    }
+
+    private function decryptModelSlotApiKey(string $value): string
+    {
+        try {
+            return Crypt::decryptString($value);
+        } catch (\Throwable) {
+            return $value;
+        }
+    }
+
+    private function sectionModuleName(Section $section): string
+    {
+        $content = is_array($section->content ?? null) ? $section->content : [];
+
+        return trim((string) ($section->module ?? $section->module_key ?? $content['module'] ?? $content['module_key'] ?? 'module'));
+    }
+
+    private function sectionHtml(Section $section): string
+    {
+        $content = is_array($section->content ?? null) ? $section->content : [];
+        if (isset($content['raw_html']) && is_string($content['raw_html'])) {
+            return $this->layoutContent->sanitizeSectionHtml($content['raw_html']);
+        }
+
+        if (is_string($section->raw_html) && trim($section->raw_html) !== '') {
+            return $this->layoutContent->sanitizeSectionHtml($section->raw_html);
+        }
+
+        return json_encode($content, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '';
+    }
+
+    /**
+     * @param  array<int, int>  $selectedSectionIds
+     */
+    private function buildSectionContext(Section $section, string $contextMode, array $selectedSectionIds): string
+    {
+        $contextMode = strtolower(trim($contextMode));
+        if ($contextMode === '' || $contextMode === 'none') {
+            return '';
+        }
+
+        $page = $section->page;
+        if (!$page) {
+            return '';
+        }
+
+        $sections = $page->sections()->orderBy('order')->get();
+        $currentIndex = $sections->search(fn (Section $item) => (int) $item->id === (int) $section->id);
+        if ($currentIndex === false) {
+            return '';
+        }
+
+        $selected = match ($contextMode) {
+            'previous' => $sections->slice(max(0, $currentIndex - 1), $currentIndex > 0 ? 1 : 0),
+            'next' => $sections->slice($currentIndex + 1, $currentIndex + 1 < $sections->count() ? 1 : 0),
+            'adjacent' => $sections->filter(fn (Section $item, int $index) => in_array($index, [$currentIndex - 1, $currentIndex + 1], true)),
+            'all' => $sections->reject(fn (Section $item) => (int) $item->id === (int) $section->id),
+            'selected' => $sections->filter(fn (Section $item) => in_array((int) $item->id, $selectedSectionIds, true) && (int) $item->id !== (int) $section->id),
+            default => collect(),
+        };
+
+        return $selected
+            ->map(fn (Section $item) => "Module #{$item->id} ({$this->sectionModuleName($item)}):\n{$this->sectionHtml($item)}")
+            ->implode("\n\n---\n\n");
+    }
+
+    private function stripMarkdownFence(string $value): string
+    {
+        $value = trim($value);
+        if (preg_match('/^```(?:html)?\s*([\s\S]*?)\s*```$/i', $value, $matches)) {
+            return trim((string) $matches[1]);
+        }
+
+        return $value;
     }
 
     /**

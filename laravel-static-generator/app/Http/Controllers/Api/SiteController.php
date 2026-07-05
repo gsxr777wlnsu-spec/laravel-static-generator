@@ -10,8 +10,10 @@ use App\Contracts\SiteRepositoryInterface;
 use App\Contracts\SftpClientInterface;
 use App\Http\Controllers\Controller;
 use App\Models\Site;
+use App\Models\SiteSharedBlock;
 use App\Services\AiAgentService;
 use App\Services\ImportService;
+use App\Services\LanguageService;
 use App\Support\SiteLayoutContent;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -33,7 +35,8 @@ class SiteController extends Controller
         private AiAgentService $aiAgentService,
         private AiAgentConfigRepositoryInterface $aiConfigs,
         private ImportService $importService,
-        private SiteLayoutContent $layoutContent
+        private SiteLayoutContent $layoutContent,
+        private LanguageService $languageService
     ) {}
 
     public function index(): JsonResponse
@@ -70,6 +73,8 @@ class SiteController extends Controller
             'status' => 'nullable|in:active,inactive,draft',
             'locale' => 'nullable|string|max:10',
             'default_locale' => 'nullable|string|max:10',
+            'alternate_locales' => 'nullable|array',
+            'alternate_locales.*' => 'nullable|string|max:10',
             'sftp_host' => 'nullable|string',
             'sftp_port' => 'nullable|integer',
             'sftp_username' => 'nullable|string',
@@ -313,6 +318,9 @@ class SiteController extends Controller
                 ->header('X-Site-Create-Debug-Id', $debugId);
         }
 
+        $this->languageService->prepareSiteLanguages($site, is_array($data['alternate_locales'] ?? null) ? $data['alternate_locales'] : []);
+        $site = $site->fresh() ?? $site;
+
         $this->audit->log('site.created', Site::class, $site->id, null, $site->toArray());
 
         $payload = $site->toArray();
@@ -358,6 +366,8 @@ class SiteController extends Controller
             'status' => 'sometimes|in:active,inactive,draft',
             'locale' => 'sometimes|string|max:10',
             'default_locale' => 'sometimes|string|max:10',
+            'alternate_locales' => 'nullable|array',
+            'alternate_locales.*' => 'nullable|string|max:10',
             'menu_html' => 'nullable|string',
             'mobile_menu_html' => 'nullable|string',
             'footer_html' => 'nullable|string',
@@ -398,8 +408,100 @@ class SiteController extends Controller
         }
 
         $site = $this->sites->update($site, $data);
+        if (array_key_exists('locale', $data) || array_key_exists('default_locale', $data) || array_key_exists('alternate_locales', $data)) {
+            $this->languageService->prepareSiteLanguages($site, is_array($data['alternate_locales'] ?? null) ? $data['alternate_locales'] : []);
+            $site = $site->fresh() ?? $site;
+        }
         
         $this->audit->log('site.updated', Site::class, $site->id, $oldValues, $site->toArray());
+
+        return response()->json($site);
+    }
+
+    public function updateSharedBlock(Request $request, int $id, string $locale): JsonResponse
+    {
+        $site = $this->sites->findById($id);
+
+        if (!$site) {
+            return response()->json(['error' => 'Site not found'], 404);
+        }
+
+        $normalizedLocale = $this->languageService->normalizeLocale($locale);
+        if ($normalizedLocale === '') {
+            return response()->json(['error' => 'Invalid locale'], 422);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'menu_html' => 'nullable|string',
+            'mobile_menu_html' => 'nullable|string',
+            'footer_html' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $data = $validator->validated();
+        $updates = [];
+
+        if (array_key_exists('menu_html', $data)) {
+            $updates['menu_html'] = $this->layoutContent->normalizeMenuInner($data['menu_html']);
+        }
+
+        if (array_key_exists('mobile_menu_html', $data)) {
+            $updates['mobile_menu_html'] = $this->layoutContent->normalizeMobileMenuHtml($data['mobile_menu_html']);
+        }
+
+        if (array_key_exists('footer_html', $data)) {
+            $updates['footer_html'] = $this->layoutContent->normalizeFooterInner($data['footer_html']);
+        }
+
+        $block = SiteSharedBlock::updateOrCreate(
+            ['site_id' => $site->id, 'locale' => $normalizedLocale],
+            $updates
+        );
+
+        return response()->json($block);
+    }
+
+    public function addLanguage(Request $request, int $id): JsonResponse
+    {
+        $site = $this->sites->findById($id);
+
+        if (!$site) {
+            return response()->json(['error' => 'Site not found'], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'locale' => 'required|string|size:2',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        try {
+            $site = $this->languageService->addSiteLanguage($site, (string) $validator->validated()['locale']);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+
+        return response()->json($site);
+    }
+
+    public function removeLanguage(int $id, string $locale): JsonResponse
+    {
+        $site = $this->sites->findById($id);
+
+        if (!$site) {
+            return response()->json(['error' => 'Site not found'], 404);
+        }
+
+        try {
+            $site = $this->languageService->removeSiteLanguage($site, $locale);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
 
         return response()->json($site);
     }

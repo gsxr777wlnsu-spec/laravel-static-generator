@@ -85,4 +85,83 @@ class AiAgentConfigTest extends TestCase
             'api_base_url' => 'https://api.closerouter.dev/v1',
         ]);
     }
+
+    public function test_authenticated_user_can_save_ai_model_slots(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->putJson('/api/ai-agent/config', [
+            'provider' => 'openrouter',
+            'api_key' => 'openrouter-secret-key',
+            'api_base_url' => 'https://openrouter.ai/api/v1',
+            'model_name' => 'z-ai/glm-5.2',
+            'ai_models' => [
+                'big_main' => [
+                    'provider' => 'openai',
+                    'api_base_url' => 'https://api.openai.com/v1',
+                    'model_name' => 'gpt-5.5',
+                    'label' => 'Big main',
+                ],
+                'big_alternate' => [
+                    'provider' => 'anthropic',
+                    'api_base_url' => '',
+                    'model_name' => 'claude-opus-4.9',
+                    'label' => 'Big alternate',
+                ],
+                'medium_main' => [
+                    'provider' => 'openrouter',
+                    'api_key' => 'slot-secret-key',
+                    'api_base_url' => 'https://openrouter.ai/api/v1',
+                    'model_name' => 'z-ai/glm-5.2',
+                    'label' => 'Medium main',
+                    'temperature' => 0.2,
+                    'tone' => 'strict',
+                    'max_tokens' => 2048,
+                    'top_p' => 0.9,
+                    'frequency_penalty' => 0.1,
+                    'presence_penalty' => 0.2,
+                ],
+                'medium_alternate' => [
+                    'provider' => 'anthropic',
+                    'api_base_url' => '',
+                    'model_name' => 'claude-sonnet-5',
+                    'label' => 'Medium alternate',
+                ],
+                'small_main' => [
+                    'provider' => 'openrouter',
+                    'api_base_url' => 'https://openrouter.ai/api/v1',
+                    'model_name' => 'qwen/qwen3.3',
+                    'label' => 'Small main',
+                ],
+                'small_alternate' => [
+                    'provider' => 'anthropic',
+                    'api_base_url' => '',
+                    'model_name' => 'claude-haiku',
+                    'label' => 'Small alternate',
+                ],
+            ],
+            'is_active' => true,
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('config.ai_models.medium_main.model_name', 'z-ai/glm-5.2');
+        $response->assertJsonPath('config.ai_models.medium_main.has_api_key', true);
+        $response->assertJsonPath('config.ai_models.medium_main.temperature', 0.2);
+        $response->assertJsonPath('config.ai_models.medium_main.tone', 'strict');
+        $response->assertJsonPath('config.ai_models.medium_main.max_tokens', 2048);
+        $response->assertJsonMissingPath('config.ai_models.medium_main.api_key');
+        $response->assertJsonPath('config.ai_models.small_alternate.model_name', 'claude-haiku');
+
+        $stored = DB::table('ai_agent_configs')
+            ->where('user_id', $user->id)
+            ->value('ai_models');
+
+        $this->assertIsString($stored);
+        $decoded = json_decode($stored, true);
+
+        $this->assertSame('qwen/qwen3.3', $decoded['small_main']['model_name'] ?? null);
+        $this->assertSame(2048, $decoded['medium_main']['max_tokens'] ?? null);
+        $this->assertNotSame('slot-secret-key', $decoded['medium_main']['api_key'] ?? null);
+        $this->assertStringNotContainsString('slot-secret-key', $stored);
+    }
 }

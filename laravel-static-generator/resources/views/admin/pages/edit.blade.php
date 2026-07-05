@@ -3,6 +3,29 @@
 @section('title', "Edit Page - {$page->title}")
 
 @section('content')
+<style>
+@media (min-width: 1024px) {
+    .ai-section-control-row {
+        display: flex;
+        width: 100%;
+        align-items: flex-end;
+        gap: 0.75rem;
+    }
+
+    .ai-section-control-button {
+        flex: 0 0 auto;
+    }
+
+    .ai-section-control-field {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+
+    .ai-section-control-field select {
+        width: 100%;
+    }
+}
+</style>
 <div class="space-y-6">
     <div class="sm:flex sm:items-center sm:justify-between">
         <div>
@@ -260,6 +283,62 @@
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Module Content (JSON)</label>
                             <textarea rows="8"
                                       class="section-content mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white font-mono text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">{{ json_encode($section->content, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</textarea>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 rounded-md border border-indigo-100 bg-indigo-50/60 p-4 dark:border-indigo-900 dark:bg-indigo-950/20">
+                        <div class="grid grid-cols-1 gap-3">
+                            <div class="lg:col-span-3">
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">AI Prompt</label>
+                                <textarea rows="3"
+                                          class="ai-section-prompt mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                          placeholder="Describe what to create or rewrite in this module"></textarea>
+                            </div>
+                            <div class="ai-section-control-row flex flex-col gap-3 lg:flex-row lg:items-end">
+                                <button type="button"
+                                        style="background-color: #059669 !important;"
+                                        class="ai-section-control-button ai-generate-section-btn inline-flex cursor-pointer items-center rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 focus:outline-none focus-visible:outline-none">
+                                    Generate
+                                </button>
+                                <div class="ai-section-control-field min-w-0 lg:flex-1 lg:basis-0">
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Model</label>
+                                    <select class="ai-section-model mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                        @foreach(($aiModelOptions ?? []) as $modelOption)
+                                            <option value="{{ $modelOption['value'] }}" {{ $modelOption['value'] === 'medium_main' ? 'selected' : '' }}>
+                                                {{ $modelOption['label'] }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="ai-section-control-field min-w-0 lg:flex-1 lg:basis-0">
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Context</label>
+                                    <select class="ai-section-context-mode mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                        <option value="none" selected>Nothing</option>
+                                        <option value="previous">Previous module only</option>
+                                        <option value="next">Next module only</option>
+                                        <option value="adjacent">Previous and next modules</option>
+                                        <option value="all">All modules</option>
+                                        <option value="selected">Selected modules</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="ai-section-context-selected hidden lg:col-span-3">
+                                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                    @foreach($page->sections as $contextSection)
+                                        @if((int) $contextSection->id !== (int) $section->id)
+                                            @php
+                                                $contextModuleKey = is_array($contextSection->content ?? null)
+                                                    ? ($contextSection->content['module'] ?? $contextSection->content['module_key'] ?? 'module')
+                                                    : 'module';
+                                            @endphp
+                                            <label class="flex items-center gap-2 rounded-md border border-gray-200 bg-white p-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                                                <input type="checkbox" class="ai-context-section-checkbox rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" value="{{ $contextSection->id }}">
+                                                <span>#{{ $contextSection->order + 1 }} {{ $contextModuleKey }}</span>
+                                            </label>
+                                        @endif
+                                    @endforeach
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -848,6 +927,77 @@ async function deleteSection(sectionId) {
     window.location.reload();
 }
 
+function setGeneratedSectionHtml(container, html) {
+    const contentTextarea = container.querySelector('.section-content');
+    if (!contentTextarea) {
+        throw new Error('Section content field was not found.');
+    }
+
+    const content = parseSectionJson(contentTextarea.value, 'Section content');
+    if (content === false) {
+        throw new Error('Section content JSON is invalid.');
+    }
+
+    content.raw_html = html;
+    if (String(html || '').trim() !== '') {
+        content.render_mode = 'raw_html';
+    }
+
+    contentTextarea.value = JSON.stringify(content, null, 4);
+    contentTextarea.dispatchEvent(new Event('input', { bubbles: true }));
+
+    const rawHtmlTextarea = container.querySelector('.section-raw-html');
+    if (rawHtmlTextarea) {
+        rawHtmlTextarea.value = html;
+    }
+}
+
+async function generateSectionContent(sectionId, container, button) {
+    const promptInput = container.querySelector('.ai-section-prompt');
+    const prompt = promptInput?.value.trim() || '';
+    if (prompt === '') {
+        renderPageEditStatus('AI prompt cannot be empty.', 'error');
+        return;
+    }
+
+    const contextMode = container.querySelector('.ai-section-context-mode')?.value || 'none';
+    const selectedSectionIds = Array.from(container.querySelectorAll('.ai-context-section-checkbox:checked'))
+        .map((checkbox) => Number(checkbox.value))
+        .filter((value) => Number.isInteger(value) && value > 0);
+
+    setInlineButtonBusy(button, true);
+    renderPageEditStatus(`Generating module #${sectionId}…`, 'warning');
+
+    const response = await fetch(`/api/ai-agent/sections/${sectionId}/generate`, {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': getCsrfToken(),
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+            prompt,
+            model_key: container.querySelector('.ai-section-model')?.value || 'medium_main',
+            context_mode: contextMode,
+            context_section_ids: selectedSectionIds,
+        }),
+    });
+
+    const result = await readApiResponse(response);
+    if (!response.ok) {
+        const message = result.errors ? JSON.stringify(result.errors) : (result.error || result.message || `Request failed with status ${response.status}`);
+        renderPageEditStatus('Error: ' + message, 'error');
+        setInlineButtonBusy(button, false);
+        return;
+    }
+
+    setGeneratedSectionHtml(container, result.html || '');
+    renderPageEditStatus(`Module #${sectionId} generated. Review it, then save the module.`, 'success');
+    setInlineButtonBusy(button, false);
+}
+
 async function addModule() {
     const moduleSelect = document.getElementById('new-module-key');
     const moduleKey = moduleSelect ? moduleSelect.value : null;
@@ -991,13 +1141,22 @@ async function openPreview() {
         previewWindow.document.write('<title>Preview</title><p style="font-family: sans-serif; padding: 16px;">Loading preview...</p>');
     }
 
+    const writePreviewWindowMessage = (title, message) => {
+        if (!previewWindow) {
+            return;
+        }
+
+        const safeTitle = String(title || 'Preview').replace(/[<>&"]/g, '');
+        const safeMessage = String(message || '').replace(/[<>&"]/g, '');
+        previewWindow.document.open();
+        previewWindow.document.write(`<title>${safeTitle}</title><p style="font-family: sans-serif; padding: 16px;">${safeMessage}</p>`);
+        previewWindow.document.close();
+    };
+
     try {
         const settingsSaved = await savePageSettings();
         if (!settingsSaved) {
-            if (previewWindow) {
-                previewWindow.close();
-            }
-            return;
+            renderPageEditStatus('Warning: page settings were not saved. Opening preview from the last saved version.', 'warning');
         }
 
         const response = await fetch('/api/pages/{{ $page->id }}/preview-token', {
@@ -1014,27 +1173,23 @@ async function openPreview() {
 
         if (!response.ok) {
             const message = result.errors ? JSON.stringify(result.errors) : (result.error || result.message || `Request failed with status ${response.status}`);
-            if (previewWindow) {
-                previewWindow.close();
-            }
+            writePreviewWindowMessage('Preview error', message);
             renderPageEditStatus('Error: ' + message, 'error');
             return;
         }
 
         if (!result.preview_url) {
-            if (previewWindow) {
-                previewWindow.close();
-            }
+            writePreviewWindowMessage('Preview error', 'Preview URL is missing in response.');
             renderPageEditStatus('Error: Preview URL is missing in response.', 'error');
             return;
         }
 
         if (previewWindow) {
-            previewWindow.location = result.preview_url;
+            previewWindow.location.href = new URL(result.preview_url, window.location.origin).toString();
             return;
         }
 
-        window.location.href = result.preview_url;
+        renderPageEditStatus('Preview window was blocked by the browser. Allow pop-ups for this admin panel and click Preview again.', 'warning');
     } finally {
         pageActionInProgress = false;
         setPageActionBusy(false);
@@ -1276,6 +1431,20 @@ document.getElementById('page-form')?.addEventListener('submit', async function 
 
 document.querySelectorAll('.section-item').forEach((container) => {
     const sectionId = container.dataset.sectionId;
+
+    container.querySelector('.ai-section-context-mode')?.addEventListener('change', (event) => {
+        const selectedBox = container.querySelector('.ai-section-context-selected');
+        selectedBox?.classList.toggle('hidden', event.currentTarget.value !== 'selected');
+    });
+
+    container.querySelector('.ai-generate-section-btn')?.addEventListener('click', async (event) => {
+        try {
+            await generateSectionContent(sectionId, container, event.currentTarget);
+        } catch (error) {
+            setInlineButtonBusy(event.currentTarget, false);
+            renderPageEditStatus('Error: ' + error.message, 'error');
+        }
+    });
 
     container.querySelector('.save-section-btn')?.addEventListener('click', async (event) => {
         try {

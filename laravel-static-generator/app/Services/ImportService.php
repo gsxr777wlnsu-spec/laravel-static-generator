@@ -16,7 +16,8 @@ class ImportService
 
     public function __construct(
         private SiteRepositoryInterface $sites,
-        private SiteLayoutContent $layoutContent
+        private SiteLayoutContent $layoutContent,
+        private LanguageService $languageService
     ) {}
 
     public function importFromMdFile(string $filePath, ?int $siteId = null, bool $allowSftpUpdates = true): array
@@ -135,6 +136,9 @@ class ImportService
             $page = $this->importPage($site, $pageData, $isNewSite);
             $importedPages[] = $page;
         }
+
+        $this->languageService->prepareSiteLanguages($site);
+        $site = $site->fresh() ?? $site;
 
         return [
             'site' => $site,
@@ -329,9 +333,11 @@ class ImportService
         $slug = $data['slug'] ?? '';
         $templateKey = $data['template_key'] ?? null;
         $hasSections = isset($data['sections']) && is_array($data['sections']) && count($data['sections']) > 0;
+        $locale = $this->languageService->normalizeLocale((string) ($data['locale'] ?? $site->locale ?? 'en')) ?: 'en';
 
         $page = Page::where('site_id', $site->id)
             ->where('slug', $slug)
+            ->where('locale', $locale)
             ->first();
 
         if ($page) {
@@ -345,7 +351,7 @@ class ImportService
                 'canonical' => $data['canonical'] ?? null,
                 'og_data' => $this->pageOgData($data),
                 'json_ld' => isset($data['json_ld']) && is_array($data['json_ld']) ? $data['json_ld'] : null,
-                'locale' => $data['locale'] ?? 'en',
+                'locale' => $locale,
             ]);
         } else {
             $page = Page::create([
@@ -360,7 +366,7 @@ class ImportService
                 'canonical' => $data['canonical'] ?? null,
                 'og_data' => $this->pageOgData($data),
                 'json_ld' => isset($data['json_ld']) && is_array($data['json_ld']) ? $data['json_ld'] : null,
-                'locale' => $data['locale'] ?? 'en',
+                'locale' => $locale,
             ]);
         }
 

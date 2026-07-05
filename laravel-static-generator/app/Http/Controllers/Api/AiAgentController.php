@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Contracts\AiAgentConfigRepositoryInterface;
 use App\Http\Controllers\Controller;
 use App\Models\AiAgentConfig;
+use App\Models\Section;
 use App\Services\AiAgentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Validator;
 use RuntimeException;
 
@@ -47,6 +49,18 @@ class AiAgentController extends Controller
             'api_key' => 'nullable|string|max:4000',
             'api_base_url' => 'nullable|string|max:500',
             'model_name' => 'nullable|string|max:150',
+            'ai_models' => 'nullable|array',
+            'ai_models.*.provider' => 'required_with:ai_models|string|in:' . implode(',', $providerValues),
+            'ai_models.*.api_key' => 'nullable|string|max:4000',
+            'ai_models.*.api_base_url' => 'nullable|string|max:500',
+            'ai_models.*.model_name' => 'nullable|string|max:150',
+            'ai_models.*.label' => 'nullable|string|max:80',
+            'ai_models.*.temperature' => 'nullable|numeric|min:0|max:2',
+            'ai_models.*.tone' => 'nullable|string|max:100',
+            'ai_models.*.max_tokens' => 'nullable|integer|min:1|max:128000',
+            'ai_models.*.top_p' => 'nullable|numeric|min:0|max:1',
+            'ai_models.*.frequency_penalty' => 'nullable|numeric|min:-2|max:2',
+            'ai_models.*.presence_penalty' => 'nullable|numeric|min:-2|max:2',
             'temperature' => 'nullable|numeric|min:0|max:2',
             'tone' => 'nullable|string|max:100',
             'max_tokens' => 'nullable|integer|min:1|max:128000',
@@ -81,6 +95,7 @@ class AiAgentController extends Controller
             'provider' => $data['provider'],
             'api_base_url' => $data['api_base_url'] ?? null,
             'model_name' => $data['model_name'] ?? null,
+            'ai_models' => $this->sanitizeModelSlots($data['ai_models'] ?? [], $existing),
             'temperature' => $data['temperature'] ?? 0.7,
             'tone' => $data['tone'] ?? null,
             'max_tokens' => $data['max_tokens'] ?? null,
@@ -114,6 +129,56 @@ class AiAgentController extends Controller
         ]);
     }
 
+    public function generateSection(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'prompt' => 'required|string|min:1|max:12000',
+            'model_key' => 'nullable|string|in:big_main,big_alternate,medium_main,medium_alternate,small_main,small_alternate',
+            'context_mode' => 'nullable|string|in:none,previous,next,adjacent,all,selected',
+            'context_section_ids' => 'nullable|array',
+            'context_section_ids.*' => 'integer|min:1',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $section = Section::with('page.site')->find($id);
+        if (!$section) {
+            return response()->json(['error' => 'Section not found'], 404);
+        }
+
+        $config = $this->configs->findForUser((int) $user->id);
+        if (!$config) {
+            return response()->json(['error' => 'AI agent config was not found.'], 422);
+        }
+
+        $data = $validator->validated();
+
+        try {
+            $html = $this->aiAgentService->generateSectionHtml(
+                section: $section,
+                config: $config,
+                prompt: $data['prompt'],
+                modelKey: $data['model_key'] ?? 'medium_main',
+                contextMode: $data['context_mode'] ?? 'none',
+                selectedSectionIds: array_map('intval', $data['context_section_ids'] ?? [])
+            );
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+
+        return response()->json([
+            'message' => 'Generation successful.',
+            'html' => $html,
+        ]);
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -121,7 +186,63 @@ class AiAgentController extends Controller
     {
         $payload = $config->toArray();
         $payload['has_api_key'] = !empty($config->getRawOriginal('api_key'));
+        $payload['ai_models'] = $this->aiAgentService->modelSlots($config);
 
         return $payload;
+    }
+
+    /**
+     * @param  array<string, mixed>  $modelSlots
+     * @return array<string, array<string, mixed>>
+     */
+    private function sanitizeModelSlots(array $modelSlots, ?AiAgentConfig $existing): array
+    {
+        $defaults = $this->aiAgentService->modelSlots();
+        $existingSlots = is_array($existing?->ai_models) ? $existing->ai_models : [];
+        $clean = [];
+
+        foreach ($defaults as $key => $defaultSlot) {
+            $slot = isset($modelSlots[$key]) && is_array($modelSlots[$key]) ? $modelSlots[$key] : [];
+            $existingSlot = isset($existingSlots[$key]) && is_array($existingSlots[$key]) ? $existingSlots[$key] : [];
+            $incomingApiKey = trim((string) ($slot['api_key'] ?? ''));
+            $clean[$key] = [
+                'provider' => trim((string) ($slot['provider'] ?? $defaultSlot['provider'])),
+                'api_base_url' => trim((string) ($slot['api_base_url'] ?? $defaultSlot['api_base_url'])),
+                'model_name' => trim((string) ($slot['model_name'] ?? $defaultSlot['model_name'])),
+                'label' => trim((string) ($slot['label'] ?? $defaultSlot['label'])),
+                'temperature' => $this->nullableFloat($slot['temperature'] ?? $defaultSlot['temperature'] ?? null),
+                'tone' => trim((string) ($slot['tone'] ?? $defaultSlot['tone'] ?? '')),
+                'max_tokens' => $this->nullableInt($slot['max_tokens'] ?? $defaultSlot['max_tokens'] ?? null),
+                'top_p' => $this->nullableFloat($slot['top_p'] ?? $defaultSlot['top_p'] ?? null),
+                'frequency_penalty' => $this->nullableFloat($slot['frequency_penalty'] ?? $defaultSlot['frequency_penalty'] ?? null),
+                'presence_penalty' => $this->nullableFloat($slot['presence_penalty'] ?? $defaultSlot['presence_penalty'] ?? null),
+            ];
+
+            if ($incomingApiKey !== '') {
+                $clean[$key]['api_key'] = Crypt::encryptString($incomingApiKey);
+            } elseif (isset($existingSlot['api_key']) && trim((string) $existingSlot['api_key']) !== '') {
+                $clean[$key]['api_key'] = (string) $existingSlot['api_key'];
+            }
+        }
+
+        return $clean;
+    }
+
+    private function nullableFloat(mixed $value): ?float
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return is_numeric($value) ? (float) $value : null;
+    }
+
+    private function nullableInt(mixed $value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return is_numeric($value) ? (int) $value : null;
     }
 }

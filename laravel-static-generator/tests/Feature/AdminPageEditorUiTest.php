@@ -75,6 +75,10 @@ class AdminPageEditorUiTest extends TestCase
         $response->assertSee('Head JSON');
         $response->assertSee('Visual');
         $response->assertSee('Code');
+        $response->assertSee('AI Prompt');
+        $response->assertSee('Medium main');
+        $response->assertSee('Previous and next modules');
+        $response->assertSee('Generate');
         $response->assertDontSee('Legacy Menu');
         $response->assertDontSee('Legacy Mobile');
         $response->assertDontSee('Add Section');

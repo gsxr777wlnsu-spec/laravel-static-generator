@@ -28,6 +28,7 @@ class AiAgentController extends Controller
             'config' => $config,
             'sites' => $sites,
             'providers' => $this->aiAgentService->providerOptions(),
+            'modelSlots' => $this->aiAgentService->modelSlots($config),
         ]);
     }
 }

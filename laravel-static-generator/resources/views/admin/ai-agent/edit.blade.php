@@ -43,6 +43,84 @@
                            class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                 </div>
 
+                <div class="sm:col-span-2">
+                    <h4 class="text-sm font-semibold text-gray-900 dark:text-white">Model Slots</h4>
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Six selectable models for page module generation. Leave a slot API key empty to keep the current key or use the shared API key.</p>
+                    <div class="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                        @foreach(($modelSlots ?? []) as $slotKey => $slot)
+                            <div class="ai-model-slot rounded-md border border-gray-200 p-3 dark:border-gray-700" data-slot-key="{{ $slotKey }}">
+                                <div class="mb-3 flex items-center justify-between gap-3">
+                                    <div>
+                                        <div class="text-sm font-medium text-gray-900 dark:text-white">{{ $slot['label'] }}</div>
+                                        <div class="text-xs text-gray-500 dark:text-gray-400">{{ $slot['group'] }} / {{ $slot['role'] }}</div>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-1 gap-3 sm:grid-cols-4">
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-700 dark:text-gray-300">Provider</label>
+                                        <select data-ai-model-field="provider"
+                                                class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                            @foreach($providers as $provider)
+                                                <option value="{{ $provider['value'] }}" {{ ($slot['provider'] ?? 'openai') === $provider['value'] ? 'selected' : '' }}>
+                                                    {{ $provider['label'] }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-700 dark:text-gray-300">Model</label>
+                                        <input type="text" data-ai-model-field="model_name" value="{{ $slot['model_name'] ?? '' }}"
+                                               class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-700 dark:text-gray-300">Base URL</label>
+                                        <input type="text" data-ai-model-field="api_base_url" value="{{ $slot['api_base_url'] ?? '' }}"
+                                               class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-700 dark:text-gray-300">API Key</label>
+                                        <input type="password" data-ai-model-field="api_key" autocomplete="off"
+                                               placeholder="{{ ($slot['has_api_key'] ?? false) ? 'Current key saved' : 'Use shared key' }}"
+                                               class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                    </div>
+                                </div>
+                                <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-700 dark:text-gray-300">Temperature</label>
+                                        <input type="number" step="0.01" min="0" max="2" data-ai-model-field="temperature" value="{{ $slot['temperature'] ?? '' }}"
+                                               class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-700 dark:text-gray-300">Tone</label>
+                                        <input type="text" data-ai-model-field="tone" value="{{ $slot['tone'] ?? '' }}" placeholder="fallback to shared"
+                                               class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-700 dark:text-gray-300">Max Tokens</label>
+                                        <input type="number" min="1" max="128000" data-ai-model-field="max_tokens" value="{{ $slot['max_tokens'] ?? '' }}"
+                                               class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-700 dark:text-gray-300">Top P</label>
+                                        <input type="number" step="0.01" min="0" max="1" data-ai-model-field="top_p" value="{{ $slot['top_p'] ?? '' }}"
+                                               class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-700 dark:text-gray-300">Frequency Penalty</label>
+                                        <input type="number" step="0.01" min="-2" max="2" data-ai-model-field="frequency_penalty" value="{{ $slot['frequency_penalty'] ?? '' }}"
+                                               class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-700 dark:text-gray-300">Presence Penalty</label>
+                                        <input type="number" step="0.01" min="-2" max="2" data-ai-model-field="presence_penalty" value="{{ $slot['presence_penalty'] ?? '' }}"
+                                               class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Temperature</label>
                     <input type="number" step="0.01" min="0" max="2" name="temperature" value="{{ $config?->temperature ?? 0.7 }}"
@@ -199,6 +277,23 @@ document.getElementById('ai-agent-form')?.addEventListener('submit', async funct
     const data = Object.fromEntries(formData);
 
     data.is_active = Boolean(formData.get('is_active'));
+    data.ai_models = {};
+
+    document.querySelectorAll('.ai-model-slot').forEach((slot) => {
+        const slotKey = slot.dataset.slotKey;
+        if (!slotKey) {
+            return;
+        }
+
+        data.ai_models[slotKey] = {};
+        slot.querySelectorAll('[data-ai-model-field]').forEach((field) => {
+            data.ai_models[slotKey][field.dataset.aiModelField] = field.value.trim();
+        });
+    });
+
+    if (!data.model_name && data.ai_models.medium_main?.model_name) {
+        data.model_name = data.ai_models.medium_main.model_name;
+    }
 
     const allowedPathsRaw = document.getElementById('allowed_paths')?.value || '';
     data.allowed_paths = allowedPathsRaw
@@ -218,6 +313,17 @@ document.getElementById('ai-agent-form')?.addEventListener('submit', async funct
         }
 
         data[field] = field === 'max_tokens' ? parseInt(data[field], 10) : parseFloat(data[field]);
+    });
+
+    Object.values(data.ai_models).forEach((slot) => {
+        numericFields.forEach((field) => {
+            if (slot[field] === '' || slot[field] === undefined) {
+                slot[field] = null;
+                return;
+            }
+
+            slot[field] = field === 'max_tokens' ? parseInt(slot[field], 10) : parseFloat(slot[field]);
+        });
     });
 
     try {
