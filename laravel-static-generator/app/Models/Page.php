@@ -39,6 +39,11 @@ class Page extends Model
         return $this->hasMany(Section::class)->orderBy('order');
     }
 
+    public function previews(): HasMany
+    {
+        return $this->hasMany(PagePreview::class);
+    }
+
     public function languageVersions(): HasMany
     {
         return $this->hasMany(Page::class, 'parent_page_id');

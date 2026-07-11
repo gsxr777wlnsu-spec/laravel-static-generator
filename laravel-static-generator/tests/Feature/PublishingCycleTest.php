@@ -6,6 +6,7 @@ use App\Contracts\SftpClientInterface;
 use App\Contracts\DeployServiceInterface;
 use App\Models\Deployment;
 use App\Models\Page;
+use App\Models\PagePreview;
 use App\Models\Section;
 use App\Models\Site;
 use App\Models\User;
@@ -117,6 +118,11 @@ class PublishingCycleTest extends TestCase
         preg_match('#^/api/preview/([^/]+)/#', (string) $previewUrl, $matches);
         $this->assertArrayHasKey(1, $matches);
         $previewToken = $matches[1];
+        $this->assertDatabaseHas('page_previews', [
+            'page_id' => $page->id,
+            'site_id' => $site->id,
+            'token' => $previewToken,
+        ]);
         Storage::disk('generated')->assertExists("preview/{$previewToken}/terms-and-conditions.html");
         Storage::disk('generated')->assertExists("preview/{$previewToken}/assets/js/main.js");
         Storage::disk('generated')->assertExists("preview/{$previewToken}/assets/css/style.css");
@@ -136,6 +142,52 @@ class PublishingCycleTest extends TestCase
         $previewResponse->assertOk();
         $previewResponse->assertSee('Home Page');
         $previewResponse->assertSee('Welcome');
+    }
+
+    public function test_preview_history_lists_and_deletes_preview_from_database_and_disk(): void
+    {
+        $this->useTemporaryGeneratedDisk();
+        $this->useTemporarySitesDisk();
+
+        $site = Site::create([
+            'name' => 'Preview History Site',
+            'domain' => 'preview-history.example',
+            'template_set' => 'base',
+            'output_path' => 'generated/preview-history',
+            'status' => 'active',
+            'locale' => 'en',
+            'default_locale' => 'en',
+        ]);
+
+        $page = Page::create([
+            'site_id' => $site->id,
+            'slug' => 'index',
+            'title' => 'Preview History Page',
+            'status' => 'published',
+            'locale' => 'en',
+        ]);
+
+        Storage::disk('generated')->put('preview/history-token/index.html', '<h1>Preview</h1>');
+        $preview = PagePreview::create([
+            'site_id' => $site->id,
+            'page_id' => $page->id,
+            'token' => 'history-token',
+            'path' => 'index.html',
+            'url' => '/api/preview/history-token/index.html',
+            'title' => 'Preview History Page',
+            'expires_at' => now()->addMinutes(30),
+        ]);
+
+        $listResponse = $this->actingAs($this->admin)->getJson("/api/pages/{$page->id}/previews");
+        $listResponse->assertOk();
+        $listResponse->assertJsonPath('previews.0.id', $preview->id);
+        $listResponse->assertJsonPath('previews.0.url', '/api/preview/history-token/index.html');
+
+        $deleteResponse = $this->actingAs($this->admin)->deleteJson("/api/pages/{$page->id}/previews/{$preview->id}");
+        $deleteResponse->assertOk();
+
+        $this->assertDatabaseMissing('page_previews', ['id' => $preview->id]);
+        $this->assertFalse(Storage::disk('generated')->exists('preview/history-token'));
     }
 
     public function test_base_site_generation_upload_preview_and_delete_removes_all_local_artifacts(): void

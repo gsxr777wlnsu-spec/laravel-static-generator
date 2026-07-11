@@ -3,6 +3,21 @@
 @section('title', 'Create Site')
 
 @section('content')
+<style>
+    .ai-prompt-model-context-row {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+        width: 100%;
+    }
+
+    @media (min-width: 768px) {
+        .ai-prompt-model-context-row {
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        }
+    }
+</style>
+
 <form method="POST" action="/api/sites" class="space-y-6">
     @csrf
     <div class="space-y-3">
@@ -149,74 +164,31 @@
                     <p class="text-xs text-gray-500 dark:text-gray-400">
                         You can edit field values manually and/or add prompts for AI rewrites.
                     </p>
+                    @if(!empty($templateFileOptions))
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Template file</label>
+                            <select id="template_file_switcher"
+                                    class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                    onchange="window.location.href = '/admin/sites/create?template_file=' + encodeURIComponent(this.value)">
+                                @foreach($templateFileOptions as $templateFile)
+                                    <option value="{{ $templateFile }}" @selected(($selectedTemplateFile ?? '') === $templateFile)>
+                                        {{ $templateFile }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                Only the selected file is rendered to keep this page under the PHP memory limit.
+                            </p>
+                        </div>
+                    @endif
 
                     <div class="space-y-10">
                         @foreach($templateFieldCatalog as $fileItem)
-                            @if(($fileItem['file'] ?? '') === 'index-raw_html.md')
-                                @include('admin.sites.partials.create-index-raw-html-fields', [
-                                    'fileItem' => $fileItem,
-                                    'moduleCatalog' => $moduleCatalog ?? [],
-                                ])
-                            @else
-                            <details class="rounded-md border border-gray-200 dark:border-gray-700">
-                                <summary class="cursor-pointer px-3 py-2 text-sm font-medium text-gray-800 dark:text-gray-200">
-                                    {{ $fileItem['file'] }}
-                                </summary>
-
-                                <div class="space-y-5 border-t border-gray-200 dark:border-gray-700 px-3 py-3">
-                                    @foreach(($fileItem['page_fields'] ?? []) as $field)
-                                        <div class="ai-prompt-row rounded-md border border-gray-200 dark:border-gray-700 p-3"
-                                             data-file="{{ $fileItem['file'] }}"
-                                             data-path="{{ $field['path'] }}">
-                                            <div class="mb-2 text-xs font-medium text-gray-700 dark:text-gray-300">
-                                                Page field: {{ $field['field'] }} (<span class="ai-field-length">{{ $field['length'] }}</span> chars)
-                                            </div>
-                                            <textarea rows="{{ $field['input_rows'] ?? 2 }}" data-default-rows="{{ $field['input_rows'] ?? 2 }}" class="ai-manual-input mb-2 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                                                      placeholder="Edit field value manually">{{ $field['value'] ?? '' }}</textarea>
-                                            <textarea rows="2" class="ai-prompt-input block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                                                      placeholder="Instruction for AI to rewrite this field"></textarea>
-                                            <label class="mt-2 inline-flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
-                                                <input type="checkbox" class="ai-send-current-value-checkbox rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
-                                                <span>Send current value to AI</span>
-                                            </label>
-                                        </div>
-                                    @endforeach
-
-                                    @foreach(($fileItem['section_fields'] ?? []) as $field)
-                                        <div class="ai-prompt-row rounded-md border border-gray-200 dark:border-gray-700 p-3"
-                                             data-file="{{ $fileItem['file'] }}"
-                                             data-path="{{ $field['path'] }}"
-                                             data-prompt-path="{{ $field['prompt_path'] ?? $field['path'] }}">
-                                            <div class="mb-2 text-xs font-medium text-gray-700 dark:text-gray-300">
-                                                {{ $field['field'] }} (<span class="ai-field-length">{{ $field['length'] }}</span> chars)
-                                            </div>
-                                            @if(array_key_exists('value', $field))
-                                                <textarea rows="2" data-default-rows="2" class="ai-manual-input mb-2 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                                                          placeholder="Edit field value manually">{{ $field['value'] ?? '' }}</textarea>
-                                            @else
-                                                <div class="mb-2 text-xs text-gray-500 dark:text-gray-400">
-                                                    {{ $field['value_preview'] }}
-                                                </div>
-                                            @endif
-
-                                            @if(($field['show_prompt'] ?? true) === true)
-                                                <textarea rows="2" class="ai-prompt-input block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                                                          placeholder="Instruction for AI to rewrite this module field"></textarea>
-                                                <label class="mt-2 inline-flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
-                                                    <input type="checkbox" class="ai-send-current-value-checkbox rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
-                                                    <span>Send current value to AI</span>
-                                                </label>
-                                            @elseif(($field['prompt_path'] ?? '') !== ($field['path'] ?? ''))
-                                                <div class="text-xs text-gray-500 dark:text-gray-400">
-                                                    Shared AI prompt is attached to the first line of this heading.
-                                                </div>
-                                            @endif
-                                        </div>
-                                    @endforeach
-
-                                </div>
-                            </details>
-                            @endif
+                            @include('admin.sites.partials.create-index-raw-html-fields', [
+                                'fileItem' => $fileItem,
+                                'moduleCatalog' => $moduleCatalog ?? [],
+                                'aiModelOptions' => $aiModelOptions ?? [],
+                            ])
                         @endforeach
                     </div>
                 </div>
@@ -1210,6 +1182,8 @@ function applyCreateSiteImportTemplate(rawText) {
             const manualInput = row.querySelector('.ai-manual-input');
             const promptInput = row.querySelector('.ai-prompt-input');
             const sendCurrentValueCheckbox = row.querySelector('.ai-send-current-value-checkbox');
+            const modelSelect = row.querySelector('.ai-prompt-model-key');
+            const contextSelect = row.querySelector('.ai-prompt-context-mode');
             if (manualInput && Object.prototype.hasOwnProperty.call(values, 'value')) {
                 const fieldPath = values.path || row.dataset.path || '';
                 const nextValue = editableJsonLdValue(fieldPath, values.value);
@@ -1236,6 +1210,13 @@ function applyCreateSiteImportTemplate(rawText) {
             }
             if (sendCurrentValueCheckbox && Object.prototype.hasOwnProperty.call(values, 'send_current_value')) {
                 sendCurrentValueCheckbox.checked = ['1', 'true', 'yes', 'on'].includes(String(values.send_current_value).toLowerCase());
+            }
+            if (modelSelect && Object.prototype.hasOwnProperty.call(values, 'model_key')) {
+                modelSelect.value = values.model_key || 'medium_main';
+            }
+            if (contextSelect && Object.prototype.hasOwnProperty.call(values, 'context_mode')) {
+                contextSelect.value = values.context_mode || 'none';
+                contextSelect.dispatchEvent(new Event('change', { bubbles: true }));
             }
 
             stats.fields += 1;
@@ -1790,6 +1771,19 @@ document.addEventListener('input', function (event) {
     syncQueuedOperationFromEditor(editor);
 });
 
+document.addEventListener('change', function (event) {
+    const contextSelect = event.target.closest('.ai-prompt-context-mode');
+    if (!contextSelect) {
+        return;
+    }
+
+    const row = contextSelect.closest('.ai-prompt-row');
+    const selectedContext = row?.querySelector('.ai-prompt-context-selected');
+    if (selectedContext) {
+        selectedContext.classList.toggle('hidden', contextSelect.value !== 'selected');
+    }
+});
+
 document.addEventListener('click', function (event) {
     const queuedRemoveButton = event.target.closest('.ai-queued-remove');
     if (queuedRemoveButton) {
@@ -2223,6 +2217,8 @@ siteCreateForm.addEventListener('submit', async function(e) {
                 const promptPath = row.dataset.promptPath || row.dataset.path;
                 const prompt = promptInput.value?.trim() || '';
                 const sendCurrentValueCheckbox = row.querySelector('.ai-send-current-value-checkbox');
+                const modelSelect = row.querySelector('.ai-prompt-model-key');
+                const contextSelect = row.querySelector('.ai-prompt-context-mode');
                 if (!prompt) {
                     return acc;
                 }
@@ -2241,6 +2237,11 @@ siteCreateForm.addEventListener('submit', async function(e) {
                     path: promptPath,
                     prompt,
                     send_current_value: sendCurrentValueCheckbox ? sendCurrentValueCheckbox.checked : true,
+                    model_key: modelSelect?.value || 'medium_main',
+                    context_mode: contextSelect?.value || 'none',
+                    context_section_paths: Array.from(row.querySelectorAll('.ai-prompt-context-section-checkbox:checked'))
+                        .map((checkbox) => checkbox.value)
+                        .filter(Boolean),
                 });
 
                 return acc;

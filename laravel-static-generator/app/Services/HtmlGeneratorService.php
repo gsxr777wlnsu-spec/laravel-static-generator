@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Contracts\HtmlGeneratorInterface;
 use App\Contracts\PageRepositoryInterface;
 use App\Models\Page;
+use App\Models\PagePreview;
 use App\Models\Site;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\View;
@@ -448,6 +449,9 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
     {
         $previewToken = Str::random(32);
         $previewDir = "preview/{$previewToken}";
+        $previewPath = $this->pageFilename($page);
+        $previewUrl = "/api/preview/{$previewToken}/{$previewPath}";
+        $expiresAt = now()->addMinutes(30);
 
         Storage::disk('generated')->put("{$previewDir}/.site.json", json_encode([
             'site_id' => (int) $page->site_id,
@@ -471,6 +475,16 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         // Copy assets from the site's generated directory to preview directory
         $this->copyAssetsToPreview($page->site_id, $previewToken);
 
+        PagePreview::create([
+            'site_id' => (int) $page->site_id,
+            'page_id' => (int) $page->id,
+            'token' => $previewToken,
+            'path' => $previewPath,
+            'url' => $previewUrl,
+            'title' => $page->title,
+            'expires_at' => $expiresAt,
+        ]);
+
         try {
             $this->cleanupExpiredPreviews();
         } catch (\Throwable $e) {
@@ -482,8 +496,8 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         
         return [
             'token' => $previewToken,
-            'url' => "/api/preview/{$previewToken}/{$this->pageFilename($page)}",
-            'expires_at' => now()->addMinutes(30)->toDateTimeString(),
+            'url' => $previewUrl,
+            'expires_at' => $expiresAt->toDateTimeString(),
         ];
     }
 
@@ -578,6 +592,7 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         $this->ensureStyleSheetAlias('generated', $previewAssetsPath);
         $this->ensureMainScriptAlias('generated', $previewAssetsPath);
         $this->rewritePreviewCssAssetPaths($previewAssetsPath, $previewToken);
+        $this->normalizeGeneratedPermissions("preview/{$previewToken}");
     }
 
     private function rewritePreviewCssAssetPaths(string $previewAssetsPath, string $previewToken): void
@@ -624,6 +639,7 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
             $this->copyStorageDirectory('sites', $sourceFromSitesDisk, 'generated', $targetPath);
             $this->ensureStyleSheetAlias('generated', $targetPath);
             $this->ensureMainScriptAlias('generated', $targetPath);
+            $this->normalizeGeneratedPermissions("site{$siteId}");
             return;
         }
 
@@ -638,6 +654,7 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         if ($fallbackPath === $targetPath) {
             $this->ensureStyleSheetAlias('generated', $targetPath);
             $this->ensureMainScriptAlias('generated', $targetPath);
+            $this->normalizeGeneratedPermissions("site{$siteId}");
             return;
         }
 
@@ -648,6 +665,7 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         $this->writeGeneratedAssetOverlay($targetPath, $assetOverlay);
         $this->ensureStyleSheetAlias('generated', $targetPath);
         $this->ensureMainScriptAlias('generated', $targetPath);
+        $this->normalizeGeneratedPermissions("site{$siteId}");
     }
 
     /**
@@ -708,6 +726,16 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
             return $etalonPath;
         }
 
+        $latestSiteAssetsPath = $this->findLatestGeneratedSiteAssetsPath($siteAssetsPath);
+        if ($latestSiteAssetsPath !== null) {
+            return $latestSiteAssetsPath;
+        }
+
+        $latestPreviewAssetsPath = $this->findLatestPreviewAssetsPath($excludePreviewToken);
+        if ($latestPreviewAssetsPath !== null) {
+            return $latestPreviewAssetsPath;
+        }
+
         if ($this->hasAnyAssetFiles('generated', $siteAssetsPath)) {
             return $siteAssetsPath;
         }
@@ -716,7 +744,7 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
             return $etalonPath;
         }
 
-        return $this->findLatestPreviewAssetsPath($excludePreviewToken);
+        return null;
     }
 
     private function hasCompleteAssets(string $diskName, string $assetsPath): bool
@@ -824,6 +852,46 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         return (string) $candidates[0]['path'];
     }
 
+    private function findLatestGeneratedSiteAssetsPath(string $excludeAssetsPath): ?string
+    {
+        $generatedDisk = Storage::disk('generated');
+        $candidates = [];
+
+        foreach ($generatedDisk->directories('') as $siteDir) {
+            if (!preg_match('/^site\d+$/', $siteDir)) {
+                continue;
+            }
+
+            $assetsPath = "{$siteDir}/assets";
+            if ($assetsPath === $excludeAssetsPath || !$this->hasCompleteAssets('generated', $assetsPath)) {
+                continue;
+            }
+
+            $modifiedAt = 0;
+            try {
+                $modifiedAt = $generatedDisk->lastModified("{$assetsPath}/css/style.css");
+            } catch (\Throwable) {
+                // Keep the candidate with a neutral timestamp.
+            }
+
+            $candidates[] = [
+                'path' => $assetsPath,
+                'modified_at' => $modifiedAt,
+            ];
+        }
+
+        if ($candidates === []) {
+            return null;
+        }
+
+        usort(
+            $candidates,
+            fn (array $left, array $right): int => $right['modified_at'] <=> $left['modified_at']
+        );
+
+        return (string) $candidates[0]['path'];
+    }
+
     private function ensureMainScriptAlias(string $diskName, string $assetsPath): void
     {
         $disk = Storage::disk($diskName);
@@ -853,6 +921,7 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
 
             if (empty($files)) {
                 $generatedDisk->deleteDirectory($dir);
+                PagePreview::where('token', (string) Str::of($dir)->after('preview/'))->delete();
                 $cleaned++;
                 continue;
             }
@@ -876,6 +945,7 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
 
             if (now()->diffInMinutes(\Illuminate\Support\Carbon::createFromTimestamp($latestModified)) > 30) {
                 $generatedDisk->deleteDirectory($dir);
+                PagePreview::where('token', (string) Str::of($dir)->after('preview/'))->delete();
                 $cleaned++;
             }
         }
@@ -910,6 +980,25 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
             $relativePath = ltrim((string) Str::of($file)->after($sourcePath), '/');
             $targetFilePath = $relativePath === '' ? $targetPath : "{$targetPath}/{$relativePath}";
             $target->put($targetFilePath, $source->get($file));
+        }
+    }
+
+    private function normalizeGeneratedPermissions(string $path): void
+    {
+        $root = Storage::disk('generated')->path(trim($path, '/'));
+        if (!is_dir($root)) {
+            return;
+        }
+
+        @chmod($root, 0755);
+
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::SELF_FIRST
+        );
+
+        foreach ($iterator as $item) {
+            @chmod($item->getPathname(), $item->isDir() ? 0755 : 0644);
         }
     }
 

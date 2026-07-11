@@ -11,9 +11,11 @@ use App\Contracts\SftpClientInterface;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Page;
+use App\Models\PagePreview;
 use App\Models\Section;
 use App\Models\Site;
 use App\Services\PageTemplatePresetService;
+use App\Services\PageHeadDefaultsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -30,6 +32,7 @@ class PageController extends Controller
         private HtmlGeneratorInterface $generator,
         private AuditLogServiceInterface $audit,
         private PageTemplatePresetService $templatePresets,
+        private PageHeadDefaultsService $headDefaults,
         private SftpClientInterface $sftp
     ) {}
 
@@ -76,10 +79,11 @@ class PageController extends Controller
         $data['template_key'] = $templateKey;
         $site = $this->sites->findById($data['site_id']);
 
-        if ($this->seo->checkDuplicateSlugs($site, $data['slug'])) {
+        if ($this->seo->checkDuplicateSlugs($site, $data['slug'], null, $data['locale'] ?? null)) {
             return response()->json(['error' => 'Slug already exists for this site'], 422);
         }
 
+        $data = $this->headDefaults->applyToData($data, $site);
         $data = $this->applyAutoCanonicalOnStore($data, $site);
 
         $warnings = [];
@@ -157,6 +161,7 @@ class PageController extends Controller
             'json_ld' => 'nullable|array',
             'status' => 'sometimes|in:published,draft,archived',
             'template_key' => 'sometimes|string|max:100',
+            'locale' => 'nullable|string|max:20',
         ]);
 
         if ($validator->fails()) {
@@ -171,7 +176,8 @@ class PageController extends Controller
         }
         
         if (isset($data['slug'])) {
-            if ($this->seo->checkDuplicateSlugs($site, $data['slug'], $page->id)) {
+            $locale = $data['locale'] ?? $page->locale;
+            if ($this->seo->checkDuplicateSlugs($site, $data['slug'], $page->id, $locale)) {
                 return response()->json(['error' => 'Slug already exists for this site'], 422);
             }
         }
@@ -281,6 +287,42 @@ class PageController extends Controller
             'preview_url' => $result['url'],
             'expires_at' => $result['expires_at'],
         ]);
+    }
+
+    public function previewHistory(int $id): JsonResponse
+    {
+        $page = Page::find($id);
+
+        if (!$page) {
+            return response()->json(['error' => 'Page not found'], 404);
+        }
+
+        $previews = PagePreview::where('page_id', $page->id)
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn (PagePreview $preview) => [
+                'id' => $preview->id,
+                'title' => $preview->title ?: "Preview #{$preview->id}",
+                'url' => $preview->url,
+                'created_at' => $preview->created_at?->toDateTimeString(),
+                'expires_at' => $preview->expires_at?->toDateTimeString(),
+            ]);
+
+        return response()->json(['previews' => $previews]);
+    }
+
+    public function destroyPreview(int $id, int $previewId): JsonResponse
+    {
+        $preview = PagePreview::where('page_id', $id)->find($previewId);
+
+        if (!$preview) {
+            return response()->json(['error' => 'Preview not found'], 404);
+        }
+
+        Storage::disk('generated')->deleteDirectory("preview/{$preview->token}");
+        $preview->delete();
+
+        return response()->json(['message' => 'Preview deleted successfully']);
     }
 
     public function bootstrapSections(Request $request, int $id): JsonResponse

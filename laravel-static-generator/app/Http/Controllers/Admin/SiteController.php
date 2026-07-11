@@ -7,6 +7,7 @@ use App\Contracts\SiteRepositoryInterface;
 use App\Http\Controllers\Controller;
 use App\Services\AiAgentService;
 use App\Services\PageTemplatePresetService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 
 class SiteController extends Controller
@@ -24,15 +25,26 @@ class SiteController extends Controller
         return view('admin.sites.index', compact('sites'));
     }
 
-    public function create()
+    public function create(Request $request)
     {
         $sourceDomain = 'test.com';
         $templateFieldCatalog = [];
+        $templateFileOptions = [];
+        $selectedTemplateFile = basename((string) $request->query('template_file', 'index-raw_html.md'));
 
         try {
-            $templateFieldCatalog = $this->aiAgentService->listTemplateFields($sourceDomain);
+            $templateFileOptions = $this->aiAgentService->listTemplateFileNames($sourceDomain);
+            if (!in_array($selectedTemplateFile, $templateFileOptions, true)) {
+                $selectedTemplateFile = in_array('index-raw_html.md', $templateFileOptions, true)
+                    ? 'index-raw_html.md'
+                    : (string) ($templateFileOptions[0] ?? '');
+            }
+            $templateFieldCatalog = $selectedTemplateFile !== ''
+                ? $this->aiAgentService->listTemplateFields($sourceDomain, $selectedTemplateFile)
+                : [];
         } catch (\Throwable) {
             $templateFieldCatalog = [];
+            $templateFileOptions = [];
         }
 
         $user = auth()->user();
@@ -41,7 +53,10 @@ class SiteController extends Controller
         return view('admin.sites.create', [
             'aiSourceDomain' => $sourceDomain,
             'templateFieldCatalog' => $templateFieldCatalog,
+            'templateFileOptions' => $templateFileOptions,
+            'selectedTemplateFile' => $selectedTemplateFile,
             'hasActiveAiConfig' => (bool) ($aiConfig?->is_active ?? false) && !empty($aiConfig?->api_key),
+            'aiModelOptions' => $this->aiAgentService->modelOptions($aiConfig),
             'moduleCatalog' => $this->templatePresets->listModulesForUi(),
         ]);
     }

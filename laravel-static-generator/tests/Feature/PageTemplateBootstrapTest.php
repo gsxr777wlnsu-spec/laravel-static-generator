@@ -93,6 +93,39 @@ class PageTemplateBootstrapTest extends TestCase
         $response->assertJsonPath('page.canonical', 'https://template-site.example/contact-us.html');
     }
 
+    public function test_creating_page_applies_default_section_head_from_txt_template(): void
+    {
+        $site = $this->createSite();
+
+        $response = $this->actingAs($this->admin)->postJson('/api/pages', [
+            'site_id' => $site->id,
+            'slug' => 'demo',
+            'title' => 'Demo Page',
+            'status' => 'draft',
+            'locale' => 'en',
+            'template_key' => 'demo',
+        ]);
+
+        $response->assertCreated();
+
+        $page = Page::findOrFail((int) $response->json('page.id'));
+        $this->assertSame('Demo Page', $page->meta_title);
+        $this->assertSame('https://template-site.example/demo.html', $page->canonical);
+        $this->assertIsArray($page->og_data);
+        $this->assertNotEmpty($page->og_data['head_meta'] ?? []);
+        $this->assertSame('robots', $page->og_data['head_meta'][0]['name'] ?? null);
+        $this->assertSame('og:type', $page->og_data['head_meta'][1]['property'] ?? null);
+        $this->assertSame('og:locale', $page->og_data['head_meta'][2]['property'] ?? null);
+        $this->assertSame('og:title', $page->og_data['head_meta'][3]['property'] ?? null);
+        $this->assertSame('og:description', $page->og_data['head_meta'][4]['property'] ?? null);
+        $this->assertSame('article:published_time', $page->og_data['head_meta'][5]['property'] ?? null);
+        $this->assertSame('article:modified_time', $page->og_data['head_meta'][6]['property'] ?? null);
+        $this->assertSame('article:author', $page->og_data['head_meta'][7]['property'] ?? null);
+        $this->assertSame('twitter:card', $page->og_data['head_meta'][8]['name'] ?? null);
+        $this->assertStringContainsString('application/ld+json', (string) ($page->og_data['head_extra'] ?? ''));
+        $this->assertArrayHasKey('head_custom', $page->og_data);
+    }
+
     public function test_updating_slug_updates_auto_generated_canonical_in_response(): void
     {
         $site = $this->createSite();

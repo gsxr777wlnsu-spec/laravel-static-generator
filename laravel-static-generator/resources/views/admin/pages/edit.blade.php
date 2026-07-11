@@ -25,6 +25,39 @@
         width: 100%;
     }
 }
+
+#preview-widget-btn {
+    position: fixed;
+    right: 1.5rem;
+    bottom: 1.5rem;
+    z-index: 50;
+    display: inline-flex;
+    width: 3.5rem;
+    height: 3.5rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background: #4f46e5;
+    color: #fff;
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.2), 0 4px 6px -4px rgb(0 0 0 / 0.2);
+}
+
+.dark #preview-widget-btn {
+    background: #6366f1;
+}
+
+#preview-widget-btn:hover {
+    background: #6366f1;
+}
+
+.dark #preview-widget-btn:hover {
+    background: #818cf8;
+}
+
+#preview-history-panel {
+    max-height: 24rem;
+}
+
 </style>
 <div class="space-y-6">
     <div class="sm:flex sm:items-center sm:justify-between">
@@ -33,6 +66,24 @@
             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Site: {{ $site->name }}</p>
         </div>
         <div class="mt-4 flex items-center gap-3 sm:mt-0">
+            <div class="relative">
+                <button id="preview-history-btn" type="button"
+                        class="inline-flex cursor-pointer items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:outline-none focus-visible:outline-none dark:bg-gray-700 dark:text-white dark:ring-gray-600 dark:hover:bg-gray-600">
+                    Preview History
+                </button>
+                <div id="preview-history-panel"
+                     class="absolute right-0 z-40 mt-2 hidden w-96 overflow-y-auto rounded-md border border-gray-200 bg-white p-3 shadow-lg dark:border-gray-700 dark:bg-gray-800">
+                    <div class="mb-2 flex items-center justify-between gap-3">
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Preview History</h3>
+                        <button id="preview-history-close-btn" type="button"
+                                class="text-sm font-semibold text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                            Close
+                        </button>
+                    </div>
+                    <div id="preview-history-status" class="hidden rounded-md border px-3 py-2 text-sm"></div>
+                    <div id="preview-history-list" class="mt-2 space-y-2"></div>
+                </div>
+            </div>
             <button id="preview-page-btn" type="button"
                     class="inline-flex cursor-pointer items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus:outline-none focus-visible:outline-none">
                 Preview
@@ -58,8 +109,8 @@
 
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Title</label>
-                        <input type="text" name="title" value="{{ $page->title }}" required
-                               class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+	                        <input type="text" name="title" value="{{ $page->title }}" required
+	                               class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                     </div>
 
                     <div>
@@ -94,41 +145,256 @@
             </div>
         </div>
 
-        <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
-            <div class="px-4 py-5 sm:p-6">
-                <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">SEO Fields</h3>
+	        <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
+	            <div class="px-4 py-5 sm:p-6">
+	                @php
+	                    $headOgData = is_array($page->og_data) ? $page->og_data : [];
+	                    $headMetaRows = isset($headOgData['head_meta']) && is_array($headOgData['head_meta']) ? $headOgData['head_meta'] : [];
+	                    $headLinkRows = isset($headOgData['head_links']) && is_array($headOgData['head_links']) ? $headOgData['head_links'] : [];
+	                    $headExtra = isset($headOgData['head_extra']) && is_string($headOgData['head_extra']) ? $headOgData['head_extra'] : '';
+	                    $headCustom = isset($headOgData['head_custom']) && is_string($headOgData['head_custom']) ? $headOgData['head_custom'] : '';
+	                    $bodyExtra = isset($headOgData['body_extra']) && is_string($headOgData['body_extra']) ? $headOgData['body_extra'] : '';
+	                    $headExtraScripts = [];
+	                    if ($headExtra !== '' && preg_match_all('/<script\b[^>]*type=["\']application\/ld\+json["\'][^>]*>([\s\S]*?)<\/script>/i', $headExtra, $headExtraScriptMatches)) {
+	                        $headExtraScripts = $headExtraScriptMatches[1];
+	                    }
+	                @endphp
 
-                <div class="grid grid-cols-1 gap-6">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Meta Title</label>
-                        <input type="text" name="meta_title" value="{{ $page->meta_title }}"
-                               class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
+	                <div class="grid grid-cols-1 gap-6">
+		                    <div data-head-editor-panel class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+	                        <div class="mb-4 flex items-start justify-between gap-3">
+	                            <div>
+	                                <h4 class="text-base font-semibold text-gray-900 dark:text-white">SECTION HEAD</h4>
+	                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Editable fields follow the same paths as the import .txt template.</p>
+	                            </div>
+	                        </div>
 
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Meta Description</label>
-                        <textarea name="meta_description" rows="3"
-                                  class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">{{ $page->meta_description }}</textarea>
-                    </div>
+		                        <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+		                            <div>
+		                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">title</label>
+		                                <input type="text" data-head-page-field="title" value="{{ $page->title }}"
+		                                       class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+		                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400"><code>pages.0.title</code></p>
+                                        <div class="mt-2" data-page-ai-field="title">
+                                            <textarea rows="2" class="page-ai-prompt mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm sm:text-sm" placeholder="AI Prompt"></textarea>
+                                            <div class="mt-2 flex items-center gap-2">
+                                                <button type="button" class="page-ai-generate-btn inline-flex cursor-pointer items-center rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-500">Generate</button>
+                                                <select class="page-ai-model block rounded-md border-gray-300 text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                                                    @foreach(($aiModelOptions ?? []) as $modelOption)
+                                                        <option value="{{ $modelOption['value'] }}" {{ $modelOption['value'] === 'medium_main' ? 'selected' : '' }}>{{ $modelOption['label'] }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                            <details class="ai-prompt-rule mt-2 rounded-md border border-gray-200 p-2 dark:border-gray-700" data-ai-rule-field="title">
+                                                <summary class="cursor-pointer text-xs font-semibold text-gray-700 dark:text-gray-300">AI Prompt Rule</summary>
+                                                <textarea rows="2" class="ai-prompt-rule-input mt-2 block w-full rounded-md border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"></textarea>
+                                                <button type="button" class="ai-prompt-rule-save mt-2 rounded-md bg-white px-2 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-100 dark:ring-gray-600">Save Rule</button>
+                                            </details>
+                                        </div>
+		                            </div>
+		                            <div>
+		                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">meta_title</label>
+		                                <input type="text" name="meta_title" data-head-page-field="meta_title" value="{{ $page->meta_title }}"
+		                                       class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+		                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400"><code>pages.0.meta_title</code></p>
+                                        <div class="mt-2" data-page-ai-field="meta_title">
+                                            <textarea rows="2" class="page-ai-prompt mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm sm:text-sm" placeholder="AI Prompt"></textarea>
+                                            <div class="mt-2 flex items-center gap-2">
+                                                <button type="button" class="page-ai-generate-btn inline-flex cursor-pointer items-center rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-500">Generate</button>
+                                                <select class="page-ai-model block rounded-md border-gray-300 text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                                                    @foreach(($aiModelOptions ?? []) as $modelOption)
+                                                        <option value="{{ $modelOption['value'] }}" {{ $modelOption['value'] === 'medium_main' ? 'selected' : '' }}>{{ $modelOption['label'] }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                            <details class="ai-prompt-rule mt-2 rounded-md border border-gray-200 p-2 dark:border-gray-700" data-ai-rule-field="meta_title">
+                                                <summary class="cursor-pointer text-xs font-semibold text-gray-700 dark:text-gray-300">AI Prompt Rule</summary>
+                                                <textarea rows="2" class="ai-prompt-rule-input mt-2 block w-full rounded-md border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"></textarea>
+                                                <button type="button" class="ai-prompt-rule-save mt-2 rounded-md bg-white px-2 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-100 dark:ring-gray-600">Save Rule</button>
+                                            </details>
+                                        </div>
+		                            </div>
+		                            <div>
+		                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">meta_description</label>
+		                                <textarea rows="3" name="meta_description" data-head-page-field="meta_description"
+		                                          class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">{{ $page->meta_description }}</textarea>
+		                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400"><code>pages.0.meta_description</code></p>
+                                        <div class="mt-2" data-page-ai-field="meta_description">
+                                            <textarea rows="2" class="page-ai-prompt mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm sm:text-sm" placeholder="AI Prompt"></textarea>
+                                            <div class="mt-2 flex items-center gap-2">
+                                                <button type="button" class="page-ai-generate-btn inline-flex cursor-pointer items-center rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-500">Generate</button>
+                                                <select class="page-ai-model block rounded-md border-gray-300 text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                                                    @foreach(($aiModelOptions ?? []) as $modelOption)
+                                                        <option value="{{ $modelOption['value'] }}" {{ $modelOption['value'] === 'medium_main' ? 'selected' : '' }}>{{ $modelOption['label'] }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                            <details class="ai-prompt-rule mt-2 rounded-md border border-gray-200 p-2 dark:border-gray-700" data-ai-rule-field="meta_description">
+                                                <summary class="cursor-pointer text-xs font-semibold text-gray-700 dark:text-gray-300">AI Prompt Rule</summary>
+                                                <textarea rows="2" class="ai-prompt-rule-input mt-2 block w-full rounded-md border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"></textarea>
+                                                <button type="button" class="ai-prompt-rule-save mt-2 rounded-md bg-white px-2 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-100 dark:ring-gray-600">Save Rule</button>
+                                            </details>
+                                        </div>
+		                            </div>
+		                            <div>
+		                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">canonical</label>
+		                                <input type="text" name="canonical" data-head-page-field="canonical" value="{{ $page->canonical }}"
+		                                       class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+		                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400"><code>pages.0.canonical</code></p>
+		                            </div>
+		                            <div>
+		                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">page locale</label>
+		                                <input type="text" data-head-page-field="locale" value="{{ $page->locale }}"
+	                                       class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+	                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400"><code>pages.0.locale</code></p>
+	                            </div>
+	                        </div>
 
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Meta Keywords</label>
-                        <textarea name="meta_keywords" rows="2"
-                                  class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">{{ $page->meta_keywords }}</textarea>
-                    </div>
+	                        <div class="mt-5 space-y-3">
+	                            <div class="flex items-center justify-between gap-3">
+	                                <h5 class="text-sm font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-300">Head meta</h5>
+	                                <button type="button" data-add-head-meta
+		                                        class="inline-flex cursor-pointer items-center rounded-md bg-white px-2 py-1 text-xs font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-100 dark:ring-gray-600 dark:hover:bg-gray-600">
+	                                    Add meta
+	                                </button>
+	                            </div>
+	                            <div data-head-meta-list class="space-y-3">
+	                                @forelse($headMetaRows as $metaIndex => $metaItem)
+	                                    @php $metaItem = is_array($metaItem) ? $metaItem : []; @endphp
+		                                    <div data-head-meta-row class="rounded-md border border-gray-200 p-3 dark:border-gray-700">
+	                                        <div class="mb-2 flex items-center justify-between gap-3">
+	                                            <span class="text-xs font-semibold text-gray-500 dark:text-gray-400">head_meta.{{ $metaIndex }}</span>
+	                                            <button type="button" data-remove-head-row
+	                                                    class="text-xs font-semibold text-rose-600 hover:text-rose-500 dark:text-rose-400">Remove</button>
+	                                        </div>
+	                                        <div class="grid grid-cols-1 gap-3 lg:grid-cols-4">
+	                                            <div>
+	                                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-300">name</label>
+	                                                <input type="text" data-head-meta-key="name" value="{{ $metaItem['name'] ?? '' }}"
+	                                                       class="mt-1 block w-full rounded-md border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+	                                            </div>
+	                                            <div>
+	                                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-300">property</label>
+	                                                <input type="text" data-head-meta-key="property" value="{{ $metaItem['property'] ?? '' }}"
+	                                                       class="mt-1 block w-full rounded-md border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+	                                            </div>
+	                                            <div>
+	                                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-300">http_equiv</label>
+	                                                <input type="text" data-head-meta-key="http_equiv" value="{{ $metaItem['http_equiv'] ?? '' }}"
+	                                                       class="mt-1 block w-full rounded-md border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+	                                            </div>
+	                                            <div>
+	                                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-300">content</label>
+	                                                <input type="text" data-head-meta-key="content" value="{{ $metaItem['content'] ?? '' }}"
+	                                                       class="mt-1 block w-full rounded-md border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+	                                            </div>
+	                                        </div>
+	                                    </div>
+	                                @empty
+		                                    <div data-head-meta-row class="rounded-md border border-gray-200 p-3 dark:border-gray-700">
+	                                        <div class="mb-2 flex items-center justify-between gap-3">
+	                                            <span class="text-xs font-semibold text-gray-500 dark:text-gray-400">head_meta.new</span>
+	                                            <button type="button" data-remove-head-row
+	                                                    class="text-xs font-semibold text-rose-600 hover:text-rose-500 dark:text-rose-400">Remove</button>
+	                                        </div>
+	                                        <div class="grid grid-cols-1 gap-3 lg:grid-cols-4">
+	                                            <div>
+	                                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-300">name</label>
+	                                                <input type="text" data-head-meta-key="name"
+	                                                       class="mt-1 block w-full rounded-md border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+	                                            </div>
+	                                            <div>
+	                                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-300">property</label>
+	                                                <input type="text" data-head-meta-key="property"
+	                                                       class="mt-1 block w-full rounded-md border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+	                                            </div>
+	                                            <div>
+	                                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-300">http_equiv</label>
+	                                                <input type="text" data-head-meta-key="http_equiv"
+	                                                       class="mt-1 block w-full rounded-md border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+	                                            </div>
+	                                            <div>
+	                                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-300">content</label>
+	                                                <input type="text" data-head-meta-key="content"
+	                                                       class="mt-1 block w-full rounded-md border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+	                                            </div>
+	                                        </div>
+	                                    </div>
+	                                @endforelse
+	                            </div>
+	                        </div>
 
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Canonical URL</label>
-                        <input type="text" name="canonical" value="{{ $page->canonical }}"
-                               class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
+	                        <div class="mt-5 space-y-3">
+	                            <div class="flex items-center justify-between gap-3">
+	                                <h5 class="text-sm font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-300">Head links</h5>
+	                                <button type="button" data-add-head-link
+		                                        class="inline-flex cursor-pointer items-center rounded-md bg-white px-2 py-1 text-xs font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-100 dark:ring-gray-600 dark:hover:bg-gray-600">
+	                                    Add link
+	                                </button>
+	                            </div>
+	                            <div data-head-link-list class="space-y-3">
+	                                @forelse($headLinkRows as $linkIndex => $linkItem)
+	                                    @php $linkItem = is_array($linkItem) ? $linkItem : []; @endphp
+		                                    <div data-head-link-row class="rounded-md border border-gray-200 p-3 dark:border-gray-700">
+	                                        <div class="mb-2 flex items-center justify-between gap-3">
+	                                            <span class="text-xs font-semibold text-gray-500 dark:text-gray-400">head_links.{{ $linkIndex }}</span>
+	                                            <button type="button" data-remove-head-row
+	                                                    class="text-xs font-semibold text-rose-600 hover:text-rose-500 dark:text-rose-400">Remove</button>
+	                                        </div>
+	                                        <div class="grid grid-cols-1 gap-3 lg:grid-cols-5">
+	                                            @foreach(['rel', 'href', 'hreflang', 'type', 'sizes'] as $linkKey)
+	                                                <div>
+	                                                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-300">{{ $linkKey }}</label>
+	                                                    <input type="text" data-head-link-key="{{ $linkKey }}" value="{{ $linkItem[$linkKey] ?? '' }}"
+	                                                           class="mt-1 block w-full rounded-md border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+	                                                </div>
+	                                            @endforeach
+	                                        </div>
+	                                    </div>
+	                                @empty
+	                                @endforelse
+	                            </div>
+	                        </div>
 
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Head JSON</label>
-                        <textarea name="og_data" rows="6"
-                                  class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white font-mono text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">{{ $page->og_data ? json_encode($page->og_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : '' }}</textarea>
-                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Editable object for <code>head_meta</code>, <code>head_links</code>, <code>head_extra</code>, <code>head_custom</code>.</p>
-                    </div>
+	                        <div class="mt-5 space-y-4">
+	                            @foreach($headExtraScripts as $scriptIndex => $scriptBody)
+	                                <div>
+	                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Head JSON-LD script block #{{ $scriptIndex + 1 }}</label>
+	                                    <textarea rows="10" data-head-extra-script="{{ $scriptIndex }}"
+	                                              class="mt-1 block w-full rounded-md border-gray-300 font-mono text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white">{{ trim($scriptBody) }}</textarea>
+	                                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400"><code>pages.0.og_data.head_extra.__script__.{{ $scriptIndex }}</code></p>
+	                                </div>
+	                            @endforeach
+
+	                            <div>
+	                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Head extra HTML</label>
+	                                <textarea rows="5" data-head-extra-template
+	                                          class="mt-1 block w-full rounded-md border-gray-300 font-mono text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white">{{ $headExtra }}</textarea>
+	                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400"><code>pages.0.og_data.head_extra</code>. JSON-LD script blocks above are written back into this HTML.</p>
+	                            </div>
+
+	                            <div>
+	                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Head custom scripts/styles</label>
+	                                <textarea rows="4" data-head-custom
+	                                          class="mt-1 block w-full rounded-md border-gray-300 font-mono text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white">{{ $headCustom }}</textarea>
+	                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400"><code>pages.0.og_data.head_custom</code></p>
+	                            </div>
+
+	                            <div>
+	                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Body extra</label>
+	                                <textarea rows="4" data-body-extra
+	                                          class="mt-1 block w-full rounded-md border-gray-300 font-mono text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white">{{ $bodyExtra }}</textarea>
+	                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400"><code>pages.0.og_data.body_extra</code></p>
+	                            </div>
+	                        </div>
+
+	                        <div class="mt-5">
+	                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Full Head JSON</label>
+	                            <textarea name="og_data" rows="8" readonly
+	                                      class="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 font-mono text-sm text-gray-700 shadow-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200">{{ $page->og_data ? json_encode($page->og_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : '' }}</textarea>
+	                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Generated from SECTION HEAD fields before save.</p>
+	                        </div>
+	                    </div>
 
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">JSON-LD (JSON)</label>
@@ -293,6 +559,11 @@
                                 <textarea rows="3"
                                           class="ai-section-prompt mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                                           placeholder="Describe what to create or rewrite in this module"></textarea>
+                                <details class="ai-prompt-rule mt-2 rounded-md border border-gray-200 p-2 dark:border-gray-700" data-ai-rule-field="{{ $moduleKey }}/module_prompt">
+                                    <summary class="cursor-pointer text-xs font-semibold text-gray-700 dark:text-gray-300">AI Prompt Rule</summary>
+                                    <textarea rows="2" class="ai-prompt-rule-input mt-2 block w-full rounded-md border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"></textarea>
+                                    <button type="button" class="ai-prompt-rule-save mt-2 rounded-md bg-white px-2 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-100 dark:ring-gray-600">Save Rule</button>
+                                </details>
                             </div>
                             <div class="ai-section-control-row flex flex-col gap-3 lg:flex-row lg:items-end">
                                 <button type="button"
@@ -353,6 +624,18 @@
                                 class="delete-section-btn inline-flex cursor-pointer items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 focus:outline-none focus-visible:outline-none">
                             Delete Module
                         </button>
+                        <button type="button"
+                                class="section-history-btn inline-flex cursor-pointer items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:outline-none focus-visible:outline-none dark:bg-gray-700 dark:text-white dark:ring-gray-600 dark:hover:bg-gray-600">
+                            History
+                        </button>
+                    </div>
+                    <div class="section-history-panel mt-3 hidden rounded-md border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                        <div class="mb-2 flex items-center justify-between gap-3">
+                            <h4 class="text-sm font-semibold text-gray-900 dark:text-white">Module History</h4>
+                            <button type="button" class="section-history-close-btn text-xs font-semibold text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">Close</button>
+                        </div>
+                        <div class="section-history-status hidden rounded-md border px-3 py-2 text-sm"></div>
+                        <div class="section-history-list space-y-2"></div>
                     </div>
                 </div>
                 @empty
@@ -365,6 +648,16 @@
         <div id="page-edit-status-text" class="whitespace-pre-wrap"></div>
     </div>
 </div>
+
+<button id="preview-widget-btn" type="button"
+        title="Save and preview"
+        aria-label="Save and preview"
+        class="fixed bottom-6 right-6 z-50 inline-flex h-14 w-14 cursor-pointer items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg ring-1 ring-indigo-500/40 transition hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 dark:bg-indigo-500 dark:ring-indigo-300/30 dark:hover:bg-indigo-400">
+    <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M2.25 12s3.5-6.75 9.75-6.75S21.75 12 21.75 12s-3.5 6.75-9.75 6.75S2.25 12 2.25 12Z" />
+        <circle cx="12" cy="12" r="2.75" />
+    </svg>
+</button>
 
 <div id="page-editor-config" data-site-id="{{ $site->id }}" class="hidden"></div>
 @php
@@ -381,6 +674,8 @@ const editorAssetPrefix = '/admin/sites/{{ $site->id }}/media/serve/assets/';
 const editorAssetServePrefix = '/admin/sites/{{ $site->id }}/media/serve/';
 const canonicalSiteDomain = @json($site->domain);
 const currentSiteId = {{ $site->id }};
+const currentTemplateSet = @json($site->template_set);
+const currentPageRuleKey = @json($page->template_key ?: $page->slug ?: 'page');
 let canonicalManuallyEdited = false;
 let pageActionInProgress = false;
 const ogDataField = document.querySelector('textarea[name="og_data"]');
@@ -437,10 +732,10 @@ function syncCanonicalFromSlug(force = false) {
         return;
     }
 
-    const generatedCanonical = buildCanonicalFromSlug(slugInput.value);
-    if (force || !canonicalManuallyEdited || canonicalInput.value.trim() === '') {
-        canonicalInput.value = generatedCanonical;
-    }
+	    const generatedCanonical = buildCanonicalFromSlug(slugInput.value);
+	    if (force || !canonicalManuallyEdited || canonicalInput.value.trim() === '') {
+	        canonicalInput.value = generatedCanonical;
+	    }
 }
 
 function escapeRegExp(value) {
@@ -639,6 +934,155 @@ function parseLooseJsonObject(value) {
         return null;
     }
 }
+
+function getHeadPageField(field) {
+    return document.querySelector(`[data-head-page-field="${field}"]`);
+}
+
+function collectHeadRows(rowSelector, keySelector) {
+    return Array.from(document.querySelectorAll(rowSelector)).map((row) => {
+        const item = {};
+
+        row.querySelectorAll(keySelector).forEach((input) => {
+            const key = input.dataset.headMetaKey || input.dataset.headLinkKey;
+            const value = input.value.trim();
+
+            if (key && value !== '') {
+                item[key] = value;
+            }
+        });
+
+        return item;
+    }).filter((item) => Object.keys(item).length > 0);
+}
+
+function buildHeadExtraWithScripts(templateHtml, scripts) {
+    const scriptBodies = Array.isArray(scripts) ? scripts : [];
+    let scriptIndex = 0;
+    let html = String(templateHtml || '');
+    const scriptPattern = /<script\b([^>]*)type=(["'])application\/ld\+json\2([^>]*)>[\s\S]*?<\/script>/gi;
+
+    html = html.replace(scriptPattern, (fullMatch, beforeType, quote, afterType) => {
+        if (scriptIndex >= scriptBodies.length) {
+            return fullMatch;
+        }
+
+        const body = scriptBodies[scriptIndex];
+        scriptIndex += 1;
+        return `<script${beforeType}type=${quote}application/ld+json${quote}${afterType}>\n${body.trim()}\n<\/script>`;
+    });
+
+    for (; scriptIndex < scriptBodies.length; scriptIndex += 1) {
+        const body = scriptBodies[scriptIndex].trim();
+        if (body === '') {
+            continue;
+        }
+
+        html += `${html.trim() === '' ? '' : '\n'}<script type="application/ld+json">\n${body}\n<\/script>`;
+    }
+
+    return html;
+}
+
+function syncHeadJsonFromFields() {
+    if (!ogDataField) {
+        return null;
+    }
+
+    const ogData = parseLooseJsonObject(ogDataField.value) || {};
+    const headMeta = collectHeadRows('[data-head-meta-row]', '[data-head-meta-key]');
+    const headLinks = collectHeadRows('[data-head-link-row]', '[data-head-link-key]');
+    const headExtraTemplate = document.querySelector('[data-head-extra-template]')?.value || '';
+    const headExtraScripts = Array.from(document.querySelectorAll('[data-head-extra-script]')).map((field) => field.value || '');
+    const headCustom = document.querySelector('[data-head-custom]')?.value || '';
+    const bodyExtra = document.querySelector('[data-body-extra]')?.value || '';
+
+    ogData.head_meta = headMeta;
+    ogData.head_links = headLinks;
+    ogData.head_extra = buildHeadExtraWithScripts(headExtraTemplate, headExtraScripts);
+    ogData.head_custom = headCustom;
+    ogData.body_extra = bodyExtra;
+
+    ogDataField.value = JSON.stringify(ogData, null, 4);
+    return ogData;
+}
+
+function createHeadMetaRow() {
+    const row = document.createElement('div');
+    row.dataset.headMetaRow = '';
+    row.className = 'rounded-md border border-gray-200 p-3 dark:border-gray-700';
+    row.innerHTML = `
+        <div class="mb-2 flex items-center justify-between gap-3">
+            <span class="text-xs font-semibold text-gray-500 dark:text-gray-400">head_meta.new</span>
+            <button type="button" data-remove-head-row class="text-xs font-semibold text-rose-600 hover:text-rose-500 dark:text-rose-400">Remove</button>
+        </div>
+        <div class="grid grid-cols-1 gap-3 lg:grid-cols-4">
+            ${['name', 'property', 'http_equiv', 'content'].map((key) => `
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-300">${key}</label>
+                    <input type="text" data-head-meta-key="${key}" class="mt-1 block w-full rounded-md border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                </div>
+            `).join('')}
+        </div>
+    `;
+
+    return row;
+}
+
+function createHeadLinkRow() {
+    const row = document.createElement('div');
+    row.dataset.headLinkRow = '';
+    row.className = 'rounded-md border border-gray-200 p-3 dark:border-gray-700';
+    row.innerHTML = `
+        <div class="mb-2 flex items-center justify-between gap-3">
+            <span class="text-xs font-semibold text-gray-500 dark:text-gray-400">head_links.new</span>
+            <button type="button" data-remove-head-row class="text-xs font-semibold text-rose-600 hover:text-rose-500 dark:text-rose-400">Remove</button>
+        </div>
+        <div class="grid grid-cols-1 gap-3 lg:grid-cols-5">
+            ${['rel', 'href', 'hreflang', 'type', 'sizes'].map((key) => `
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-300">${key}</label>
+                    <input type="text" data-head-link-key="${key}" class="mt-1 block w-full rounded-md border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                </div>
+            `).join('')}
+        </div>
+    `;
+
+    return row;
+}
+
+document.querySelectorAll('[data-head-page-field]').forEach((field) => {
+    field.addEventListener('input', () => {
+        syncHeadJsonFromFields();
+    });
+});
+
+document.querySelector('[data-add-head-meta]')?.addEventListener('click', () => {
+    document.querySelector('[data-head-meta-list]')?.appendChild(createHeadMetaRow());
+    syncHeadJsonFromFields();
+});
+
+document.querySelector('[data-add-head-link]')?.addEventListener('click', () => {
+    document.querySelector('[data-head-link-list]')?.appendChild(createHeadLinkRow());
+    syncHeadJsonFromFields();
+});
+
+document.addEventListener('click', (event) => {
+    const removeButton = event.target.closest('[data-remove-head-row]');
+    if (!removeButton) {
+        return;
+    }
+
+    removeButton.closest('[data-head-meta-row], [data-head-link-row]')?.remove();
+    syncHeadJsonFromFields();
+});
+
+document.addEventListener('input', (event) => {
+    if (event.target.closest('[data-head-meta-row], [data-head-link-row]')
+        || event.target.matches('[data-head-extra-template], [data-head-extra-script], [data-head-custom], [data-body-extra]')) {
+        syncHeadJsonFromFields();
+    }
+});
 
 function normalizeHeadValue(value) {
     return typeof value === 'string' ? value.trim() : '';
@@ -927,6 +1371,122 @@ async function deleteSection(sectionId) {
     window.location.reload();
 }
 
+function renderSectionHistoryStatus(container, message, type = 'info') {
+    const status = container.querySelector('.section-history-status');
+    if (!status) {
+        return;
+    }
+
+    status.textContent = message;
+    status.className = 'section-history-status rounded-md border px-3 py-2 text-sm';
+
+    if (type === 'error') {
+        status.classList.add('border-red-200', 'bg-red-50', 'text-red-700', 'dark:border-red-800', 'dark:bg-red-900/20', 'dark:text-red-200');
+    } else {
+        status.classList.add('border-gray-200', 'bg-gray-50', 'text-gray-700', 'dark:border-gray-700', 'dark:bg-gray-900', 'dark:text-gray-200');
+    }
+}
+
+function formatSectionHistoryDate(value) {
+    if (!value) {
+        return '';
+    }
+
+    const date = new Date(value.replace(' ', 'T'));
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+
+    return date.toLocaleString([], {
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+    });
+}
+
+function renderSectionHistory(container, histories) {
+    const list = container.querySelector('.section-history-list');
+    if (!list) {
+        return;
+    }
+
+    list.innerHTML = '';
+
+    if (!Array.isArray(histories) || histories.length === 0) {
+        renderSectionHistoryStatus(container, 'No saved history for this module yet.');
+        return;
+    }
+
+    container.querySelector('.section-history-status')?.classList.add('hidden');
+
+    histories.forEach((history) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'block w-full rounded-md border border-gray-200 px-3 py-2 text-left text-sm font-semibold text-indigo-600 hover:bg-indigo-50 hover:text-indigo-500 dark:border-gray-700 dark:text-indigo-400 dark:hover:bg-indigo-950/20 dark:hover:text-indigo-300';
+        button.textContent = formatSectionHistoryDate(history.created_at) || history.label || `History #${history.id}`;
+        button.addEventListener('click', async () => {
+            await restoreSectionHistory(container, history.id);
+        });
+
+        list.append(button);
+    });
+}
+
+async function loadSectionHistory(sectionId, container) {
+    renderSectionHistoryStatus(container, 'Loading history...');
+
+    const response = await fetch(`/api/sections/${sectionId}/history`, {
+        headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        credentials: 'same-origin',
+    });
+
+    const result = await readApiResponse(response);
+
+    if (!response.ok) {
+        const message = result.errors ? JSON.stringify(result.errors) : (result.error || result.message || `Request failed with status ${response.status}`);
+        renderSectionHistoryStatus(container, 'Error: ' + message, 'error');
+        return;
+    }
+
+    renderSectionHistory(container, result.histories || []);
+}
+
+async function restoreSectionHistory(container, historyId) {
+    const sectionId = container.dataset.sectionId;
+    if (!sectionId || !confirm('Restore this saved module version? Current module content will be saved to history first.')) {
+        return;
+    }
+
+    renderSectionHistoryStatus(container, 'Restoring module...');
+
+    const response = await fetch(`/api/sections/${sectionId}/history/${historyId}/restore`, {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': getCsrfToken(),
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        credentials: 'same-origin',
+    });
+
+    const result = await readApiResponse(response);
+
+    if (!response.ok) {
+        const message = result.errors ? JSON.stringify(result.errors) : (result.error || result.message || `Request failed with status ${response.status}`);
+        renderSectionHistoryStatus(container, 'Error: ' + message, 'error');
+        return;
+    }
+
+    renderPageEditStatus(`Module #${sectionId} restored. Reloading...`, 'success');
+    window.location.reload();
+}
+
 function setGeneratedSectionHtml(container, html) {
     const contentTextarea = container.querySelector('.section-content');
     if (!contentTextarea) {
@@ -950,6 +1510,112 @@ function setGeneratedSectionHtml(container, html) {
     if (rawHtmlTextarea) {
         rawHtmlTextarea.value = html;
     }
+}
+
+async function loadAiPromptRule(details) {
+    const fieldKey = details?.dataset.aiRuleField || '';
+    const input = details?.querySelector('.ai-prompt-rule-input');
+    if (!fieldKey || !input || details.dataset.ruleLoaded === 'true') {
+        return;
+    }
+
+    const params = new URLSearchParams({
+        template_set: currentTemplateSet,
+        page_key: currentPageRuleKey,
+        field_key: fieldKey,
+    });
+
+    const response = await fetch(`/api/ai-agent/prompt-rule?${params.toString()}`, {
+        headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        credentials: 'same-origin',
+    });
+
+    const result = await readApiResponse(response);
+    if (!response.ok) {
+        throw new Error(result.error || result.message || `Request failed with status ${response.status}`);
+    }
+
+    input.value = result.rule || '';
+    details.dataset.ruleLoaded = 'true';
+}
+
+async function saveAiPromptRule(details) {
+    const fieldKey = details?.dataset.aiRuleField || '';
+    const input = details?.querySelector('.ai-prompt-rule-input');
+    if (!fieldKey || !input) {
+        return;
+    }
+
+    const response = await fetch('/api/ai-agent/prompt-rule', {
+        method: 'PUT',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': getCsrfToken(),
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+            template_set: currentTemplateSet,
+            page_key: currentPageRuleKey,
+            field_key: fieldKey,
+            rule: input.value || '',
+        }),
+    });
+
+    const result = await readApiResponse(response);
+    if (!response.ok) {
+        throw new Error(result.error || result.message || `Request failed with status ${response.status}`);
+    }
+
+    details.dataset.ruleLoaded = 'true';
+    renderPageEditStatus('AI prompt rule saved.', 'success');
+}
+
+async function generatePageAiField(container) {
+    const fieldKey = container.dataset.pageAiField || '';
+    const prompt = container.querySelector('.page-ai-prompt')?.value.trim() || '';
+    if (!fieldKey || prompt === '') {
+        renderPageEditStatus('AI prompt cannot be empty.', 'error');
+        return;
+    }
+
+    renderPageEditStatus(`Generating ${fieldKey}...`, 'warning');
+
+    const response = await fetch('/api/ai-agent/pages/{{ $page->id }}/field/generate', {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': getCsrfToken(),
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+            field_key: fieldKey,
+            prompt,
+            model_key: container.querySelector('.page-ai-model')?.value || 'medium_main',
+        }),
+    });
+
+    const result = await readApiResponse(response);
+    if (!response.ok) {
+        const message = result.errors ? JSON.stringify(result.errors) : (result.error || result.message || `Request failed with status ${response.status}`);
+        renderPageEditStatus('Error: ' + message, 'error');
+        return;
+    }
+
+    const field = getHeadPageField(fieldKey);
+    if (field) {
+        field.value = result.value || '';
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+        syncHeadJsonFromFields();
+    }
+
+    renderPageEditStatus(`${fieldKey} generated. Review it, then save the page.`, 'success');
 }
 
 async function generateSectionContent(sectionId, container, button) {
@@ -1156,7 +1822,14 @@ async function openPreview() {
     try {
         const settingsSaved = await savePageSettings();
         if (!settingsSaved) {
-            renderPageEditStatus('Warning: page settings were not saved. Opening preview from the last saved version.', 'warning');
+            writePreviewWindowMessage('Preview error', 'Page settings were not saved.');
+            return;
+        }
+
+        const sectionsSaved = await saveAllSectionsSilently();
+        if (!sectionsSaved) {
+            writePreviewWindowMessage('Preview error', 'Modules were not saved.');
+            return;
         }
 
         const response = await fetch('/api/pages/{{ $page->id }}/preview-token', {
@@ -1186,6 +1859,9 @@ async function openPreview() {
 
         if (previewWindow) {
             previewWindow.location.href = new URL(result.preview_url, window.location.origin).toString();
+            if (!document.getElementById('preview-history-panel')?.classList.contains('hidden')) {
+                await loadPreviewHistory();
+            }
             return;
         }
 
@@ -1239,6 +1915,7 @@ async function applyTemplateToSections() {
 function setPageActionBusy(busy) {
     const saveChangesBtn = document.querySelector('#page-form button[type="submit"]');
     const saveDeployBtn = document.getElementById('save-deploy-btn');
+    const previewButtons = document.querySelectorAll('#preview-page-btn, #preview-widget-btn');
 
     if (saveChangesBtn) {
         saveChangesBtn.disabled = busy;
@@ -1251,6 +1928,12 @@ function setPageActionBusy(busy) {
         saveDeployBtn.classList.toggle('opacity-60', busy);
         saveDeployBtn.classList.toggle('cursor-not-allowed', busy);
     }
+
+    previewButtons.forEach((button) => {
+        button.disabled = busy;
+        button.classList.toggle('opacity-60', busy);
+        button.classList.toggle('cursor-not-allowed', busy);
+    });
 }
 
 function setInlineButtonBusy(button, busy, busyText = 'Saving…') {
@@ -1276,20 +1959,149 @@ function currentSaveTime() {
     });
 }
 
+function renderPreviewHistoryStatus(message, type = 'info') {
+    const status = document.getElementById('preview-history-status');
+    if (!status) {
+        return;
+    }
+
+    status.textContent = message;
+    status.className = 'rounded-md border px-3 py-2 text-sm';
+
+    if (type === 'error') {
+        status.classList.add('border-red-200', 'bg-red-50', 'text-red-700', 'dark:border-red-800', 'dark:bg-red-900/20', 'dark:text-red-200');
+    } else {
+        status.classList.add('border-gray-200', 'bg-gray-50', 'text-gray-700', 'dark:border-gray-700', 'dark:bg-gray-900', 'dark:text-gray-200');
+    }
+}
+
+function formatPreviewDate(value) {
+    if (!value) {
+        return '';
+    }
+
+    const date = new Date(value.replace(' ', 'T'));
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+
+    return date.toLocaleString([], {
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+
+function renderPreviewHistory(previews) {
+    const list = document.getElementById('preview-history-list');
+    if (!list) {
+        return;
+    }
+
+    list.innerHTML = '';
+
+    if (!Array.isArray(previews) || previews.length === 0) {
+        renderPreviewHistoryStatus('No previews for this page yet.');
+        return;
+    }
+
+    document.getElementById('preview-history-status')?.classList.add('hidden');
+
+    previews.forEach((preview) => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between gap-3 rounded-md border border-gray-200 p-2 dark:border-gray-700';
+
+        const link = document.createElement('button');
+        link.type = 'button';
+        link.className = 'min-w-0 flex-1 text-left text-sm font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300';
+        link.textContent = `${preview.title || 'Preview'}${preview.created_at ? ' — ' + formatPreviewDate(preview.created_at) : ''}`;
+        link.addEventListener('click', () => {
+            window.open(new URL(preview.url, window.location.origin).toString(), '_blank', 'noopener');
+        });
+
+        const deleteButton = document.createElement('button');
+        deleteButton.type = 'button';
+        deleteButton.className = 'shrink-0 rounded-md bg-red-600 px-2 py-1 text-xs font-semibold text-white hover:bg-red-500';
+        deleteButton.textContent = 'Delete';
+        deleteButton.addEventListener('click', async () => {
+            await deletePreviewHistoryItem(preview.id);
+        });
+
+        row.append(link, deleteButton);
+        list.append(row);
+    });
+}
+
+async function loadPreviewHistory() {
+    renderPreviewHistoryStatus('Loading previews...');
+
+    const response = await fetch('/api/pages/{{ $page->id }}/previews', {
+        headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        credentials: 'same-origin',
+    });
+
+    const result = await readApiResponse(response);
+
+    if (!response.ok) {
+        const message = result.errors ? JSON.stringify(result.errors) : (result.error || result.message || `Request failed with status ${response.status}`);
+        renderPreviewHistoryStatus('Error: ' + message, 'error');
+        return;
+    }
+
+    renderPreviewHistory(result.previews || []);
+}
+
+async function deletePreviewHistoryItem(previewId) {
+    if (!confirm('Delete this preview from disk and database?')) {
+        return;
+    }
+
+    const response = await fetch(`/api/pages/{{ $page->id }}/previews/${previewId}`, {
+        method: 'DELETE',
+        headers: {
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': getCsrfToken(),
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        credentials: 'same-origin',
+    });
+
+    const result = await readApiResponse(response);
+
+    if (!response.ok) {
+        const message = result.errors ? JSON.stringify(result.errors) : (result.error || result.message || `Request failed with status ${response.status}`);
+        renderPreviewHistoryStatus('Error: ' + message, 'error');
+        return;
+    }
+
+    await loadPreviewHistory();
+}
+
 async function savePageSettings() {
     const pageForm = document.getElementById('page-form');
     if (!pageForm) {
         return false;
     }
 
-    applyPublishedTimeSyncToOgDataField();
+	    syncHeadJsonFromFields();
+	    applyPublishedTimeSyncToOgDataField();
 
     const formData = new FormData(pageForm);
     const data = Object.fromEntries(formData);
 
-    if (!String(data.canonical || '').trim()) {
-        data.canonical = buildCanonicalFromSlug(data.slug || '');
-    }
+	    if (!String(data.canonical || '').trim()) {
+	        data.canonical = buildCanonicalFromSlug(data.slug || '');
+	    }
+
+	    const localeField = getHeadPageField('locale');
+	    if (localeField) {
+	        data.locale = localeField.value;
+	    }
 
     const ogData = parseJsonField(data.og_data || '', 'OpenGraph Data');
     if (ogData === false) return false;
@@ -1346,7 +2158,7 @@ async function saveAllSectionsSilently() {
 
         const ok = await saveSection(sectionId, container, { silent: true });
         if (!ok) {
-            renderPageEditStatus(`Module save failed (section #${sectionId}). Deploy aborted.`, 'error');
+            renderPageEditStatus(`Module save failed (section #${sectionId}). Action aborted.`, 'error');
             return false;
         }
     }
@@ -1429,6 +2241,38 @@ document.getElementById('page-form')?.addEventListener('submit', async function 
     await handlePageSave({ deployAfterSave: false });
 });
 
+document.querySelectorAll('.ai-prompt-rule').forEach((details) => {
+    details.addEventListener('toggle', async () => {
+        if (!details.open) {
+            return;
+        }
+
+        try {
+            await loadAiPromptRule(details);
+        } catch (error) {
+            renderPageEditStatus('Error: ' + error.message, 'error');
+        }
+    });
+
+    details.querySelector('.ai-prompt-rule-save')?.addEventListener('click', async () => {
+        try {
+            await saveAiPromptRule(details);
+        } catch (error) {
+            renderPageEditStatus('Error: ' + error.message, 'error');
+        }
+    });
+});
+
+document.querySelectorAll('[data-page-ai-field]').forEach((container) => {
+    container.querySelector('.page-ai-generate-btn')?.addEventListener('click', async () => {
+        try {
+            await generatePageAiField(container);
+        } catch (error) {
+            renderPageEditStatus('Error: ' + error.message, 'error');
+        }
+    });
+});
+
 document.querySelectorAll('.section-item').forEach((container) => {
     const sectionId = container.dataset.sectionId;
 
@@ -1462,9 +2306,61 @@ document.querySelectorAll('.section-item').forEach((container) => {
             renderPageEditStatus('Error: ' + error.message, 'error');
         }
     });
+
+    container.querySelector('.section-history-btn')?.addEventListener('click', async () => {
+        const panel = container.querySelector('.section-history-panel');
+        if (!panel) {
+            return;
+        }
+
+        const willOpen = panel.classList.contains('hidden');
+        panel.classList.toggle('hidden', !willOpen);
+
+        if (willOpen) {
+            try {
+                await loadSectionHistory(sectionId, container);
+            } catch (error) {
+                renderSectionHistoryStatus(container, 'Error: ' + error.message, 'error');
+            }
+        }
+    });
+
+    container.querySelector('.section-history-close-btn')?.addEventListener('click', () => {
+        container.querySelector('.section-history-panel')?.classList.add('hidden');
+    });
 });
 
 document.getElementById('preview-page-btn')?.addEventListener('click', async () => {
+    try {
+        await openPreview();
+    } catch (error) {
+        renderPageEditStatus('Error: ' + error.message, 'error');
+    }
+});
+
+document.getElementById('preview-history-btn')?.addEventListener('click', async () => {
+    const panel = document.getElementById('preview-history-panel');
+    if (!panel) {
+        return;
+    }
+
+    const willOpen = panel.classList.contains('hidden');
+    panel.classList.toggle('hidden', !willOpen);
+
+    if (willOpen) {
+        try {
+            await loadPreviewHistory();
+        } catch (error) {
+            renderPreviewHistoryStatus('Error: ' + error.message, 'error');
+        }
+    }
+});
+
+document.getElementById('preview-history-close-btn')?.addEventListener('click', () => {
+    document.getElementById('preview-history-panel')?.classList.add('hidden');
+});
+
+document.getElementById('preview-widget-btn')?.addEventListener('click', async () => {
     try {
         await openPreview();
     } catch (error) {

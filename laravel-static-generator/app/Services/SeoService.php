@@ -65,13 +65,17 @@ class SeoService implements SeoServiceInterface
         return $description;
     }
 
-    public function checkDuplicateSlugs(Site $site, string $slug, ?int $excludePageId = null): bool
+    public function checkDuplicateSlugs(Site $site, string $slug, ?int $excludePageId = null, ?string $locale = null): bool
     {
         $query = Page::where('site_id', $site->id)
             ->where('slug', $slug);
         
         if ($excludePageId) {
             $query->where('id', '!=', $excludePageId);
+        }
+
+        if ($locale !== null) {
+            $query->where('locale', $locale);
         }
         
         return $query->exists();

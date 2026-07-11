@@ -10,5 +10,5 @@ interface SeoServiceInterface
     public function validateMetaDescription(string $description): array;
     public function generateMetaTitle(string $content): string;
     public function generateMetaDescription(string $content): string;
-    public function checkDuplicateSlugs(Site $site, string $slug, ?int $excludePageId = null): bool;
+    public function checkDuplicateSlugs(Site $site, string $slug, ?int $excludePageId = null, ?string $locale = null): bool;
 }

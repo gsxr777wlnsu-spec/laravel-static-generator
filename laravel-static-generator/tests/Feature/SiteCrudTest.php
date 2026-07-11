@@ -24,16 +24,30 @@ class SiteCrudTest extends TestCase
     use RefreshDatabase;
 
     protected User $admin;
+    protected string $templatesRoot;
 
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->templatesRoot = '/tmp/laravel-static-generator-tests/site-crud-ai-templates-' . Str::uuid();
+        File::ensureDirectoryExists($this->templatesRoot);
+        config()->set('services.ai_agent.templates_root', $this->templatesRoot);
 
         $this->admin = User::create([
             'name' => 'Admin',
             'email' => 'admin-site@test.com',
             'password' => Hash::make('password'),
         ]);
+    }
+
+    protected function tearDown(): void
+    {
+        if (isset($this->templatesRoot) && is_dir($this->templatesRoot)) {
+            File::deleteDirectory($this->templatesRoot);
+        }
+
+        parent::tearDown();
     }
 
     public function test_store_persists_status_and_locale_fields(): void

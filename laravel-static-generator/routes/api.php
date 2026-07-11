@@ -39,6 +39,8 @@ Route::middleware(['web', 'auth', 'throttle:api'])->group(function () {
         Route::delete('/{id}', [PageController::class, 'destroy']);
         Route::get('/{id}/preview', [PageController::class, 'preview']);
         Route::post('/{id}/preview-token', [PageController::class, 'generatePreviewToken']);
+        Route::get('/{id}/previews', [PageController::class, 'previewHistory']);
+        Route::delete('/{id}/previews/{previewId}', [PageController::class, 'destroyPreview']);
         Route::post('/{id}/sections/bootstrap', [PageController::class, 'bootstrapSections']);
     });
 
@@ -47,6 +49,8 @@ Route::middleware(['web', 'auth', 'throttle:api'])->group(function () {
         Route::post('/', [SectionController::class, 'store']);
         Route::get('/{id}', [SectionController::class, 'show']);
         Route::put('/{id}', [SectionController::class, 'update']);
+        Route::get('/{id}/history', [SectionController::class, 'history']);
+        Route::post('/{id}/history/{historyId}/restore', [SectionController::class, 'restoreHistory']);
         Route::post('/{id}/generated-background-override', [SectionController::class, 'storeGeneratedBackgroundOverride']);
         Route::delete('/{id}', [SectionController::class, 'destroy']);
         Route::post('/reorder', [SectionController::class, 'reorder']);
@@ -70,6 +74,9 @@ Route::middleware(['web', 'auth', 'throttle:api'])->group(function () {
         Route::get('/config', [AiAgentController::class, 'show']);
         Route::put('/config', [AiAgentController::class, 'upsert']);
         Route::post('/sections/{id}/generate', [AiAgentController::class, 'generateSection']);
+        Route::get('/prompt-rule', [AiAgentController::class, 'showPromptRule']);
+        Route::put('/prompt-rule', [AiAgentController::class, 'savePromptRule']);
+        Route::post('/pages/{id}/field/generate', [AiAgentController::class, 'generatePageField']);
     });
 
     Route::prefix('templates')->group(function () {

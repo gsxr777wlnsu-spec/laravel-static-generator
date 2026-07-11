@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Contracts\AiAgentConfigRepositoryInterface;
 use App\Http\Controllers\Controller;
 use App\Models\AiAgentConfig;
+use App\Models\AiPromptRule;
+use App\Models\Page;
 use App\Models\Section;
 use App\Services\AiAgentService;
 use Illuminate\Http\JsonResponse;
@@ -167,7 +169,8 @@ class AiAgentController extends Controller
                 prompt: $data['prompt'],
                 modelKey: $data['model_key'] ?? 'medium_main',
                 contextMode: $data['context_mode'] ?? 'none',
-                selectedSectionIds: array_map('intval', $data['context_section_ids'] ?? [])
+                selectedSectionIds: array_map('intval', $data['context_section_ids'] ?? []),
+                mandatoryRule: $this->ruleForSection($section)
             );
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 500);
@@ -177,6 +180,122 @@ class AiAgentController extends Controller
             'message' => 'Generation successful.',
             'html' => $html,
         ]);
+    }
+
+    public function showPromptRule(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'template_set' => 'required|string|max:100',
+            'page_key' => 'required|string|max:100',
+            'field_key' => 'required|string|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $data = $validator->validated();
+        $rule = AiPromptRule::where($data)->first();
+
+        return response()->json(['rule' => $rule?->rule ?? '']);
+    }
+
+    public function savePromptRule(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'template_set' => 'required|string|max:100',
+            'page_key' => 'required|string|max:100',
+            'field_key' => 'required|string|max:255',
+            'rule' => 'nullable|string|max:12000',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $data = $validator->validated();
+        $rule = AiPromptRule::updateOrCreate(
+            [
+                'template_set' => $data['template_set'],
+                'page_key' => $data['page_key'],
+                'field_key' => $data['field_key'],
+            ],
+            ['rule' => trim((string) ($data['rule'] ?? ''))]
+        );
+
+        return response()->json(['rule' => $rule->rule ?? '']);
+    }
+
+    public function generatePageField(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'field_key' => 'required|string|in:title,meta_title,meta_description',
+            'prompt' => 'required|string|min:1|max:12000',
+            'model_key' => 'nullable|string|in:big_main,big_alternate,medium_main,medium_alternate,small_main,small_alternate',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $page = Page::with('site')->find($id);
+        if (!$page) {
+            return response()->json(['error' => 'Page not found'], 404);
+        }
+
+        $config = $this->configs->findForUser((int) $user->id);
+        if (!$config) {
+            return response()->json(['error' => 'AI agent config was not found.'], 422);
+        }
+
+        $data = $validator->validated();
+        $field = $data['field_key'];
+
+        try {
+            $value = $this->aiAgentService->rewriteFieldValue(
+                currentValue: (string) ($page->{$field} ?? ''),
+                prompt: $data['prompt'],
+                fieldPath: "pages.0.{$field}",
+                config: $config,
+                modelKey: $data['model_key'] ?? 'medium_main',
+                mandatoryRule: $this->ruleForPageField($page, $field)
+            );
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+
+        return response()->json(['value' => $value]);
+    }
+
+    private function ruleForSection(Section $section): string
+    {
+        $section->loadMissing('page.site');
+        $templateSet = (string) ($section->page?->site?->template_set ?? '');
+        $pageKey = (string) ($section->page?->template_key ?: $section->page?->slug ?: 'page');
+        $content = is_array($section->content) ? $section->content : [];
+        $module = (string) ($content['module'] ?? $content['module_key'] ?? $section->type);
+
+        return (string) (AiPromptRule::where([
+            'template_set' => $templateSet,
+            'page_key' => $pageKey,
+            'field_key' => "{$module}/module_prompt",
+        ])->value('rule') ?? '');
+    }
+
+    private function ruleForPageField(Page $page, string $field): string
+    {
+        $page->loadMissing('site');
+
+        return (string) (AiPromptRule::where([
+            'template_set' => (string) ($page->site?->template_set ?? ''),
+            'page_key' => (string) ($page->template_key ?: $page->slug ?: 'page'),
+            'field_key' => $field,
+        ])->value('rule') ?? '');
     }
 
     /**

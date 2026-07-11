@@ -4,6 +4,9 @@ import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import TextAlign from '@tiptap/extension-text-align';
 import Underline from '@tiptap/extension-underline';
+import { Table, TableRow } from '@tiptap/extension-table';
+import { TableCell } from '@tiptap/extension-table-cell';
+import { TableHeader } from '@tiptap/extension-table-header';
 
 const editors = new Map();
 const modalState = {
@@ -823,6 +826,10 @@ function buildRawTextNodeMap(rawHtml, editorTexts) {
     return mappedIndexes;
 }
 
+function rawTextNodeSpanHasTable(rawTextNodes, indexes) {
+    return indexes.some((nodeIndex) => rawTextNodes[nodeIndex]?.parentElement?.closest('table'));
+}
+
 function splitTextAcrossRawParts(text, parts) {
     const normalizedText = normalizePatchText(text);
     const previousParts = Array.isArray(parts) ? parts : [];
@@ -1519,6 +1526,10 @@ function createEditor(container) {
             Placeholder.configure({
                 placeholder: 'Edit module HTML content',
             }),
+            Table,
+            TableRow,
+            TableCell,
+            TableHeader,
         ],
         content: getDisplayHtml(annotateRawImages(rawHtml)),
         onUpdate: () => {

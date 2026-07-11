@@ -10,13 +10,23 @@
         ->filter()
         ->unique()
         ->values();
+    $sectionLabelsByPath = $knownSectionPaths
+        ->mapWithKeys(function ($sectionPath) use ($controlsBySection, $fieldsBySection) {
+            $control = $controlsBySection->get($sectionPath);
+            $firstSectionField = $fieldsBySection->get($sectionPath, collect())->first();
+            $module = (string) (($control['module'] ?? '') ?: (is_array($firstSectionField) ? ($firstSectionField['module'] ?? '') : '') ?: $sectionPath);
 
-    $renderField = function (array $field, string $fileName): string {
+            return [(string) $sectionPath => 'SECTION ' . strtoupper(str_replace(['-', '_'], ' ', $module))];
+        });
+
+    $renderField = function (array $field, string $fileName) use ($aiModelOptions, $sectionLabelsByPath): string {
         $rows = (int) ($field['input_rows'] ?? 2);
         $rows = max(2, $rows);
         $path = e((string) ($field['path'] ?? ''));
         $promptPath = e((string) ($field['prompt_path'] ?? $field['path'] ?? ''));
         $file = e($fileName);
+        $sectionPathValue = (string) ($field['section_path'] ?? '');
+        $sectionPath = e($sectionPathValue);
         $label = e((string) ($field['field'] ?? 'Field'));
         $length = (int) ($field['length'] ?? mb_strlen((string) ($field['value'] ?? '')));
         $value = e((string) ($field['value'] ?? ''));
@@ -31,7 +41,7 @@
         $imageClass = trim((string) ($field['image_class'] ?? ''));
         $imageAlt = trim((string) ($field['image_alt'] ?? ''));
 
-        $html = '<div class="ai-prompt-row rounded-md border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800" data-file="' . $file . '" data-path="' . $path . '" data-prompt-path="' . $promptPath . '" data-tag="' . $tag . '" data-attribute="' . $attribute . '">';
+        $html = '<div class="ai-prompt-row rounded-md border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800" data-file="' . $file . '" data-path="' . $path . '" data-prompt-path="' . $promptPath . '" data-section-path="' . $sectionPath . '" data-tag="' . $tag . '" data-attribute="' . $attribute . '">';
         $html .= '<div class="mb-2 text-xs font-medium text-gray-700 dark:text-gray-300">' . $label . ' (<span class="ai-field-length">' . $length . '</span> chars)</div>';
         $html .= '<textarea rows="' . $rows . '" data-default-rows="' . $rows . '" class="ai-manual-input mb-2 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white" placeholder="Edit field value manually">' . $value . '</textarea>';
         if ($isAssetUrl) {
@@ -51,6 +61,35 @@
 
         if ($showPrompt) {
             $html .= '<textarea rows="2" class="ai-prompt-input block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white" placeholder="Instruction for AI to rewrite this field"></textarea>';
+            $html .= '<div class="ai-prompt-model-context-row mt-2">';
+            $html .= '<div class="min-w-0"><label class="block text-xs font-medium text-gray-600 dark:text-gray-300">Model</label><select class="ai-prompt-model-key mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white">';
+            foreach (($aiModelOptions ?? []) as $modelOption) {
+                $optionValue = e((string) ($modelOption['value'] ?? ''));
+                $optionLabel = e((string) ($modelOption['label'] ?? $modelOption['value'] ?? ''));
+                $selected = ((string) ($modelOption['value'] ?? '') === 'medium_main') ? ' selected' : '';
+                $html .= '<option value="' . $optionValue . '"' . $selected . '>' . $optionLabel . '</option>';
+            }
+            $html .= '</select></div>';
+            $html .= '<div class="min-w-0"><label class="block text-xs font-medium text-gray-600 dark:text-gray-300">Context</label><select class="ai-prompt-context-mode mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white">';
+            $html .= '<option value="none" selected>Nothing</option>';
+            $html .= '<option value="previous">Previous section only</option>';
+            $html .= '<option value="next">Next section only</option>';
+            $html .= '<option value="adjacent">Previous and next sections</option>';
+            $html .= '<option value="all">All sections</option>';
+            $html .= '<option value="selected">Selected sections</option>';
+            $html .= '</select></div>';
+            $html .= '</div>';
+            $html .= '<div class="ai-prompt-context-selected mt-3 hidden rounded-md border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900">';
+            $html .= '<div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">';
+            foreach ($sectionLabelsByPath as $contextPath => $contextLabel) {
+                $disabled = $sectionPathValue !== '' && $contextPath === $sectionPathValue ? ' disabled' : '';
+                $disabledClass = $disabled !== '' ? ' opacity-50' : '';
+                $html .= '<label class="flex items-center gap-2 rounded-md border border-gray-200 bg-white p-2 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300' . $disabledClass . '">';
+                $html .= '<input type="checkbox" class="ai-prompt-context-section-checkbox rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" value="' . e((string) $contextPath) . '"' . $disabled . '>';
+                $html .= '<span>' . e((string) $contextLabel) . '</span>';
+                $html .= '</label>';
+            }
+            $html .= '</div></div>';
             $html .= '<label class="mt-2 inline-flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300"><input type="checkbox" class="ai-send-current-value-checkbox rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked><span>Send current value to AI</span></label>';
         } elseif ($promptNotice) {
             $html .= '<div class="text-xs text-gray-500 dark:text-gray-400">Shared AI prompt is attached to the first line of this heading.</div>';
@@ -288,7 +327,7 @@
                                             data-anchor-position="after">
                                         Queue Add Block
                                     </button>
-                                @endif
+	                                @endif
 
                                 <div class="mt-6 border-t border-gray-200 pt-4 dark:border-gray-700">
                                     <div class="mb-3 text-xs font-semibold uppercase text-gray-600 dark:text-gray-300">
@@ -356,6 +395,7 @@
                                         Queue Add Standard Block
                                     </button>
                                 </div>
+
                             </div>
                         </div>
                     @endforeach

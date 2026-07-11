@@ -85,7 +85,7 @@ class AdminPageEditorUiTest extends TestCase
         $response->assertDontSee('Section Type');
     }
 
-    public function test_preview_button_does_not_silently_resave_all_sections(): void
+    public function test_preview_button_saves_sections_and_floating_widget_is_available(): void
     {
         $source = File::get(resource_path('views/admin/pages/edit.blade.php'));
         $this->assertIsString($source);
@@ -93,8 +93,32 @@ class AdminPageEditorUiTest extends TestCase
         preg_match('/async function openPreview\(\) \{(?P<body>.*?)async function applyTemplateToSections\(\)/s', $source, $matches);
 
         $this->assertArrayHasKey('body', $matches);
-        $this->assertStringNotContainsString('saveAllSectionsSilently()', $matches['body']);
+        $this->assertStringContainsString('const sectionsSaved = await saveAllSectionsSilently();', $matches['body']);
         $this->assertStringContainsString("fetch('/api/pages/{{ \$page->id }}/preview-token'", $matches['body']);
+        $this->assertStringContainsString('id="preview-widget-btn"', $source);
+        $this->assertStringContainsString('id="preview-history-btn"', $source);
+        $this->assertStringContainsString('Preview History', $source);
+        $this->assertStringContainsString('/api/pages/{{ $page->id }}/previews', $source);
+        $this->assertStringContainsString('section-history-btn', $source);
+        $this->assertStringContainsString('/api/sections/${sectionId}/history', $source);
+        $this->assertStringContainsString('fixed bottom-6 right-6', $source);
+        $this->assertStringContainsString('dark:bg-indigo-500', $source);
+    }
+
+    public function test_head_meta_editor_shows_empty_row_when_page_has_no_head_meta(): void
+    {
+        $source = File::get(resource_path('views/admin/pages/edit.blade.php'));
+        $this->assertIsString($source);
+
+        preg_match('/<div data-head-meta-list class="space-y-3">(?P<body>.*?)<div class="mt-5 space-y-3">/s', $source, $matches);
+
+        $this->assertArrayHasKey('body', $matches);
+        $this->assertStringContainsString('@empty', $matches['body']);
+        $this->assertStringContainsString('head_meta.new', $matches['body']);
+        $this->assertStringContainsString('data-head-meta-key="name"', $matches['body']);
+        $this->assertStringContainsString('data-head-meta-key="property"', $matches['body']);
+        $this->assertStringContainsString('data-head-meta-key="http_equiv"', $matches['body']);
+        $this->assertStringContainsString('data-head-meta-key="content"', $matches['body']);
     }
 
     public function test_page_editor_preserves_complex_raw_html_when_editing_images(): void

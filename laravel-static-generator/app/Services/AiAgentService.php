@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\AiAgentConfig;
+use App\Models\AiPromptRule;
 use App\Models\Section;
 use App\Support\SiteLayoutContent;
 use DOMDocument;
@@ -15,6 +16,7 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use RuntimeException;
 use Symfony\Component\Yaml\Yaml;
 
@@ -281,10 +283,11 @@ class AiAgentService
         string $prompt,
         string $modelKey = 'medium_main',
         string $contextMode = 'none',
-        array $selectedSectionIds = []
+        array $selectedSectionIds = [],
+        string $mandatoryRule = ''
     ): string {
-        $slot = $this->resolveModelSlot($config, $modelKey);
-        if (!$config->is_active || (trim((string) $config->api_key) === '' && trim((string) ($slot['api_key'] ?? '')) === '')) {
+        $runtimeConfig = $this->runtimeConfigForModelSlot($config, $modelKey);
+        if (!$runtimeConfig->is_active || trim((string) $runtimeConfig->api_key) === '') {
             throw new RuntimeException('AI agent config is not active or API key is missing.');
         }
 
@@ -299,28 +302,12 @@ class AiAgentService
             throw new RuntimeException("AI agent does not have access to site #{$site->id}.");
         }
 
-        $runtimeConfig = clone $config;
-        $runtimeConfig->provider = $slot['provider'];
-        $runtimeConfig->api_base_url = $slot['api_base_url'] !== '' ? $slot['api_base_url'] : null;
-        $runtimeConfig->model_name = $slot['model_name'];
-        if (trim((string) ($slot['api_key'] ?? '')) !== '') {
-            $runtimeConfig->api_key = $slot['api_key'];
-        }
-        foreach (['temperature', 'top_p', 'frequency_penalty', 'presence_penalty'] as $field) {
-            if ($slot[$field] !== null) {
-                $runtimeConfig->{$field} = $slot[$field];
-            }
-        }
-        if ($slot['max_tokens'] !== null) {
-            $runtimeConfig->max_tokens = $slot['max_tokens'];
-        }
-
         $module = $this->sectionModuleName($section);
         $currentHtml = $this->sectionHtml($section);
         $context = $this->buildSectionContext($section, $contextMode, $selectedSectionIds);
 
         $systemMessage = 'You generate or rewrite one webpage module. Return only final valid HTML for this module, without markdown fences, JSON, explanations, or surrounding page layout.';
-        $tone = trim((string) ($slot['tone'] !== '' ? $slot['tone'] : $config->tone));
+        $tone = trim((string) $runtimeConfig->tone);
         if ($tone !== '') {
             $systemMessage .= " Target tone: {$tone}.";
         }
@@ -328,6 +315,9 @@ class AiAgentService
         $userMessage = "Site: {$site->domain}\n";
         $userMessage .= "Page: {$page->slug} / {$page->title}\n";
         $userMessage .= "Current module: {$module}\n";
+        if (trim($mandatoryRule) !== '') {
+            $userMessage .= "Mandatory rule for this field: {$mandatoryRule}\nUser prompt cannot override this rule.\n";
+        }
         $userMessage .= "Instruction:\n{$prompt}\n\n";
         $userMessage .= "Current module HTML:\n{$currentHtml}\n";
         if ($context !== '') {
@@ -336,6 +326,27 @@ class AiAgentService
 
         return $this->layoutContent->sanitizeSectionHtml(
             $this->stripMarkdownFence($this->callConfiguredModel($runtimeConfig, $systemMessage, $userMessage))
+        );
+    }
+
+    public function rewriteFieldValue(
+        string $currentValue,
+        string $prompt,
+        string $fieldPath,
+        AiAgentConfig $config,
+        string $modelKey = 'medium_main',
+        string $mandatoryRule = ''
+    ): string {
+        $runtimeConfig = $this->runtimeConfigForModelSlot($config, $modelKey);
+
+        return $this->rewriteFieldWithAi(
+            currentValue: $currentValue,
+            prompt: $prompt,
+            fieldPath: $fieldPath,
+            config: $runtimeConfig,
+            sendCurrentValue: true,
+            context: '',
+            mandatoryRule: $mandatoryRule
         );
     }
 
@@ -354,6 +365,36 @@ class AiAgentService
         }
 
         return $slots[$modelKey];
+    }
+
+    private function runtimeConfigForModelSlot(AiAgentConfig $config, string $modelKey): AiAgentConfig
+    {
+        if (trim($modelKey) === '') {
+            return clone $config;
+        }
+
+        $slot = $this->resolveModelSlot($config, $modelKey);
+        $runtimeConfig = clone $config;
+        $runtimeConfig->provider = $slot['provider'];
+        $runtimeConfig->api_base_url = $slot['api_base_url'] !== '' ? $slot['api_base_url'] : null;
+        $runtimeConfig->model_name = $slot['model_name'];
+        $runtimeConfig->tone = $slot['tone'] !== '' ? $slot['tone'] : $config->tone;
+
+        if (trim((string) ($slot['api_key'] ?? '')) !== '') {
+            $runtimeConfig->api_key = $slot['api_key'];
+        }
+
+        foreach (['temperature', 'top_p', 'frequency_penalty', 'presence_penalty'] as $field) {
+            if ($slot[$field] !== null) {
+                $runtimeConfig->{$field} = $slot[$field];
+            }
+        }
+
+        if ($slot['max_tokens'] !== null) {
+            $runtimeConfig->max_tokens = $slot['max_tokens'];
+        }
+
+        return $runtimeConfig;
     }
 
     private function nullableFloat(mixed $value): ?float
@@ -439,6 +480,61 @@ class AiAgentService
             ->implode("\n\n---\n\n");
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $item
+     */
+    private function buildYamlFieldContext(array $data, array $item): string
+    {
+        $contextMode = strtolower(trim((string) ($item['context_mode'] ?? 'none')));
+        if ($contextMode === '' || $contextMode === 'none') {
+            return '';
+        }
+
+        $sections = Arr::get($data, 'pages.0.sections');
+        if (!is_array($sections) || $sections === []) {
+            return '';
+        }
+
+        $currentIndex = null;
+        if (preg_match('/^pages\.0\.sections\.(\d+)\./', (string) ($item['path'] ?? ''), $matches)) {
+            $currentIndex = (int) $matches[1];
+        }
+
+        $selectedPaths = array_flip($this->normalizeStringList($item['context_section_paths'] ?? []));
+        $selected = [];
+
+        foreach ($sections as $index => $section) {
+            if (!is_array($section)) {
+                continue;
+            }
+
+            $sectionPath = "pages.0.sections.{$index}";
+            $include = match ($contextMode) {
+                'previous' => $currentIndex !== null && $index === $currentIndex - 1,
+                'next' => $currentIndex !== null && $index === $currentIndex + 1,
+                'adjacent' => $currentIndex !== null && in_array($index, [$currentIndex - 1, $currentIndex + 1], true),
+                'all' => $currentIndex === null || $index !== $currentIndex,
+                'selected' => isset($selectedPaths[$sectionPath]) && ($currentIndex === null || $index !== $currentIndex),
+                default => false,
+            };
+
+            if (!$include) {
+                continue;
+            }
+
+            $rawHtml = $section['raw_html'] ?? '';
+            if (!is_string($rawHtml) || trim($rawHtml) === '') {
+                continue;
+            }
+
+            $module = (string) ($section['module'] ?? $section['module_key'] ?? "section-{$index}");
+            $selected[] = "Section {$sectionPath} ({$module}):\n" . $this->layoutContent->sanitizeSectionHtml($rawHtml);
+        }
+
+        return implode("\n\n---\n\n", $selected);
+    }
+
     private function stripMarkdownFence(string $value): string
     {
         $value = trim($value);
@@ -450,13 +546,32 @@ class AiAgentService
     }
 
     /**
+     * @return array<int, string>
+     */
+    public function listTemplateFileNames(string $sourceDomain): array
+    {
+        $sourceDirectory = $this->resolveSourceDirectory($sourceDomain);
+        $files = array_map('basename', glob($sourceDirectory . '/*-raw_html.md') ?: []);
+        sort($files);
+
+        return $files;
+    }
+
+    /**
      * @return array<int, array{file:string,page_fields:array<int, array<string, mixed>>,section_fields:array<int, array<string, mixed>>,section_block_controls:array<int, array<string, mixed>>}>
      */
-    public function listTemplateFields(string $sourceDomain): array
+    public function listTemplateFields(string $sourceDomain, ?string $onlyFile = null): array
     {
         $sourceDirectory = $this->resolveSourceDirectory($sourceDomain);
         $files = glob($sourceDirectory . '/*-raw_html.md') ?: [];
         sort($files);
+        $onlyFile = $onlyFile !== null ? basename($onlyFile) : null;
+        if ($onlyFile !== null && $onlyFile !== '') {
+            $files = array_values(array_filter(
+                $files,
+                static fn (string $file): bool => basename($file) === $onlyFile
+            ));
+        }
 
         $catalog = [];
 
@@ -789,7 +904,7 @@ class AiAgentService
             ];
         }
 
-        if (!$config || !$config->is_active || trim((string) $config->api_key) === '') {
+        if (!$config || !$config->is_active) {
             throw new RuntimeException('AI agent config is not active or API key is missing.');
         }
 
@@ -845,6 +960,7 @@ class AiAgentService
             $insertionAnchorMap = [];
 
             foreach ($items as $item) {
+                $mandatoryRule = $this->promptRuleForYamlPath($data, $item['path']);
                 $headExtraVirtualPath = $this->parseHeadExtraScriptVirtualPath($item['path']);
                 if ($headExtraVirtualPath !== null) {
                     $headExtra = Arr::get($data, $headExtraVirtualPath['head_extra_path']);
@@ -881,8 +997,10 @@ class AiAgentService
                             currentValue: $currentValue,
                             prompt: $item['prompt'],
                             fieldPath: $item['path'],
-                            config: $config,
-                            sendCurrentValue: $item['send_current_value'] ?? true
+                            config: $this->runtimeConfigForModelSlot($config, $item['model_key'] ?? 'medium_main'),
+                            sendCurrentValue: $item['send_current_value'] ?? true,
+                            context: $this->buildYamlFieldContext($data, $item),
+                            mandatoryRule: $mandatoryRule
                         );
                     } catch (\Throwable $e) {
                         Log::error('ai.apply_prompts.field.failed', [
@@ -966,8 +1084,10 @@ class AiAgentService
                             currentValue: $currentValue,
                             prompt: $item['prompt'],
                             fieldPath: $item['path'],
-                            config: $config,
-                            sendCurrentValue: $item['send_current_value'] ?? true
+                            config: $this->runtimeConfigForModelSlot($config, $item['model_key'] ?? 'medium_main'),
+                            sendCurrentValue: $item['send_current_value'] ?? true,
+                            context: $this->buildYamlFieldContext($data, $item),
+                            mandatoryRule: $mandatoryRule
                         );
                     } catch (\Throwable $e) {
                         Log::error('ai.apply_prompts.field.failed', [
@@ -1036,8 +1156,10 @@ class AiAgentService
                         currentValue: $currentValue,
                         prompt: $item['prompt'],
                         fieldPath: $item['path'],
-                        config: $config,
-                        sendCurrentValue: $item['send_current_value'] ?? true
+                        config: $this->runtimeConfigForModelSlot($config, $item['model_key'] ?? 'medium_main'),
+                        sendCurrentValue: $item['send_current_value'] ?? true,
+                        context: $this->buildYamlFieldContext($data, $item),
+                        mandatoryRule: $mandatoryRule
                     );
                 } catch (\Throwable $e) {
                     Log::error('ai.apply_prompts.field.failed', [
@@ -1467,8 +1589,14 @@ class AiAgentService
         string $prompt,
         string $fieldPath,
         AiAgentConfig $config,
-        bool $sendCurrentValue = true
+        bool $sendCurrentValue = true,
+        string $context = '',
+        string $mandatoryRule = ''
     ): string {
+        if (!$config->is_active || trim((string) $config->api_key) === '') {
+            throw new RuntimeException('AI agent config is not active or API key is missing.');
+        }
+
         $isHtmlField = str_ends_with($fieldPath, '.raw_html');
         $isJsonLdScriptField = str_contains($fieldPath, '.og_data.head_extra.__script__.');
         $isMetaTitleField = str_ends_with($fieldPath, '.meta_title');
@@ -1494,9 +1622,15 @@ class AiAgentService
         }
 
         $userMessage = "Field path: {$fieldPath}\n";
+        if (trim($mandatoryRule) !== '') {
+            $userMessage .= "Mandatory rule for this field: {$mandatoryRule}\nUser prompt cannot override this rule.\n";
+        }
         $userMessage .= "Instruction: {$prompt}\n";
         if ($sendCurrentValue) {
             $userMessage .= "Current value:\n{$currentValue}";
+        }
+        if (trim($context) !== '') {
+            $userMessage .= "\n\nContext from other sections in this import file:\n{$context}";
         }
 
         $generatedValue = $this->callConfiguredModel($config, $systemMessage, $userMessage);
@@ -1506,6 +1640,43 @@ class AiAgentService
         }
 
         return $this->stripWrappingQuotes($generatedValue);
+    }
+
+    private function promptRuleForYamlPath(array $data, string $path): string
+    {
+        $templateSet = trim((string) ($data['template'] ?? $data['template_set'] ?? ''));
+        if ($templateSet === '') {
+            return '';
+        }
+
+        $pageKey = 'page';
+        if (preg_match('/^pages\.(\d+)\./', $path, $pageMatches) === 1) {
+            $page = Arr::get($data, "pages.{$pageMatches[1]}");
+            if (is_array($page)) {
+                $pageKey = trim((string) ($page['template_key'] ?? $page['slug'] ?? 'page')) ?: 'page';
+            }
+        }
+
+        $fieldKey = trim((string) Str::of($path)->afterLast('.'));
+        if (preg_match('/^pages\.(\d+)\.sections\.(\d+)\./', $path, $sectionMatches) === 1) {
+            $section = Arr::get($data, "pages.{$sectionMatches[1]}.sections.{$sectionMatches[2]}");
+            if (is_array($section)) {
+                $module = trim((string) ($section['module'] ?? $section['module_key'] ?? ''));
+                if ($module !== '') {
+                    $fieldKey = "{$module}/module_prompt";
+                }
+            }
+        }
+
+        if ($fieldKey === '') {
+            return '';
+        }
+
+        return (string) (AiPromptRule::where([
+            'template_set' => $templateSet,
+            'page_key' => $pageKey,
+            'field_key' => $fieldKey,
+        ])->value('rule') ?? '');
     }
 
     private function stripWrappingQuotes(string $value): string
@@ -2181,7 +2352,7 @@ class AiAgentService
 
     /**
      * @param  array<int, array{file?:string,path?:string,prompt?:string}>  $fieldPrompts
-     * @return array<int, array{file:string,path:string,prompt:string,send_current_value:bool}>
+     * @return array<int, array{file:string,path:string,prompt:string,send_current_value:bool,model_key:string,context_mode:string,context_section_paths:array<int,string>}>
      */
     private function normalizeFieldPrompts(array $fieldPrompts): array
     {
@@ -2204,6 +2375,11 @@ class AiAgentService
                 continue;
             }
 
+            $contextMode = strtolower(trim((string) ($item['context_mode'] ?? 'none')));
+            if (!in_array($contextMode, ['none', 'previous', 'next', 'adjacent', 'all', 'selected'], true)) {
+                $contextMode = 'none';
+            }
+
             $normalized[] = [
                 'file' => $file,
                 'path' => $path,
@@ -2211,6 +2387,9 @@ class AiAgentService
                 'send_current_value' => array_key_exists('send_current_value', $item)
                     ? filter_var($item['send_current_value'], FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? false
                     : true,
+                'model_key' => trim((string) ($item['model_key'] ?? '')),
+                'context_mode' => $contextMode,
+                'context_section_paths' => $this->normalizeStringList($item['context_section_paths'] ?? []),
             ];
         }
 
@@ -3280,7 +3459,7 @@ class AiAgentService
 
     private function shouldExtractRawHtmlTextFields(string $fileName, string $field): bool
     {
-        return $fileName === self::RAW_HTML_TEXT_SCOPE_FILE && $field === 'raw_html';
+        return str_ends_with($fileName, '-raw_html.md') && $field === 'raw_html';
     }
 
     private function shouldHideSectionFromEditing(string $module): bool

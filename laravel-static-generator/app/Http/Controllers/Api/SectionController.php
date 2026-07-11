@@ -6,6 +6,7 @@ use App\Contracts\AuditLogServiceInterface;
 use App\Contracts\SectionServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Models\Section;
+use App\Models\SectionHistory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -93,6 +94,17 @@ class SectionController extends Controller
 
         try {
             $oldValues = $section->toArray();
+            if ($request->has('content')) {
+                SectionHistory::create([
+                    'section_id' => $section->id,
+                    'page_id' => $section->page_id,
+                    'type' => $section->type,
+                    'content' => $section->content ?? [],
+                    'order' => (int) $section->order,
+                ]);
+                $this->pruneSectionHistory($section->id);
+            }
+
             $section = $this->sections->update($section, $validator->validated());
             
             $this->audit->log('section.updated', Section::class, $section->id, $oldValues, $section->toArray());
@@ -116,6 +128,63 @@ class SectionController extends Controller
         $this->sections->delete($section);
 
         return response()->json(['message' => 'Section deleted successfully']);
+    }
+
+    public function history(int $id): JsonResponse
+    {
+        $section = Section::find($id);
+
+        if (!$section) {
+            return response()->json(['error' => 'Section not found'], 404);
+        }
+
+        $histories = SectionHistory::where('section_id', $section->id)
+            ->orderByDesc('created_at')
+            ->limit(10)
+            ->get()
+            ->map(fn (SectionHistory $history) => [
+                'id' => $history->id,
+                'label' => 'Saved ' . ($history->created_at?->toDateTimeString() ?? ''),
+                'created_at' => $history->created_at?->toDateTimeString(),
+            ]);
+
+        return response()->json(['histories' => $histories]);
+    }
+
+    public function restoreHistory(int $id, int $historyId): JsonResponse
+    {
+        $section = Section::find($id);
+
+        if (!$section) {
+            return response()->json(['error' => 'Section not found'], 404);
+        }
+
+        $history = SectionHistory::where('section_id', $section->id)->find($historyId);
+
+        if (!$history) {
+            return response()->json(['error' => 'History item not found'], 404);
+        }
+
+        $oldValues = $section->toArray();
+
+        SectionHistory::create([
+            'section_id' => $section->id,
+            'page_id' => $section->page_id,
+            'type' => $section->type,
+            'content' => $section->content ?? [],
+            'order' => (int) $section->order,
+        ]);
+        $this->pruneSectionHistory($section->id);
+
+        $section = $this->sections->update($section, [
+            'type' => $history->type,
+            'content' => $history->content,
+            'order' => (int) $history->order,
+        ]);
+
+        $this->audit->log('section.restored', Section::class, $section->id, $oldValues, $section->toArray());
+
+        return response()->json($section);
     }
 
     public function storeGeneratedBackgroundOverride(Request $request, int $id): JsonResponse
@@ -240,5 +309,18 @@ class SectionController extends Controller
             'avif' => 'image/avif',
             default => null,
         };
+    }
+
+    private function pruneSectionHistory(int $sectionId): void
+    {
+        $keepIds = SectionHistory::where('section_id', $sectionId)
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->limit(10)
+            ->pluck('id');
+
+        SectionHistory::where('section_id', $sectionId)
+            ->whereNotIn('id', $keepIds)
+            ->delete();
     }
 }
