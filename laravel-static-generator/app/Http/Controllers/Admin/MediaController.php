@@ -80,13 +80,6 @@ class MediaController extends Controller
             }
         }
 
-        foreach (Storage::disk('generated')->directories('preview') as $previewDirectory) {
-            $candidatePath = trim($previewDirectory, '/') . '/' . $normalizedPath;
-            if (Storage::disk('generated')->exists($candidatePath)) {
-                return ['generated', $candidatePath];
-            }
-        }
-
         return [null, null];
     }
 

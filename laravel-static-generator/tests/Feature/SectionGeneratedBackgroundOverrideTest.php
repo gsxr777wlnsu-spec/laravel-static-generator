@@ -22,13 +22,17 @@ class SectionGeneratedBackgroundOverrideTest extends TestCase
         parent::setUp();
 
         $generatedRoot = '/tmp/laravel-static-generator-tests/generated-' . Str::uuid();
+        $sitesRoot = '/tmp/laravel-static-generator-tests/sites-' . Str::uuid();
         File::ensureDirectoryExists($generatedRoot);
+        File::ensureDirectoryExists($sitesRoot);
 
         config()->set('filesystems.disks.generated.root', $generatedRoot);
+        config()->set('filesystems.disks.sites.root', $sitesRoot);
         Storage::forgetDisk('generated');
+        Storage::forgetDisk('sites');
     }
 
-    public function test_it_stores_generated_only_background_override_for_section(): void
+    public function test_it_persists_background_override_for_section(): void
     {
         $admin = User::factory()->create();
         $site = Site::create([
@@ -75,6 +79,24 @@ class SectionGeneratedBackgroundOverrideTest extends TestCase
             ->assertJsonPath('asset_url', '/assets/images/hero/hero-background.webp');
 
         Storage::disk('generated')->assertExists("site{$site->id}/assets/images/hero/hero-background.webp");
+        Storage::disk('sites')->assertExists("{$site->id}/assets/images/hero/hero-background.webp");
+        $this->assertSame(
+            Storage::disk('generated')->get("site{$site->id}/assets/images/hero/hero-background.webp"),
+            Storage::disk('sites')->get("{$site->id}/assets/images/hero/hero-background.webp")
+        );
+
+        Storage::disk('generated')->put("site{$site->id}/assets/css/style.css", 'body {}');
+        Storage::disk('generated')->put("site{$site->id}/assets/js/main.js", '');
+        Storage::disk('generated')->put("site{$site->id}/assets/images/hero/hero-background.webp", 'stale-background');
+
+        $previewResponse = $this->actingAs($admin)->postJson("/api/pages/{$page->id}/preview-token");
+        $previewResponse->assertOk();
+        preg_match('#^/api/preview/([^/]+)/#', (string) $previewResponse->json('preview_url'), $matches);
+
+        $this->assertSame(
+            Storage::disk('sites')->get("{$site->id}/assets/images/hero/hero-background.webp"),
+            Storage::disk('generated')->get("preview/{$matches[1]}/assets/images/hero/hero-background.webp")
+        );
     }
 
     public function test_it_rejects_mime_extension_mismatch_for_generated_background_override(): void

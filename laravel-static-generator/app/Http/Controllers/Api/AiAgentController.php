@@ -234,9 +234,12 @@ class AiAgentController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'field_key' => 'required|string|in:title,meta_title,meta_description',
+            'field_key' => ['required', 'string', 'regex:/^(title|meta_title|meta_description|head_meta\.(3|4)\.content)$/'],
             'prompt' => 'required|string|min:1|max:12000',
             'model_key' => 'nullable|string|in:big_main,big_alternate,medium_main,medium_alternate,small_main,small_alternate',
+            'context_mode' => 'nullable|string|in:none,all,selected',
+            'context_section_ids' => 'nullable|array',
+            'context_section_ids.*' => 'integer|min:1',
         ]);
 
         if ($validator->fails()) {
@@ -255,21 +258,57 @@ class AiAgentController extends Controller
 
         $data = $validator->validated();
         $field = $data['field_key'];
+        $currentValue = $this->pageFieldValue($page, $field);
 
         try {
             $value = $this->aiAgentService->rewriteFieldValue(
-                currentValue: (string) ($page->{$field} ?? ''),
+                currentValue: $currentValue,
                 prompt: $data['prompt'],
                 fieldPath: "pages.0.{$field}",
                 config: $config,
                 modelKey: $data['model_key'] ?? 'medium_main',
-                mandatoryRule: $this->ruleForPageField($page, $field)
+                mandatoryRule: $this->ruleForPageField($page, $field),
+                context: $this->pageFieldContext(
+                    $page,
+                    $data['context_mode'] ?? 'none',
+                    array_map('intval', $data['context_section_ids'] ?? [])
+                )
             );
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }
 
         return response()->json(['value' => $value]);
+    }
+
+    private function pageFieldValue(Page $page, string $field): string
+    {
+        if (preg_match('/^head_meta\.(\d+)\.content$/', $field, $matches)) {
+            return (string) data_get($page->og_data, "head_meta.{$matches[1]}.content", '');
+        }
+
+        return (string) ($page->{$field} ?? '');
+    }
+
+    /** @param array<int, int> $selectedSectionIds */
+    private function pageFieldContext(Page $page, string $mode, array $selectedSectionIds): string
+    {
+        if ($mode === 'none') {
+            return '';
+        }
+
+        $sections = $page->sections()->orderBy('order')->get();
+        if ($mode === 'selected') {
+            $sections = $sections->filter(fn (Section $section) => in_array((int) $section->id, $selectedSectionIds, true));
+        }
+
+        return $sections->map(function (Section $section): string {
+            $content = is_array($section->content) ? $section->content : [];
+            $html = (string) ($content['raw_html'] ?? $section->raw_html ?? '');
+            $module = (string) ($section->module ?? $content['module'] ?? $content['module_key'] ?? $section->type);
+
+            return "Module #{$section->id} ({$module}):\n{$html}";
+        })->implode("\n\n---\n\n");
     }
 
     private function ruleForSection(Section $section): string

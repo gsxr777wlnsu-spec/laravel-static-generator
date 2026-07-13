@@ -79,6 +79,9 @@ class AdminPageEditorUiTest extends TestCase
         $response->assertSee('Medium main');
         $response->assertSee('Previous and next modules');
         $response->assertSee('Generate');
+        $response->assertSee('data-collapsible-target="#page-settings-panel"', false);
+        $response->assertSee('data-collapsible-target="#section-head-panel"', false);
+        $response->assertSee('section-collapsible-body', false);
         $response->assertDontSee('Legacy Menu');
         $response->assertDontSee('Legacy Mobile');
         $response->assertDontSee('Add Section');
@@ -131,20 +134,44 @@ class AdminPageEditorUiTest extends TestCase
         $this->assertStringContainsString('data-raw-image-index', $source);
         $this->assertStringContainsString('function patchRawImageAttributes(state, rawImageIndex, attrs)', $source);
         $this->assertStringContainsString('function generatedBackgroundOverrideConfig(target)', $source);
-        $this->assertStringContainsString('function uploadGeneratedBackgroundOverride(sectionId, targetPath, file)', $source);
+        $this->assertStringContainsString("function uploadGeneratedBackgroundOverride(sectionId, targetPath, file = null, sourcePath = '')", $source);
         $this->assertStringContainsString('function syntheticBackgroundTargets(moduleKey)', $source);
         $this->assertStringContainsString('function ensureBackgroundStyleOverride(rawHtml, target, nextUrl)', $source);
         $this->assertStringContainsString('function patchRawTextNodesFromEditor(state)', $source);
         $this->assertStringContainsString('function normalizePatchText(text)', $source);
         $this->assertStringContainsString('function findRawTextNodeSpan(rawTextNodes, searchOffset, text)', $source);
         $this->assertStringContainsString('function splitTextAcrossRawParts(text, parts)', $source);
+        $this->assertStringContainsString('function patchDeletedRawTextNodes(state, previousTexts, nextTexts)', $source);
+        $this->assertStringContainsString('rawTextNodes[rawIndex].textContent = \'\';', $source);
+        $this->assertStringContainsString('if (patchDeletedRawTextNodes(state, previousTexts, nextTexts))', $source);
         $this->assertStringContainsString('function buildRawTextNodeMap(rawHtml, editorTexts)', $source);
+        $this->assertStringContainsString("const TitleAccent = Mark.create({", $source);
+        $this->assertStringContainsString("tag: 'span.title--accent'", $source);
+        $this->assertStringContainsString("class: 'title--accent'", $source);
+        $this->assertStringContainsString('TitleAccent,', $source);
         $this->assertStringContainsString('normalizePatchText(node.textContent) === normalizedText', $source);
         $this->assertStringContainsString('mappedEntry = findRawTextNodeSpan(rawTextNodes, searchOffset, text) || -1;', $source);
         $this->assertStringContainsString('rawTextNodes[nodeIndex].textContent = nextParts[partIndex] || \'\';', $source);
         $this->assertStringContainsString('state.rawTextNodeMap = buildRawTextNodeMap(state.originalRawHtml, nextTexts)', $source);
         $this->assertStringContainsString('rawTextNodes[rawIndex].textContent = text', $source);
         $this->assertStringContainsString('state.preserveRawHtml ? state.originalRawHtml : getEditorHtml(state.editor)', $source);
+    }
+
+    public function test_head_ai_fields_include_module_context_controls(): void
+    {
+        $source = File::get(resource_path('views/admin/pages/edit.blade.php'));
+
+        $this->assertStringContainsString('data-page-ai-field="head_meta.{{ $metaIndex }}.content"', $source);
+        $this->assertStringContainsString('function initializePageAiContext(container)', $source);
+        $this->assertStringContainsString('class="page-ai-context-mode', $source);
+        $this->assertStringContainsString('class="page-ai-context-section-checkbox', $source);
+        $this->assertStringContainsString('context_mode: container.querySelector(\'.page-ai-context-mode\')?.value', $source);
+        $this->assertStringContainsString('context_section_ids: selectedSectionIds', $source);
+        $this->assertStringContainsString('function getPageAiTarget(field)', $source);
+        $this->assertStringContainsString("setInlineButtonBusy(button, true, 'Generating…')", $source);
+        $this->assertStringContainsString('class="h-4 w-4 animate-spin"', $source);
+        $this->assertStringContainsString('function renderAiGenerateError(button, message)', $source);
+        $this->assertStringContainsString('ai-generate-inline-error', $source);
     }
 
     public function test_page_editor_visual_mode_covers_text_and_image_saves_for_complex_sections(): void

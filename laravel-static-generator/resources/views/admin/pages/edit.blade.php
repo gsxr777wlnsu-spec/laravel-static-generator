@@ -98,9 +98,17 @@
     <form id="page-form" class="space-y-6">
         <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
             <div class="px-4 py-5 sm:p-6">
-                <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Page Settings</h3>
+                <div class="mb-4 flex items-center justify-between gap-3">
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">Page Settings</h3>
+                    <button type="button"
+                            data-collapsible-toggle
+                            data-collapsible-target="#page-settings-panel"
+                            class="inline-flex cursor-pointer items-center rounded-md bg-white px-2 py-1 text-xs font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-100 dark:ring-gray-600 dark:hover:bg-gray-600">
+                        Collapse
+                    </button>
+                </div>
 
-                <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <div id="page-settings-panel" class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Slug</label>
                         <input type="text" name="slug" value="{{ $page->slug }}" required
@@ -167,8 +175,15 @@
 	                                <h4 class="text-base font-semibold text-gray-900 dark:text-white">SECTION HEAD</h4>
 	                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Editable fields follow the same paths as the import .txt template.</p>
 	                            </div>
+                                <button type="button"
+                                        data-collapsible-toggle
+                                        data-collapsible-target="#section-head-panel"
+                                        class="inline-flex cursor-pointer items-center rounded-md bg-white px-2 py-1 text-xs font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-100 dark:ring-gray-600 dark:hover:bg-gray-600">
+                                    Collapse
+                                </button>
 	                        </div>
 
+                            <div id="section-head-panel">
 		                        <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
 		                            <div>
 		                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">title</label>
@@ -289,6 +304,19 @@
 	                                                       class="mt-1 block w-full rounded-md border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white">
 	                                            </div>
 	                                        </div>
+                                            @if(in_array($metaIndex, [3, 4], true))
+                                                <div class="mt-3" data-page-ai-field="head_meta.{{ $metaIndex }}.content">
+                                                    <textarea rows="2" class="page-ai-prompt mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm sm:text-sm" placeholder="AI Prompt"></textarea>
+                                                    <div class="mt-2 flex items-center gap-2">
+                                                        <button type="button" class="page-ai-generate-btn inline-flex cursor-pointer items-center rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-500">Generate</button>
+                                                        <select class="page-ai-model block rounded-md border-gray-300 text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                                                            @foreach(($aiModelOptions ?? []) as $modelOption)
+                                                                <option value="{{ $modelOption['value'] }}" {{ $modelOption['value'] === 'medium_main' ? 'selected' : '' }}>{{ $modelOption['label'] }}</option>
+                                                            @endforeach
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            @endif
 	                                    </div>
 	                                @empty
 		                                    <div data-head-meta-row class="rounded-md border border-gray-200 p-3 dark:border-gray-700">
@@ -394,6 +422,7 @@
 	                                      class="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 font-mono text-sm text-gray-700 shadow-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200">{{ $page->og_data ? json_encode($page->og_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : '' }}</textarea>
 	                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Generated from SECTION HEAD fields before save.</p>
 	                        </div>
+                            </div>
 	                    </div>
 
                     <div>
@@ -456,12 +485,25 @@
 
             <div class="space-y-4">
                 @forelse($page->sections as $section)
-                <div class="rounded-md border border-gray-200 dark:border-gray-700 p-4 section-item" data-section-id="{{ $section->id }}">
                     @php
                         $moduleKey = is_array($section->content ?? null)
                             ? ($section->content['module'] ?? $section->content['module_key'] ?? 'module')
                             : 'module';
                     @endphp
+                <div class="rounded-md border border-gray-200 dark:border-gray-700 p-4 section-item" data-section-id="{{ $section->id }}" data-module-key="{{ $moduleKey }}">
+                    <div class="mb-4 flex items-center justify-between gap-3">
+                        <div>
+                            <h4 class="text-base font-semibold text-gray-900 dark:text-white">Module: {{ $moduleKey }}</h4>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Section #{{ $section->id }}</p>
+                        </div>
+                        <button type="button"
+                                data-collapsible-toggle
+                                data-collapsible-target="#section-panel-{{ $section->id }}"
+                                class="inline-flex cursor-pointer items-center rounded-md bg-white px-2 py-1 text-xs font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-100 dark:ring-gray-600 dark:hover:bg-gray-600">
+                            Collapse
+                        </button>
+                    </div>
+                    <div id="section-panel-{{ $section->id }}" class="section-collapsible-body">
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
                         <div class="sm:col-span-2">
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Module</label>
@@ -636,6 +678,7 @@
                         </div>
                         <div class="section-history-status hidden rounded-md border px-3 py-2 text-sm"></div>
                         <div class="section-history-list space-y-2"></div>
+                    </div>
                     </div>
                 </div>
                 @empty
@@ -937,6 +980,16 @@ function parseLooseJsonObject(value) {
 
 function getHeadPageField(field) {
     return document.querySelector(`[data-head-page-field="${field}"]`);
+}
+
+function getPageAiTarget(field) {
+    const headMetaMatch = String(field || '').match(/^head_meta\.(\d+)\.content$/);
+    if (headMetaMatch) {
+        const row = document.querySelectorAll('[data-head-meta-row]')[Number(headMetaMatch[1])];
+        return row?.querySelector('[data-head-meta-key="content"]') || null;
+    }
+
+    return getHeadPageField(field);
 }
 
 function collectHeadRows(rowSelector, keySelector) {
@@ -1340,6 +1393,7 @@ async function saveSection(sectionId, container, options = {}) {
         renderPageEditStatus(`Module #${sectionId} saved at ${currentSaveTime()}.`, 'success');
         setInlineButtonBusy(button, false);
     }
+    await commitPendingPrompt(container);
     return true;
 }
 
@@ -1576,15 +1630,22 @@ async function saveAiPromptRule(details) {
 }
 
 async function generatePageAiField(container) {
+    const button = container.querySelector('.page-ai-generate-btn');
     const fieldKey = container.dataset.pageAiField || '';
     const prompt = container.querySelector('.page-ai-prompt')?.value.trim() || '';
     if (!fieldKey || prompt === '') {
+        renderAiGenerateError(button, 'AI prompt cannot be empty.');
         renderPageEditStatus('AI prompt cannot be empty.', 'error');
         return;
     }
 
+    renderAiGenerateError(button, '');
+    setInlineButtonBusy(button, true, 'Generating…');
     renderPageEditStatus(`Generating ${fieldKey}...`, 'warning');
 
+    const selectedSectionIds = Array.from(container.querySelectorAll('.page-ai-context-section-checkbox:checked'))
+        .map((checkbox) => Number(checkbox.value))
+        .filter((value) => Number.isInteger(value) && value > 0);
     const response = await fetch('/api/ai-agent/pages/{{ $page->id }}/field/generate', {
         method: 'POST',
         headers: {
@@ -1598,17 +1659,23 @@ async function generatePageAiField(container) {
             field_key: fieldKey,
             prompt,
             model_key: container.querySelector('.page-ai-model')?.value || 'medium_main',
+            context_mode: container.querySelector('.page-ai-context-mode')?.value || 'none',
+            context_section_ids: selectedSectionIds,
         }),
     });
 
     const result = await readApiResponse(response);
     if (!response.ok) {
         const message = result.errors ? JSON.stringify(result.errors) : (result.error || result.message || `Request failed with status ${response.status}`);
+        renderAiGenerateError(button, message);
+        setInlineButtonBusy(button, false);
         renderPageEditStatus('Error: ' + message, 'error');
         return;
     }
 
-    const field = getHeadPageField(fieldKey);
+    container.dataset.pendingAiPrompt = prompt;
+
+    const field = getPageAiTarget(fieldKey);
     if (field) {
         field.value = result.value || '';
         field.dispatchEvent(new Event('input', { bubbles: true }));
@@ -1616,12 +1683,48 @@ async function generatePageAiField(container) {
     }
 
     renderPageEditStatus(`${fieldKey} generated. Review it, then save the page.`, 'success');
+    setInlineButtonBusy(button, false);
+}
+
+function initializePageAiContext(container) {
+    if (container.querySelector('.page-ai-context-mode')) {
+        return;
+    }
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'mt-2';
+    wrapper.innerHTML = `
+        <label class="block text-xs font-medium text-gray-600 dark:text-gray-300">Context</label>
+        <select class="page-ai-context-mode mt-1 block w-full rounded-md border-gray-300 text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+            <option value="none" selected>Nothing</option>
+            <option value="all">All modules</option>
+            <option value="selected">Selected modules</option>
+        </select>
+        <div class="page-ai-context-selected mt-2 hidden grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            @foreach($page->sections as $contextSection)
+                @php
+                    $headContextModuleKey = is_array($contextSection->content ?? null)
+                        ? ($contextSection->content['module'] ?? $contextSection->content['module_key'] ?? 'module')
+                        : 'module';
+                @endphp
+                <label class="flex items-center gap-2 rounded-md border border-gray-200 bg-white p-2 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                    <input type="checkbox" class="page-ai-context-section-checkbox rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" value="{{ $contextSection->id }}">
+                    <span>#{{ $contextSection->order + 1 }} {{ $headContextModuleKey }}</span>
+                </label>
+            @endforeach
+        </div>
+    `;
+    container.appendChild(wrapper);
+    wrapper.querySelector('.page-ai-context-mode')?.addEventListener('change', (event) => {
+        wrapper.querySelector('.page-ai-context-selected')?.classList.toggle('hidden', event.currentTarget.value !== 'selected');
+    });
 }
 
 async function generateSectionContent(sectionId, container, button) {
     const promptInput = container.querySelector('.ai-section-prompt');
     const prompt = promptInput?.value.trim() || '';
     if (prompt === '') {
+        renderAiGenerateError(button, 'AI prompt cannot be empty.');
         renderPageEditStatus('AI prompt cannot be empty.', 'error');
         return;
     }
@@ -1631,7 +1734,8 @@ async function generateSectionContent(sectionId, container, button) {
         .map((checkbox) => Number(checkbox.value))
         .filter((value) => Number.isInteger(value) && value > 0);
 
-    setInlineButtonBusy(button, true);
+    renderAiGenerateError(button, '');
+    setInlineButtonBusy(button, true, 'Generating…');
     renderPageEditStatus(`Generating module #${sectionId}…`, 'warning');
 
     const response = await fetch(`/api/ai-agent/sections/${sectionId}/generate`, {
@@ -1654,14 +1758,107 @@ async function generateSectionContent(sectionId, container, button) {
     const result = await readApiResponse(response);
     if (!response.ok) {
         const message = result.errors ? JSON.stringify(result.errors) : (result.error || result.message || `Request failed with status ${response.status}`);
+        renderAiGenerateError(button, message);
         renderPageEditStatus('Error: ' + message, 'error');
         setInlineButtonBusy(button, false);
         return;
     }
 
+    container.dataset.pendingAiPrompt = prompt;
+
     setGeneratedSectionHtml(container, result.html || '');
     renderPageEditStatus(`Module #${sectionId} generated. Review it, then save the module.`, 'success');
     setInlineButtonBusy(button, false);
+}
+
+function promptHistoryScope(container) {
+    const section = container.closest('.section-item');
+    const fieldKey = container.dataset.pageAiField || 'module_prompt';
+
+    return {
+        template_set: @json((string) ($site->template_set ?? 'base')),
+        page_key: @json((string) ($page->template_key ?: $page->slug ?: 'page')),
+        module_key: section?.dataset.moduleKey || 'head',
+        locale: @json((string) ($page->locale ?? 'en')),
+        field_key: fieldKey,
+    };
+}
+
+async function promptHistoryRequest(path, method, payload = null) {
+    const query = method === 'GET' ? `?${new URLSearchParams(payload).toString()}` : '';
+    const response = await fetch(`/api/ai-prompt-history${path}${query}`, {
+        method,
+        headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': getCsrfToken(),
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        credentials: 'same-origin',
+        body: method === 'GET' ? null : JSON.stringify(payload),
+    });
+    const result = await readApiResponse(response);
+    if (!response.ok) throw new Error(result.error || result.message || 'Prompt history request failed');
+    return result;
+}
+
+async function loadPromptHistory(container) {
+    const result = await promptHistoryRequest('/', 'GET', promptHistoryScope(container));
+    const input = container.querySelector('.page-ai-prompt, .ai-section-prompt');
+    const history = Array.isArray(result.history) ? result.history : [];
+    const favorites = Array.isArray(result.favorites) ? result.favorites : [];
+    if (input && input.value.trim() === '' && history[0]?.prompt) input.value = history[0].prompt;
+    container.dataset.latestPromptHistoryId = history[0]?.id || '';
+
+    const panel = container.querySelector('.ai-prompt-history-panel');
+    if (!panel) return;
+    const renderItems = (items) => items.map((item) => `
+        <div class="flex items-start gap-2 rounded border border-gray-200 p-2 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
+            <button type="button" class="ai-prompt-history-use flex-1 text-left text-gray-700 dark:text-gray-200" data-prompt="${encodeURIComponent(item.prompt)}">${String(item.prompt).replace(/</g, '&lt;')}</button>
+            <button type="button" class="ai-prompt-history-delete text-rose-600 dark:text-rose-300" data-id="${item.id}">Delete</button>
+        </div>`).join('');
+    panel.innerHTML = `
+        <div class="mt-2 text-xs font-semibold text-gray-700 dark:text-gray-200">History</div>${renderItems(history.slice(1)) || '<div class="text-xs text-gray-500 dark:text-gray-400">Empty</div>'}
+        <div class="mt-2 text-xs font-semibold text-gray-700 dark:text-gray-200">Favorites</div>${renderItems(favorites) || '<div class="text-xs text-gray-500 dark:text-gray-400">Empty</div>'}`;
+    panel.querySelectorAll('.ai-prompt-history-use').forEach((button) => button.addEventListener('click', () => {
+        if (input) input.value = decodeURIComponent(button.dataset.prompt || '');
+    }));
+    panel.querySelectorAll('.ai-prompt-history-delete').forEach((button) => button.addEventListener('click', async () => {
+        await promptHistoryRequest(`/${button.dataset.id}`, 'DELETE');
+        await loadPromptHistory(container);
+    }));
+}
+
+function initializePromptHistory(container) {
+    const input = container.querySelector('.page-ai-prompt, .ai-section-prompt');
+    if (!input || container.querySelector('.ai-prompt-history-controls')) return;
+    const controls = document.createElement('div');
+    controls.className = 'ai-prompt-history-controls mt-2';
+    controls.innerHTML = '<div class="flex gap-2"><button type="button" class="ai-prompt-history-toggle text-xs font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-300 dark:hover:text-indigo-200">History</button><button type="button" class="ai-prompt-favorite text-xs font-semibold text-amber-600 hover:text-amber-500 dark:text-amber-300 dark:hover:text-amber-200">Add to favorites</button><button type="button" class="ai-prompt-delete-current text-xs font-semibold text-rose-600 hover:text-rose-500 dark:text-rose-300 dark:hover:text-rose-200">Delete current</button></div><div class="ai-prompt-history-panel hidden"></div>';
+    input.insertAdjacentElement('afterend', controls);
+    controls.querySelector('.ai-prompt-history-toggle')?.addEventListener('click', () => controls.querySelector('.ai-prompt-history-panel')?.classList.toggle('hidden'));
+    controls.querySelector('.ai-prompt-favorite')?.addEventListener('click', async () => {
+        const prompt = input.value.trim();
+        if (!prompt) return;
+        await promptHistoryRequest('/favorite', 'POST', { ...promptHistoryScope(container), prompt });
+        await loadPromptHistory(container);
+    });
+    controls.querySelector('.ai-prompt-delete-current')?.addEventListener('click', async () => {
+        const id = container.dataset.latestPromptHistoryId || '';
+        if (!id) return;
+        await promptHistoryRequest(`/${id}`, 'DELETE');
+        input.value = '';
+        await loadPromptHistory(container);
+    });
+    loadPromptHistory(container).catch(() => {});
+}
+
+async function commitPendingPrompt(container) {
+    const prompt = container.dataset.pendingAiPrompt || '';
+    if (!prompt) return;
+    await promptHistoryRequest('/record', 'POST', { ...promptHistoryScope(container), prompt });
+    delete container.dataset.pendingAiPrompt;
+    await loadPromptHistory(container);
 }
 
 async function addModule() {
@@ -1820,6 +2017,10 @@ async function openPreview() {
     };
 
     try {
+        if (typeof window.waitForBackgroundSelections === 'function') {
+            await window.waitForBackgroundSelections();
+        }
+
         const settingsSaved = await savePageSettings();
         if (!settingsSaved) {
             writePreviewWindowMessage('Preview error', 'Page settings were not saved.');
@@ -1943,12 +2144,29 @@ function setInlineButtonBusy(button, busy, busyText = 'Saving…') {
 
     if (!button.dataset.defaultText) {
         button.dataset.defaultText = button.textContent.trim();
+        button.dataset.defaultHtml = button.innerHTML;
     }
 
     button.disabled = busy;
-    button.textContent = busy ? busyText : button.dataset.defaultText;
+    button.innerHTML = busy
+        ? `<svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="4"></circle><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z"></path></svg><span>${busyText}</span>`
+        : button.dataset.defaultHtml;
+    button.classList.toggle('gap-2', busy);
     button.classList.toggle('opacity-60', busy);
     button.classList.toggle('cursor-not-allowed', busy);
+}
+
+function renderAiGenerateError(button, message) {
+    if (!button) return;
+    const host = button.parentElement || button;
+    let error = host.parentElement?.querySelector('.ai-generate-inline-error');
+    if (!error) {
+        error = document.createElement('p');
+        error.className = 'ai-generate-inline-error mt-2 text-xs font-medium text-rose-600 dark:text-rose-300';
+        host.insertAdjacentElement('afterend', error);
+    }
+    error.textContent = message || '';
+    error.classList.toggle('hidden', !message);
 }
 
 function currentSaveTime() {
@@ -1956,6 +2174,40 @@ function currentSaveTime() {
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
+    });
+}
+
+function collapsibleStorageKey(targetSelector) {
+    return `page-edit-collapsed:{{ $page->id }}:${targetSelector}`;
+}
+
+function setCollapsibleState(button, collapsed) {
+    const targetSelector = button.dataset.collapsibleTarget || '';
+    const target = targetSelector ? document.querySelector(targetSelector) : null;
+    if (!target) {
+        return;
+    }
+
+    target.classList.toggle('hidden', collapsed);
+    button.textContent = collapsed ? 'Expand' : 'Collapse';
+    button.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    localStorage.setItem(collapsibleStorageKey(targetSelector), collapsed ? '1' : '0');
+}
+
+function initializeCollapsibles() {
+    document.querySelectorAll('[data-collapsible-toggle]').forEach((button) => {
+        const targetSelector = button.dataset.collapsibleTarget || '';
+        if (!targetSelector) {
+            return;
+        }
+
+        const collapsed = localStorage.getItem(collapsibleStorageKey(targetSelector)) === '1';
+        setCollapsibleState(button, collapsed);
+
+        button.addEventListener('click', () => {
+            const target = document.querySelector(targetSelector);
+            setCollapsibleState(button, !target?.classList.contains('hidden'));
+        });
     });
 }
 
@@ -2140,6 +2392,10 @@ async function savePageSettings() {
         return false;
     }
 
+    for (const container of document.querySelectorAll('[data-page-ai-field]')) {
+        await commitPendingPrompt(container);
+    }
+
     return true;
 }
 
@@ -2241,6 +2497,8 @@ document.getElementById('page-form')?.addEventListener('submit', async function 
     await handlePageSave({ deployAfterSave: false });
 });
 
+initializeCollapsibles();
+
 document.querySelectorAll('.ai-prompt-rule').forEach((details) => {
     details.addEventListener('toggle', async () => {
         if (!details.open) {
@@ -2264,10 +2522,14 @@ document.querySelectorAll('.ai-prompt-rule').forEach((details) => {
 });
 
 document.querySelectorAll('[data-page-ai-field]').forEach((container) => {
-    container.querySelector('.page-ai-generate-btn')?.addEventListener('click', async () => {
+    initializePageAiContext(container);
+    initializePromptHistory(container);
+    container.querySelector('.page-ai-generate-btn')?.addEventListener('click', async (event) => {
         try {
             await generatePageAiField(container);
         } catch (error) {
+            setInlineButtonBusy(event.currentTarget, false);
+            renderAiGenerateError(event.currentTarget, error.message || 'Model is unavailable. Generation failed.');
             renderPageEditStatus('Error: ' + error.message, 'error');
         }
     });
@@ -2275,6 +2537,7 @@ document.querySelectorAll('[data-page-ai-field]').forEach((container) => {
 
 document.querySelectorAll('.section-item').forEach((container) => {
     const sectionId = container.dataset.sectionId;
+    initializePromptHistory(container);
 
     container.querySelector('.ai-section-context-mode')?.addEventListener('change', (event) => {
         const selectedBox = container.querySelector('.ai-section-context-selected');
@@ -2286,6 +2549,7 @@ document.querySelectorAll('.section-item').forEach((container) => {
             await generateSectionContent(sectionId, container, event.currentTarget);
         } catch (error) {
             setInlineButtonBusy(event.currentTarget, false);
+            renderAiGenerateError(event.currentTarget, error.message || 'Model is unavailable. Generation failed.');
             renderPageEditStatus('Error: ' + error.message, 'error');
         }
     });

@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AiContentController;
 use App\Http\Controllers\Api\AiAgentController;
 use App\Http\Controllers\Api\ImportController;
 use App\Http\Controllers\Api\MediaController;
+use App\Http\Controllers\Api\AiPromptHistoryController;
 use App\Http\Controllers\Api\PageController;
 use App\Http\Controllers\Api\SectionController;
 use App\Http\Controllers\Api\SiteController;
@@ -59,6 +60,7 @@ Route::middleware(['web', 'auth', 'throttle:api'])->group(function () {
     Route::prefix('media')->group(function () {
         Route::get('/', [MediaController::class, 'index']);
         Route::post('/', [MediaController::class, 'store']);
+        Route::delete('/file', [MediaController::class, 'destroySiteFile']);
         Route::get('/{id}', [MediaController::class, 'show']);
         Route::put('/{id}', [MediaController::class, 'update']);
         Route::delete('/{id}', [MediaController::class, 'destroy']);
@@ -68,6 +70,13 @@ Route::middleware(['web', 'auth', 'throttle:api'])->group(function () {
     Route::prefix('ai')->group(function () {
         Route::post('/process-markdown', [AiContentController::class, 'processMarkdown']);
         Route::post('/generate', [AiContentController::class, 'generate']);
+    });
+
+    Route::prefix('ai-prompt-history')->group(function () {
+        Route::get('/', [AiPromptHistoryController::class, 'index']);
+        Route::post('/record', [AiPromptHistoryController::class, 'record']);
+        Route::post('/favorite', [AiPromptHistoryController::class, 'favorite']);
+        Route::delete('/{id}', [AiPromptHistoryController::class, 'destroy']);
     });
 
     Route::prefix('ai-agent')->group(function () {

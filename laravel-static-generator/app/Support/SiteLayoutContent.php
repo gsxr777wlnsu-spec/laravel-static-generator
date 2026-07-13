@@ -111,6 +111,8 @@ class SiteLayoutContent
     public function sanitizeSectionHtml(?string $html): string
     {
         $html = trim((string) $html);
+        $html = preg_replace('/^\s*<\?xml\b[^>]*>\s*/i', '', $html) ?? $html;
+        $html = preg_replace('/^\s*<!--\s*\?xml\b[^>]*-->\s*/i', '', $html) ?? $html;
         if ($html === '') {
             return '';
         }
@@ -134,7 +136,7 @@ class SiteLayoutContent
             $this->removeNode($node);
         }
 
-        return $this->renderBodyInnerHtml($document);
+        return $this->unwrapDuplicateSection($document) ?? $this->renderBodyInnerHtml($document);
     }
 
     public function shouldRenderHeaderInsideFirstHero(?Page $page): bool
@@ -371,6 +373,48 @@ class SiteLayoutContent
         }
 
         return trim($this->innerHtml($body));
+    }
+
+    private function unwrapDuplicateSection(DOMDocument $document): ?string
+    {
+        $body = $document->getElementsByTagName('body')->item(0);
+        if (!$body instanceof DOMElement) {
+            return null;
+        }
+
+        $elements = [];
+        foreach ($body->childNodes as $child) {
+            if ($child instanceof DOMElement) {
+                $elements[] = $child;
+            }
+        }
+
+        $outer = count($elements) === 1 ? $elements[0] : null;
+        if (!$outer instanceof DOMElement || strtolower($outer->tagName) !== 'section' || $outer->hasAttribute('id')) {
+            return null;
+        }
+
+        $innerElements = [];
+        foreach ($outer->childNodes as $child) {
+            if ($child instanceof DOMElement) {
+                $innerElements[] = $child;
+            }
+        }
+
+        $inner = count($innerElements) === 1 ? $innerElements[0] : null;
+        if (!$inner instanceof DOMElement || strtolower($inner->tagName) !== 'section' || !$inner->hasAttribute('id')) {
+            return null;
+        }
+
+        $outerClasses = preg_split('/\s+/', trim($outer->getAttribute('class'))) ?: [];
+        $innerClasses = preg_split('/\s+/', trim($inner->getAttribute('class'))) ?: [];
+        if (array_intersect($outerClasses, $innerClasses) === []) {
+            return null;
+        }
+
+        $html = $document->saveHTML($inner);
+
+        return is_string($html) ? trim($html) : null;
     }
 
     private function innerHtml(DOMNode $node): string

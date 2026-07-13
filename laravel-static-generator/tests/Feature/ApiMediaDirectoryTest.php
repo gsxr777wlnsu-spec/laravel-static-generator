@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Site;
+use App\Models\Media;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -87,5 +88,57 @@ class ApiMediaDirectoryTest extends TestCase
         $this->assertStringStartsWith($site->id . '/assets/images/logo/', $path);
         $this->assertStringEndsWith('.svg', $path);
         Storage::disk('sites')->assertExists($path);
+    }
+
+    public function test_site_media_file_can_be_deleted_with_its_database_record(): void
+    {
+        $admin = User::factory()->create();
+        $site = $this->createSite('delete-site.example');
+        $path = "{$site->id}/assets/images/upload/photo.png";
+        Storage::disk('sites')->put($path, 'site-photo');
+        $media = Media::create([
+            'site_id' => $site->id,
+            'path' => $path,
+            'alt' => 'Photo',
+            'mime_type' => 'image/png',
+            'size' => 10,
+        ]);
+
+        $response = $this->actingAs($admin)->deleteJson('/api/media/file', [
+            'site_id' => $site->id,
+            'path' => 'assets/images/upload/photo.png',
+        ]);
+
+        $response->assertOk();
+        Storage::disk('sites')->assertMissing($path);
+        $this->assertDatabaseMissing('media', ['id' => $media->id]);
+    }
+
+    public function test_template_file_cannot_be_deleted_through_site_media_endpoint(): void
+    {
+        $admin = User::factory()->create();
+        $site = $this->createSite('protected-base.example');
+        Storage::disk('generated')->put('site1/assets/images/base.png', 'base-photo');
+
+        $response = $this->actingAs($admin)->deleteJson('/api/media/file', [
+            'site_id' => $site->id,
+            'path' => 'assets/images/base.png',
+        ]);
+
+        $response->assertNotFound();
+        Storage::disk('generated')->assertExists('site1/assets/images/base.png');
+    }
+
+    private function createSite(string $domain): Site
+    {
+        return Site::create([
+            'name' => $domain,
+            'domain' => $domain,
+            'template_set' => 'base',
+            'output_path' => "generated/{$domain}",
+            'status' => 'active',
+            'locale' => 'en',
+            'default_locale' => 'en',
+        ]);
     }
 }

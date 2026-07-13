@@ -196,7 +196,8 @@ class SectionController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'file' => 'required|file|max:10240',
+            'file' => 'nullable|file|max:10240',
+            'source_path' => 'nullable|string|max:500',
             'target_path' => 'required|string|max:500',
         ]);
 
@@ -209,30 +210,61 @@ class SectionController extends Controller
             return response()->json(['error' => 'Section site was not found'], 422);
         }
 
-        $file = $request->file('file');
-        if ($file === null || !$file->isValid()) {
-            return response()->json(['error' => 'Uploaded file is invalid'], 422);
-        }
-
         $targetPath = $this->normalizeGeneratedAssetPath((string) $request->input('target_path'));
         if ($targetPath === null) {
             return response()->json(['error' => 'Target path is invalid'], 422);
         }
 
-        $mimeType = strtolower(trim((string) $file->getMimeType()));
-        if ($mimeType === 'image/x-webp') {
-            $mimeType = 'image/webp';
-        }
-
         $expectedMimeType = $this->mimeTypeFromExtension($targetPath);
-        if ($expectedMimeType === null || $mimeType !== $expectedMimeType) {
+        if ($expectedMimeType === null) {
             return response()->json([
-                'error' => 'Uploaded file type does not match target extension',
+                'error' => 'Target path extension is not supported',
             ], 422);
         }
 
+        $file = $request->file('file');
+        $sourcePath = $this->normalizeGeneratedAssetPath((string) $request->input('source_path', ''));
+        if (($file === null || !$file->isValid()) && $sourcePath === null) {
+            return response()->json(['error' => 'Uploaded file or source image is required'], 422);
+        }
+
+        if ($file !== null && $file->isValid()) {
+            $mimeType = strtolower(trim((string) $file->getMimeType()));
+            if ($mimeType === 'image/x-webp') {
+                $mimeType = 'image/webp';
+            }
+
+            $contents = file_get_contents($file->getRealPath());
+            $contents = $this->normalizeImageContentsForTarget($contents, $mimeType, $expectedMimeType);
+        } else {
+            $source = $sourcePath === null
+                ? null
+                : $this->readSourceAssetContents($siteId, $sourcePath);
+
+            if ($source === null) {
+                return response()->json(['error' => 'Selected source image was not found'], 422);
+            }
+
+            $mimeType = $source['mime_type'];
+            if ($mimeType === 'image/x-webp') {
+                $mimeType = 'image/webp';
+            }
+
+            $contents = $source['contents'];
+            $contents = $this->normalizeImageContentsForTarget($contents, $mimeType, $expectedMimeType);
+        }
+
         $storagePath = "site{$siteId}/{$targetPath}";
-        Storage::disk('generated')->put($storagePath, file_get_contents($file->getRealPath()));
+        if ($contents === false || $contents === null) {
+            return response()->json(['error' => 'Image file could not be read'], 422);
+        }
+
+        if (!Storage::disk('sites')->put("{$siteId}/{$targetPath}", $contents)) {
+            return response()->json(['error' => 'Background override could not be persisted'], 500);
+        }
+
+        Storage::disk('generated')->put($storagePath, $contents);
+        $this->syncGeneratedAssetOverrideToPreviews($siteId, $targetPath, $contents);
 
         return response()->json([
             'message' => 'Generated background override stored successfully',
@@ -309,6 +341,113 @@ class SectionController extends Controller
             'avif' => 'image/avif',
             default => null,
         };
+    }
+
+    private function syncGeneratedAssetOverrideToPreviews(int $siteId, string $targetPath, string $contents): void
+    {
+        foreach (Storage::disk('generated')->directories('preview') as $previewDirectory) {
+            $siteJsonPath = trim($previewDirectory, '/') . '/.site.json';
+            if (!Storage::disk('generated')->exists($siteJsonPath)) {
+                continue;
+            }
+
+            $previewSiteId = (int) (json_decode(Storage::disk('generated')->get($siteJsonPath), true)['site_id'] ?? 0);
+            if ($previewSiteId !== $siteId) {
+                continue;
+            }
+
+            Storage::disk('generated')->put(trim($previewDirectory, '/') . '/' . $targetPath, $contents);
+        }
+    }
+
+    /**
+     * @return array{contents:string,mime_type:string}|null
+     */
+    private function readSourceAssetContents(int $siteId, string $sourcePath): ?array
+    {
+        $candidates = [
+            ['sites', "{$siteId}/{$sourcePath}"],
+            ['generated', "site{$siteId}/{$sourcePath}"],
+            ['generated', "{$siteId}/{$sourcePath}"],
+            ['generated', "site1/{$sourcePath}"],
+            ['generated', "1/{$sourcePath}"],
+        ];
+
+        foreach ($candidates as [$diskName, $path]) {
+            $disk = Storage::disk($diskName);
+            if (!$disk->exists($path)) {
+                continue;
+            }
+
+            return [
+                'contents' => $disk->get($path),
+                'mime_type' => $disk->mimeType($path) ?: '',
+            ];
+        }
+
+        foreach (Storage::disk('generated')->directories('preview') as $previewDirectory) {
+            $previewDirectory = trim($previewDirectory, '/');
+            $siteJsonPath = "{$previewDirectory}/.site.json";
+            if (!Storage::disk('generated')->exists($siteJsonPath)) {
+                continue;
+            }
+
+            $previewSiteId = (int) (json_decode(Storage::disk('generated')->get($siteJsonPath), true)['site_id'] ?? 0);
+            if ($previewSiteId !== $siteId) {
+                continue;
+            }
+
+            $path = "{$previewDirectory}/{$sourcePath}";
+            if (!Storage::disk('generated')->exists($path)) {
+                continue;
+            }
+
+            return [
+                'contents' => Storage::disk('generated')->get($path),
+                'mime_type' => Storage::disk('generated')->mimeType($path) ?: '',
+            ];
+        }
+
+        return null;
+    }
+
+    private function normalizeImageContentsForTarget(string|false $contents, string $sourceMimeType, string $targetMimeType): ?string
+    {
+        if ($contents === false) {
+            return null;
+        }
+
+        if ($sourceMimeType === $targetMimeType) {
+            return $contents;
+        }
+
+        if (
+            $targetMimeType === 'image/webp'
+            && in_array($sourceMimeType, ['image/jpeg', 'image/png', 'image/gif'], true)
+        ) {
+            return $this->convertImageContentsToWebp($contents);
+        }
+
+        return null;
+    }
+
+    private function convertImageContentsToWebp(string $contents): ?string
+    {
+        $image = @imagecreatefromstring($contents);
+        if (!$image) {
+            return null;
+        }
+
+        ob_start();
+        $encoded = imagewebp($image, null, 90);
+        $webp = ob_get_clean();
+        imagedestroy($image);
+
+        if (!$encoded || !is_string($webp) || $webp === '') {
+            return null;
+        }
+
+        return $webp;
     }
 
     private function pruneSectionHistory(int $sectionId): void

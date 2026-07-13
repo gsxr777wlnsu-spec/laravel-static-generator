@@ -43,10 +43,23 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
 
         $html = View::make($templatePath, $data)->render();
         $html = $this->languageService->applyLanguageSwitcherToHtml($html, $page, $page->site);
+        $html = $this->moveExternalHeaderIntoDemoHero($html);
 
         $result = $this->normalizeGoogleMapEmbeds($html);
 
         return $result;
+    }
+
+    private function moveExternalHeaderIntoDemoHero(string $html): string
+    {
+        $rewritten = preg_replace(
+            '/(<body\b[^>]*>\s*)(<header\b[^>]*>.*?<\/header>\s*)(<main\b[^>]*>\s*<div\b[^>]*class=(["\'])container\4[^>]*>\s*<section\b[^>]*class=(["\'])[^"\']*\bhero--demo\b[^"\']*\5[^>]*>)/is',
+            '$1$3$2',
+            $html,
+            1
+        );
+
+        return $rewritten ?? $html;
     }
 
     public function generateSite(Site $site, ?callable $onProgress = null): array
@@ -505,6 +518,7 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
     {
         $html = preg_replace('/(href|src)=(["\'])\/assets\/([^"\']*)\2/', '$1=$2/api/preview/' . $previewToken . '/assets/$3$2', $html);
         $html = preg_replace('/(href|src)=(["\'])\/js\/([^"\']*)\2/', '$1=$2/api/preview/' . $previewToken . '/js/$3$2', $html);
+        $html = $this->rewriteCssAssetUrlsForPreview($html, $previewToken);
         $html = preg_replace_callback('/href=(["\'])\/([^"\']*)\1/i', function (array $matches) use ($previewToken): string {
             $quote = $matches[1];
             $path = $matches[2] ?? '';
@@ -575,6 +589,10 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
         $previewAssetsPath = "preview/{$previewToken}/assets";
         try {
             $this->copyStorageDirectory('generated', $sourceAssetPath, 'generated', $previewAssetsPath);
+            $siteAssetsPath = "{$siteId}/assets";
+            if ($this->hasAnyAssetFiles('sites', $siteAssetsPath)) {
+                $this->copyStorageDirectory('sites', $siteAssetsPath, 'generated', $previewAssetsPath);
+            }
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning('Preview assets copy failed', [
                 'site_id' => $siteId,
@@ -610,23 +628,33 @@ class HtmlGeneratorService implements HtmlGeneratorInterface
             }
 
             $css = $disk->get($cssFile);
-            $rewritten = preg_replace(
-                '/url\(\s*(["\']?)\/assets\/([^)"\']+)\1\s*\)/',
-                "url(\$1/api/preview/{$previewToken}/assets/\$2\$1)",
-                $css
-            );
-            if ($rewritten !== null) {
-                $rewritten = preg_replace(
-                    '/url\(\s*(["\']?)\/api\/preview\/[^\/)"\']+\/assets\/([^)"\']+)\1\s*\)/',
-                    "url(\$1/api/preview/{$previewToken}/assets/\$2\$1)",
-                    $rewritten
-                );
-            }
+            $rewritten = $this->rewriteCssAssetUrlsForPreview($css, $previewToken);
 
             if ($rewritten !== null && $rewritten !== $css) {
                 $disk->put($cssFile, $rewritten);
             }
         }
+    }
+
+    private function rewriteCssAssetUrlsForPreview(string $css, string $previewToken): string
+    {
+        $rewritten = preg_replace(
+            '/url\(\s*(["\']?)\/assets\/([^)"\']+)\1\s*\)/',
+            "url(\$1/api/preview/{$previewToken}/assets/\$2\$1)",
+            $css
+        );
+
+        if ($rewritten === null) {
+            return $css;
+        }
+
+        $rewritten = preg_replace(
+            '/url\(\s*(["\']?)(?:https?:\/\/[^\/)"\']+)?\/api\/preview\/[^\/)"\']+\/assets\/([^)"\']+)\1\s*\)/',
+            "url(\$1/api/preview/{$previewToken}/assets/\$2\$1)",
+            $rewritten
+        );
+
+        return $rewritten ?? $css;
     }
 
     private function copyAssetsToSite(int $siteId): void

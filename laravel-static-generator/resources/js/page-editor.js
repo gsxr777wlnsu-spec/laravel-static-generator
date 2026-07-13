@@ -1,4 +1,4 @@
-import { Editor, mergeAttributes, Node } from '@tiptap/core';
+import { Editor, Mark, mergeAttributes, Node } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -9,6 +9,7 @@ import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
 
 const editors = new Map();
+const pendingBackgroundSelections = new Set();
 const modalState = {
     element: null,
     directoryList: null,
@@ -17,9 +18,22 @@ const modalState = {
     uploadStatus: null,
     onSelect: null,
     directory: 'assets/images/upload',
+    rootDirectory: null,
     currentItem: null,
     directories: [],
 };
+
+const TitleAccent = Mark.create({
+    name: 'titleAccent',
+
+    parseHTML() {
+        return [{ tag: 'span.title--accent' }];
+    },
+
+    renderHTML({ HTMLAttributes }) {
+        return ['span', mergeAttributes(HTMLAttributes, { class: 'title--accent' }), 0];
+    },
+});
 
 const MediaImage = Node.create({
     name: 'image',
@@ -377,7 +391,7 @@ function extractRawBackgroundTargets(rawHtml) {
         while ((blockMatch = blockRegex.exec(cssText)) !== null) {
             const selector = String(blockMatch[1] || '').trim();
             const body = String(blockMatch[2] || '');
-            const declarationRegex = /(background-image)\s*:\s*([^;]+)\s*;?/gi;
+            const declarationRegex = /(background(?:-image)?)\s*:\s*([^;]+)\s*;?/gi;
             let declarationMatch;
             let declarationIndex = 0;
 
@@ -456,7 +470,7 @@ function replaceRawBackgroundTarget(rawHtml, targetKey, nextUrl) {
         return rawHtml;
     }
 
-    const declarations = [...blockText.matchAll(/(background-image)\s*:\s*([^;]+)\s*;?/gi)];
+    const declarations = [...blockText.matchAll(/(background(?:-image)?)\s*:\s*([^;]+)\s*;?/gi)];
     if (!declarations[declarationIndex]) {
         return rawHtml;
     }
@@ -583,6 +597,14 @@ function generatedBackgroundOverrideConfig(target) {
         };
     }
 
+    if (selector === '.hero--demo .hero__media[data-demo-frame-media]::before') {
+        return {
+            targetPath: 'assets/images/hero/demo-frame-background.webp',
+            replacementUrl: '/assets/images/hero/demo-frame-background.webp',
+            buttonLabel: 'Upload Demo Frame Background',
+        };
+    }
+
     if (selector === '.conclusion__card::before') {
         return {
             targetPath: 'assets/images/hero/conclusion-background.webp',
@@ -594,10 +616,15 @@ function generatedBackgroundOverrideConfig(target) {
     return null;
 }
 
-async function uploadGeneratedBackgroundOverride(sectionId, targetPath, file) {
+async function uploadGeneratedBackgroundOverride(sectionId, targetPath, file = null, sourcePath = '') {
     const formData = new FormData();
-    formData.append('file', file);
     formData.append('target_path', targetPath);
+    if (file) {
+        formData.append('file', file);
+    }
+    if (sourcePath) {
+        formData.append('source_path', sourcePath);
+    }
 
     const response = await fetch(`/api/sections/${sectionId}/generated-background-override`, {
         method: 'POST',
@@ -618,6 +645,28 @@ async function uploadGeneratedBackgroundOverride(sectionId, targetPath, file) {
 
     return result;
 }
+
+function selectedMediaAssetPath(item) {
+    const path = String(item?.path || '').trim().replace(/^\/+/, '');
+    return path.startsWith('assets/') ? path : '';
+}
+
+function cacheBustedAssetUrl(url) {
+    const cleanUrl = String(url || '').split('?')[0];
+    return `${cleanUrl}?v=${Date.now()}`;
+}
+
+function trackBackgroundSelection(promise) {
+    pendingBackgroundSelections.add(promise);
+    promise.finally(() => pendingBackgroundSelections.delete(promise));
+    return promise;
+}
+
+window.waitForBackgroundSelections = async function waitForBackgroundSelections() {
+    while (pendingBackgroundSelections.size > 0) {
+        await Promise.all([...pendingBackgroundSelections]);
+    }
+};
 
 function updateBackgroundSidebar(container) {
     const state = editors.get(container);
@@ -645,10 +694,9 @@ function updateBackgroundSidebar(container) {
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">${target.label}</label>
             <input type="text" class="tiptap-background-input mt-1 block w-full rounded-md shadow-sm sm:text-sm" value="${target.url.replace(/"/g, '&quot;')}">
             ${overrideConfig ? `
-                <label class="mt-2 inline-flex cursor-pointer items-center rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500">
+                <button type="button" class="tiptap-background-select mt-2 inline-flex cursor-pointer items-center rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500">
                     ${overrideConfig.buttonLabel}
-                    <input type="file" accept="image/webp" class="tiptap-background-upload hidden">
-                </label>
+                </button>
                 <div class="tiptap-background-upload-status mt-2 text-xs text-gray-500 dark:text-gray-400 hidden"></div>
             ` : ''}
         `;
@@ -665,54 +713,63 @@ function updateBackgroundSidebar(container) {
             updateBackgroundSidebar(container);
         });
 
-        const uploadInput = wrapper.querySelector('.tiptap-background-upload');
+        const selectButton = wrapper.querySelector('.tiptap-background-select');
         const uploadStatus = wrapper.querySelector('.tiptap-background-upload-status');
-        uploadInput?.addEventListener('change', async () => {
-            const file = uploadInput.files?.[0];
-            if (!file || !overrideConfig) {
+        selectButton?.addEventListener('click', () => {
+            if (!overrideConfig) {
                 return;
             }
 
-            if (uploadStatus) {
-                uploadStatus.textContent = 'Uploading...';
-                uploadStatus.classList.remove('hidden');
-            }
-
-            try {
-                await uploadGeneratedBackgroundOverride(
-                    Number(container.dataset.sectionId || 0),
-                    overrideConfig.targetPath,
-                    file
-                );
-
-                const nextHtml = ensureBackgroundStyleOverride(
-                    state.originalRawHtml || state.codeTextarea?.value || '',
-                    target,
-                    overrideConfig.replacementUrl
-                );
-                setRawHtmlForState(container, state, nextHtml);
-                state.rawTextNodeMap = buildRawTextNodeMap(state.originalRawHtml, state.editorTextSnapshot || []);
-
-                if (typeof window.savePageSection === 'function') {
-                    await window.savePageSection(container.dataset.sectionId, container, { silent: true });
+            openModal((item) => trackBackgroundSelection((async () => {
+                const sourcePath = selectedMediaAssetPath(item);
+                if (!sourcePath) {
+                    if (typeof window.renderPageEditStatus === 'function') {
+                        window.renderPageEditStatus('Selected image path is not supported for background override.', 'error');
+                    }
+                    return;
                 }
 
-                if (typeof window.renderPageEditStatus === 'function') {
-                    window.renderPageEditStatus('Generated background override uploaded successfully.', 'success');
-                }
-
-                updateBackgroundSidebar(container);
-            } catch (error) {
-                if (typeof window.renderPageEditStatus === 'function') {
-                    window.renderPageEditStatus(`Background upload failed: ${error.message}`, 'error');
-                }
-            } finally {
                 if (uploadStatus) {
-                    uploadStatus.textContent = '';
-                    uploadStatus.classList.add('hidden');
+                    uploadStatus.textContent = 'Applying...';
+                    uploadStatus.classList.remove('hidden');
                 }
-                uploadInput.value = '';
-            }
+
+                try {
+                    await uploadGeneratedBackgroundOverride(
+                        Number(container.dataset.sectionId || 0),
+                        overrideConfig.targetPath,
+                        null,
+                        sourcePath
+                    );
+
+                    const nextHtml = ensureBackgroundStyleOverride(
+                        state.originalRawHtml || state.codeTextarea?.value || '',
+                        target,
+                        cacheBustedAssetUrl(overrideConfig.replacementUrl)
+                    );
+                    setRawHtmlForState(container, state, nextHtml);
+                    state.rawTextNodeMap = buildRawTextNodeMap(state.originalRawHtml, state.editorTextSnapshot || []);
+
+                    if (typeof window.savePageSection === 'function') {
+                        await window.savePageSection(container.dataset.sectionId, container, { silent: true });
+                    }
+
+                    if (typeof window.renderPageEditStatus === 'function') {
+                        window.renderPageEditStatus('Generated background override applied successfully.', 'success');
+                    }
+
+                    updateBackgroundSidebar(container);
+                } catch (error) {
+                    if (typeof window.renderPageEditStatus === 'function') {
+                        window.renderPageEditStatus(`Background selection failed: ${error.message}`, 'error');
+                    }
+                } finally {
+                    if (uploadStatus) {
+                        uploadStatus.textContent = '';
+                        uploadStatus.classList.add('hidden');
+                    }
+                }
+            })()), { directory: 'assets/images', rootDirectory: 'assets/images' });
         });
 
         fields.appendChild(wrapper);
@@ -856,6 +913,64 @@ function splitTextAcrossRawParts(text, parts) {
     return nextParts;
 }
 
+function patchDeletedRawTextNodes(state, previousTexts, nextTexts) {
+    if (nextTexts.length >= previousTexts.length) {
+        return false;
+    }
+
+    const retainedPreviousIndexes = [];
+    let nextIndex = 0;
+
+    previousTexts.forEach((text, previousIndex) => {
+        if (
+            nextIndex < nextTexts.length
+            && normalizePatchText(text) === normalizePatchText(nextTexts[nextIndex])
+        ) {
+            retainedPreviousIndexes.push(previousIndex);
+            nextIndex++;
+        }
+    });
+
+    if (nextIndex !== nextTexts.length) {
+        return false;
+    }
+
+    const template = document.createElement('template');
+    template.innerHTML = state.originalRawHtml || state.codeTextarea?.value || '';
+    const rawTextNodes = collectRawTextNodes(template.content);
+    const rawTextNodeMap = Array.isArray(state.rawTextNodeMap)
+        ? state.rawTextNodeMap
+        : buildRawTextNodeMap(template.innerHTML, previousTexts);
+    const retained = new Set(retainedPreviousIndexes);
+    let changed = false;
+
+    previousTexts.forEach((text, previousIndex) => {
+        if (retained.has(previousIndex)) {
+            return;
+        }
+
+        const rawEntry = rawTextNodeMap[previousIndex];
+        const indexes = rawEntry?.indexes || (Number.isInteger(rawEntry) ? [rawEntry] : []);
+
+        indexes.forEach((rawIndex) => {
+            if (rawTextNodes[rawIndex]) {
+                rawTextNodes[rawIndex].textContent = '';
+                changed = true;
+            }
+        });
+    });
+
+    if (!changed) {
+        return false;
+    }
+
+    setRawHtmlForState(state.container, state, template.innerHTML);
+    state.editorTextSnapshot = nextTexts;
+    state.rawTextNodeMap = buildRawTextNodeMap(state.originalRawHtml, nextTexts);
+
+    return true;
+}
+
 function patchRawTextNodesFromEditor(state) {
     if (!state?.preserveRawHtml) {
         return false;
@@ -865,6 +980,10 @@ function patchRawTextNodesFromEditor(state) {
     const previousTexts = state.editorTextSnapshot || [];
 
     if (nextTexts.length !== previousTexts.length) {
+        if (patchDeletedRawTextNodes(state, previousTexts, nextTexts)) {
+            return true;
+        }
+
         state.editorTextSnapshot = nextTexts;
         state.rawTextNodeMap = buildRawTextNodeMap(state.originalRawHtml || state.codeTextarea?.value || '', nextTexts);
         return false;
@@ -1180,7 +1299,11 @@ function renderDirectoryList() {
         return;
     }
 
-    const directories = Array.isArray(modal.directories) ? modal.directories : [];
+    const rootDirectory = typeof modal.rootDirectory === 'string' ? modal.rootDirectory : '';
+    const directories = (Array.isArray(modal.directories) ? modal.directories : [])
+        .filter((directory) => rootDirectory === ''
+            || directory === rootDirectory
+            || directory.startsWith(`${rootDirectory}/`));
     if (directories.length === 0) {
         modal.directoryList.innerHTML = '<p class="tiptap-media-empty">No folders</p>';
         return;
@@ -1276,19 +1399,58 @@ async function loadGallery() {
                 return rightTime - leftTime;
             })
             .forEach((item) => {
-                const card = document.createElement('button');
-                card.type = 'button';
+                const card = document.createElement('div');
                 card.className = 'tiptap-media-card';
                 card.innerHTML = `
                     <div class="tiptap-media-card-preview">
                         <img src="${item.url}" alt="${item.alt || ''}">
                     </div>
                     <span>${(item.path || '').split('/').pop() || 'image'}</span>
+                    ${item.deletable ? '<button type="button" class="tiptap-media-delete" aria-label="Delete image">Delete</button>' : ''}
                 `;
 
-                card.addEventListener('click', () => {
-                    modal.onSelect?.(item);
-                    closeModal();
+                card.addEventListener('click', async () => {
+                    card.style.pointerEvents = 'none';
+
+                    try {
+                        await modal.onSelect?.(item);
+                        closeModal();
+                    } catch (error) {
+                        card.style.pointerEvents = '';
+
+                        if (typeof window.renderPageEditStatus === 'function') {
+                            window.renderPageEditStatus(`Image selection failed: ${error.message}`, 'error');
+                        }
+                    }
+                });
+
+                card.querySelector('.tiptap-media-delete')?.addEventListener('click', async (event) => {
+                    event.stopPropagation();
+                    if (!confirm('Delete this site media file?')) {
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch('/api/media/file', {
+                            method: 'DELETE',
+                            headers: {
+                                Accept: 'application/json',
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                            body: JSON.stringify({ site_id: getConfig().siteId, path: item.path }),
+                        });
+                        const result = await response.json();
+                        if (!response.ok) {
+                            throw new Error(result.error || 'Failed to delete media file');
+                        }
+                        await loadGallery();
+                    } catch (error) {
+                        if (typeof window.renderPageEditStatus === 'function') {
+                            window.renderPageEditStatus(`Delete failed: ${error.message}`, 'error');
+                        }
+                    }
                 });
 
                 modal.gallery.appendChild(card);
@@ -1304,6 +1466,9 @@ function openModal(onSelect, options = {}) {
     modal.directory = typeof options.directory === 'string' && options.directory.trim() !== ''
         ? options.directory.trim().replace(/\/+$/g, '')
         : 'assets/images/upload';
+    modal.rootDirectory = typeof options.rootDirectory === 'string' && options.rootDirectory.trim() !== ''
+        ? options.rootDirectory.trim().replace(/\/+$/g, '')
+        : null;
     modal.currentItem = options.currentItem || null;
     modal.element.classList.remove('hidden');
     loadGallery();
@@ -1317,6 +1482,7 @@ function closeModal() {
     modalState.element.classList.add('hidden');
     modalState.onSelect = null;
     modalState.currentItem = null;
+    modalState.rootDirectory = null;
     modalState.directories = [];
 }
 
@@ -1513,6 +1679,7 @@ function createEditor(container) {
             StarterKit.configure({
                 heading: { levels: [2, 3] },
             }),
+            TitleAccent,
             Underline,
             Link.configure({
                 openOnClick: false,

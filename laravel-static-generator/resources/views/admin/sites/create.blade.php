@@ -517,6 +517,68 @@ function findPromptRow(file, path) {
         .find((row) => row.dataset.file === file && row.dataset.path === path) || null;
 }
 
+function createPromptHistoryScope(row) {
+    const file = String(row.dataset.file || 'page').replace(/-raw_html\.md$/i, '').replace(/\.md$/i, '');
+    return {
+        template_set: String(document.querySelector('[name="template_set"]')?.value || 'base'),
+        page_key: file,
+        module_key: String(row.dataset.moduleKey || 'head'),
+        locale: String(document.querySelector('[name="locale"]')?.value || 'en'),
+        field_key: String(row.dataset.promptPath || row.dataset.path || 'field'),
+    };
+}
+
+async function createPromptHistoryRequest(path, method, payload = null) {
+    const query = method === 'GET' ? `?${new URLSearchParams(payload).toString()}` : '';
+    const response = await fetch(`/api/ai-prompt-history${path}${query}`, {
+        method,
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin',
+        body: method === 'GET' ? null : JSON.stringify(payload),
+    });
+    const result = await readApiResponse(response);
+    if (!response.ok) throw new Error(result.error || 'Prompt history request failed');
+    return result;
+}
+
+async function loadCreatePromptHistory(row) {
+    const result = await createPromptHistoryRequest('/', 'GET', createPromptHistoryScope(row));
+    const input = row.querySelector('.ai-prompt-input');
+    const panel = row.querySelector('.ai-create-history-panel');
+    const history = Array.isArray(result.history) ? result.history : [];
+    const favorites = Array.isArray(result.favorites) ? result.favorites : [];
+    if (input && input.value.trim() === '' && history[0]?.prompt) input.value = history[0].prompt;
+    row.dataset.latestPromptHistoryId = history[0]?.id || '';
+    if (!panel) return;
+    const items = (values) => values.map((item) => `<div class="flex gap-2 rounded border border-gray-200 p-2 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"><button type="button" class="ai-create-history-use flex-1 text-left text-gray-700 dark:text-gray-200" data-prompt="${encodeURIComponent(item.prompt)}">${String(item.prompt).replace(/</g, '&lt;')}</button><button type="button" class="ai-create-history-delete text-rose-600 dark:text-rose-300" data-id="${item.id}">Delete</button></div>`).join('');
+    panel.innerHTML = `<div class="text-xs font-semibold text-gray-700 dark:text-gray-200">History</div>${items(history.slice(1)) || '<div class="text-xs text-gray-500 dark:text-gray-400">Empty</div>'}<div class="mt-2 text-xs font-semibold text-gray-700 dark:text-gray-200">Favorites</div>${items(favorites) || '<div class="text-xs text-gray-500 dark:text-gray-400">Empty</div>'}`;
+    panel.querySelectorAll('.ai-create-history-use').forEach((button) => button.addEventListener('click', () => { if (input) input.value = decodeURIComponent(button.dataset.prompt || ''); }));
+    panel.querySelectorAll('.ai-create-history-delete').forEach((button) => button.addEventListener('click', async () => { await createPromptHistoryRequest(`/${button.dataset.id}`, 'DELETE'); await loadCreatePromptHistory(row); }));
+}
+
+function initializeCreatePromptHistory(row) {
+    row.querySelector('.ai-create-history-toggle')?.addEventListener('click', () => row.querySelector('.ai-create-history-panel')?.classList.toggle('hidden'));
+    row.querySelector('.ai-create-favorite')?.addEventListener('click', async () => {
+        const prompt = row.querySelector('.ai-prompt-input')?.value.trim() || '';
+        if (!prompt) return;
+        await createPromptHistoryRequest('/favorite', 'POST', { ...createPromptHistoryScope(row), prompt });
+        await loadCreatePromptHistory(row);
+    });
+    const favoriteButton = row.querySelector('.ai-create-favorite');
+    if (favoriteButton && !row.querySelector('.ai-create-delete-current')) {
+        favoriteButton.insertAdjacentHTML('afterend', '<button type="button" class="ai-create-delete-current text-xs font-semibold text-rose-600 hover:text-rose-500 dark:text-rose-300 dark:hover:text-rose-200">Delete current</button>');
+        row.querySelector('.ai-create-delete-current')?.addEventListener('click', async () => {
+            const id = row.dataset.latestPromptHistoryId || '';
+            if (!id) return;
+            await createPromptHistoryRequest(`/${id}`, 'DELETE');
+            const input = row.querySelector('.ai-prompt-input');
+            if (input) input.value = '';
+            await loadCreatePromptHistory(row);
+        });
+    }
+    loadCreatePromptHistory(row).catch(() => {});
+}
+
 function getPromptRowValue(path) {
     const row = findPromptRow('index-raw_html.md', path);
     return row?.querySelector('.ai-manual-input')?.value ?? '';
@@ -2322,6 +2384,11 @@ siteCreateForm.addEventListener('submit', async function(e) {
         });
         
         if (response.ok) {
+            await Promise.all(Array.from(document.querySelectorAll('.ai-prompt-row')).map(async (row) => {
+                const prompt = row.querySelector('.ai-prompt-input')?.value.trim() || '';
+                if (!prompt) return;
+                await createPromptHistoryRequest('/record', 'POST', { ...createPromptHistoryScope(row), prompt });
+            }));
             shouldResetSubmitState = false;
             renderSiteCreateReport(result, responseDebugId);
             if (statusBox && statusText) {
@@ -2377,5 +2444,7 @@ siteCreateForm.addEventListener('submit', async function(e) {
         }
     }
 });
+
+document.querySelectorAll('.ai-prompt-row').forEach((row) => initializeCreatePromptHistory(row));
 </script>
 @endsection

@@ -335,7 +335,8 @@ class AiAgentService
         string $fieldPath,
         AiAgentConfig $config,
         string $modelKey = 'medium_main',
-        string $mandatoryRule = ''
+        string $mandatoryRule = '',
+        string $context = ''
     ): string {
         $runtimeConfig = $this->runtimeConfigForModelSlot($config, $modelKey);
 
@@ -345,7 +346,7 @@ class AiAgentService
             fieldPath: $fieldPath,
             config: $runtimeConfig,
             sendCurrentValue: true,
-            context: '',
+            context: $context,
             mandatoryRule: $mandatoryRule
         );
     }
@@ -1802,7 +1803,10 @@ class AiAgentService
 
         $content = $response->json('choices.0.message.content');
         if (!is_string($content) || trim($content) === '') {
-            throw new RuntimeException('OpenAI-compatible API returned empty response.');
+            $finishReason = trim((string) $response->json('choices.0.finish_reason'));
+            $returnedModel = trim((string) $response->json('model')) ?: $model;
+            $suffix = $finishReason !== '' ? " (finish_reason: {$finishReason})" : '';
+            throw new RuntimeException("Model {$returnedModel} returned no generated content{$suffix}.");
         }
 
         Log::info('ai.provider.request.completed', [

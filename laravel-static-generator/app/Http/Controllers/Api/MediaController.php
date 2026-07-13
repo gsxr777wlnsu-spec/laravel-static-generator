@@ -136,6 +136,38 @@ class MediaController extends Controller
         return response()->json(['message' => 'Media deleted successfully']);
     }
 
+    public function destroySiteFile(Request $request): JsonResponse
+    {
+        $validated = Validator::make($request->all(), [
+            'site_id' => 'required|integer|exists:sites,id',
+            'path' => 'required|string|max:1000',
+        ])->validate();
+
+        $relativePath = $this->normalizeRelativeDirectory($validated['path']);
+        if ($relativePath === null || !str_starts_with($relativePath, 'assets/')) {
+            return response()->json(['error' => 'Invalid site media path'], 422);
+        }
+
+        $sitePath = $validated['site_id'] . '/' . $relativePath;
+        if (!Storage::disk('sites')->exists($sitePath)) {
+            return response()->json(['error' => 'Site media file not found'], 404);
+        }
+
+        $record = Media::query()
+            ->where('site_id', $validated['site_id'])
+            ->where('path', $sitePath)
+            ->first();
+
+        if ($record) {
+            $this->audit->log('media.deleted', Media::class, $record->id, $record->toArray(), null);
+            $this->manager->delete($record);
+        } else {
+            Storage::disk('sites')->delete($sitePath);
+        }
+
+        return response()->json(['message' => 'Media deleted successfully']);
+    }
+
     public function resize(Request $request, int $id): JsonResponse
     {
         $media = Media::find($id);
@@ -205,7 +237,7 @@ class MediaController extends Controller
             }
 
             foreach ($directoryFiles as $filePath) {
-                if (!$this->isSupportedMediaPath($filePath)) {
+                if (!$this->isSupportedMediaFile($disk, $filePath)) {
                     continue;
                 }
 
@@ -226,6 +258,7 @@ class MediaController extends Controller
                     'mime_type' => $record?->mime_type ?? (Storage::disk($disk)->mimeType($filePath) ?: null),
                     'url' => route('admin.media.serve', ['siteId' => $siteId, 'path' => $relativePath]),
                     'created_at' => $record?->created_at?->toJSON(),
+                    'deletable' => $disk === 'sites' && $filePath === "{$siteId}/{$relativePath}",
                 ];
             }
         }
@@ -275,29 +308,6 @@ class MediaController extends Controller
             }
         }
 
-        try {
-            $previewDirectories = Storage::disk('generated')->directories('preview');
-        } catch (\Throwable) {
-            $previewDirectories = [];
-        }
-
-        foreach ($previewDirectories as $previewDirectory) {
-            $candidatePath = trim($previewDirectory, '/') . '/' . $directory;
-            try {
-                $exists = Storage::disk('generated')->exists($candidatePath);
-            } catch (\Throwable) {
-                $exists = false;
-            }
-
-            if ($exists) {
-                $key = "generated:{$candidatePath}";
-                if (!isset($seen[$key])) {
-                    $seen[$key] = true;
-                    $resolved[] = ['generated', $candidatePath];
-                }
-            }
-        }
-
         return $resolved;
     }
 
@@ -325,9 +335,27 @@ class MediaController extends Controller
         return $normalized === '' ? null : $normalized;
     }
 
-    private function isSupportedMediaPath(string $path): bool
+    private function isSupportedMediaFile(string $disk, string $path): bool
     {
-        return in_array(strtolower(pathinfo($path, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'avif'], true);
+        $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        if (!in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'avif'], true)) {
+            return false;
+        }
+
+        $mimeType = strtolower((string) (Storage::disk($disk)->mimeType($path) ?: ''));
+        if ($mimeType === 'image/x-webp') {
+            $mimeType = 'image/webp';
+        }
+
+        return match ($extension) {
+            'jpg', 'jpeg' => $mimeType === 'image/jpeg',
+            'png' => $mimeType === 'image/png',
+            'gif' => $mimeType === 'image/gif',
+            'webp' => $mimeType === 'image/webp',
+            'svg' => in_array($mimeType, ['image/svg+xml', 'text/plain', 'text/xml', 'application/xml'], true),
+            'avif' => $mimeType === 'image/avif',
+            default => false,
+        };
     }
 
     /**

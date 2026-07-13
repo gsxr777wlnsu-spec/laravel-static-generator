@@ -34,6 +34,7 @@
         $promptNotice = !$showPrompt && (($field['prompt_path'] ?? '') !== ($field['path'] ?? ''));
         $tag = e((string) ($field['tag'] ?? ''));
         $attribute = e((string) ($field['attribute'] ?? ''));
+        $moduleKey = e((string) ($field['module'] ?? ($sectionPathValue === '' ? 'head' : 'module')));
         $assetKind = strtolower((string) ($field['asset_kind'] ?? ''));
         $isImageSrc = strtolower((string) ($field['tag'] ?? '')) === 'img'
             && strtolower((string) ($field['attribute'] ?? '')) === 'src';
@@ -41,7 +42,7 @@
         $imageClass = trim((string) ($field['image_class'] ?? ''));
         $imageAlt = trim((string) ($field['image_alt'] ?? ''));
 
-        $html = '<div class="ai-prompt-row rounded-md border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800" data-file="' . $file . '" data-path="' . $path . '" data-prompt-path="' . $promptPath . '" data-section-path="' . $sectionPath . '" data-tag="' . $tag . '" data-attribute="' . $attribute . '">';
+        $html = '<div class="ai-prompt-row rounded-md border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800" data-file="' . $file . '" data-path="' . $path . '" data-prompt-path="' . $promptPath . '" data-section-path="' . $sectionPath . '" data-module-key="' . $moduleKey . '" data-tag="' . $tag . '" data-attribute="' . $attribute . '">';
         $html .= '<div class="mb-2 text-xs font-medium text-gray-700 dark:text-gray-300">' . $label . ' (<span class="ai-field-length">' . $length . '</span> chars)</div>';
         $html .= '<textarea rows="' . $rows . '" data-default-rows="' . $rows . '" class="ai-manual-input mb-2 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white" placeholder="Edit field value manually">' . $value . '</textarea>';
         if ($isAssetUrl) {
@@ -61,6 +62,7 @@
 
         if ($showPrompt) {
             $html .= '<textarea rows="2" class="ai-prompt-input block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white" placeholder="Instruction for AI to rewrite this field"></textarea>';
+            $html .= '<div class="ai-create-prompt-history mt-2"><div class="flex gap-2"><button type="button" class="ai-create-history-toggle text-xs font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-300 dark:hover:text-indigo-200">History</button><button type="button" class="ai-create-favorite text-xs font-semibold text-amber-600 hover:text-amber-500 dark:text-amber-300 dark:hover:text-amber-200">Add to favorites</button></div><div class="ai-create-history-panel mt-2 hidden"></div></div>';
             $html .= '<div class="ai-prompt-model-context-row mt-2">';
             $html .= '<div class="min-w-0"><label class="block text-xs font-medium text-gray-600 dark:text-gray-300">Model</label><select class="ai-prompt-model-key mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white">';
             foreach (($aiModelOptions ?? []) as $modelOption) {
